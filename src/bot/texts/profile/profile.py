@@ -12,11 +12,16 @@ PROFILE_CARD = (
     "⭐ UBP за сезон: <b>{ubp_season}</b> (место в топе: {rank})\n"
     "🏆 UBP за всё время: <b>{ubp_total}</b>\n\n"
     "{tickets_line}\n"
-    "🎴 Круток за всё время: <b>{total_rolls}</b>"
+    "🎴 Круток за всё время: <b>{total_rolls}</b>\n\n"
+    "{progress}"
 )
 NO_USERNAME = "—"
 NO_CLAN = "нет клана"
 NO_RANK = "—"
+
+PROGRESS_HEADER = "📚 <b>Прогресс по вселенным</b>\n"
+PROGRESS_LINE = "🌌 {universe}: {bar} <b>{percent}%</b> ({owned}/{total})\n"
+PROGRESS_EMPTY = "📚 Пока нет ни одной карты — крутите в «Колоде»!"
 
 TICKETS_LINE_READY = "🎫 Тикеты: <b>{count}/{cap}</b> (бесплатный лимит заполнен)"
 TICKETS_LINE_COUNTDOWN = "🎫 Тикеты: <b>{count}/{cap}</b> (следующий через {mm:02d}:{ss:02d})"

@@ -18,6 +18,7 @@ from bot.constant.profile import (
     CB_PROFILE_RENAME,
 )
 from bot.db.repositories.clan import get_name as get_clan_name
+from bot.db.repositories.inventory import UniverseProgress, get_universe_progress
 from bot.db.repositories.season import get_active as get_active_season
 from bot.db.repositories.user import get_by_id, get_many_by_ids, set_display_name
 from bot.keyboards.profile import players_pager, profile_menu
@@ -32,6 +33,9 @@ from bot.texts.profile import (
     PLAYERS_HEADER,
     PLAYERS_LINE,
     PROFILE_CARD,
+    PROGRESS_EMPTY,
+    PROGRESS_HEADER,
+    PROGRESS_LINE,
     RENAME_CANCELLED,
     RENAME_DONE,
     RENAME_INVALID,
@@ -44,7 +48,7 @@ from bot.texts.profile import (
     TOP_HEADER,
     TOP_LINE,
 )
-from bot.utils.formatting import esc
+from bot.utils.formatting import esc, progress_bar
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="profile")
@@ -59,6 +63,18 @@ def _tickets_line(status: ticket.TicketStatus) -> str:
     return TICKETS_LINE_COUNTDOWN.format(count=status.count, cap=TICKET_NATURAL_CAP, mm=mm, ss=ss)
 
 
+def _progress_block(progress: list[UniverseProgress]) -> str:
+    if not any(p.owned for p in progress):
+        return PROGRESS_EMPTY
+    lines = "".join(
+        PROGRESS_LINE.format(
+            universe=esc(p.title), bar=progress_bar(p.percent), percent=p.percent, owned=p.owned, total=p.total
+        )
+        for p in progress
+    )
+    return PROGRESS_HEADER + lines
+
+
 async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> str | None:
     user = await get_by_id(session, user_id)
     if user is None:
@@ -68,6 +84,7 @@ async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> 
     season = await get_active_season(session)
     rank = await get_rank(redis, season.id, user_id) if season else None
     ticket_status = await ticket.get_status(session, user_id)
+    progress = await get_universe_progress(session, user_id)
     await session.commit()  # get_status могла применить лениво накопленный реген тикетов
 
     return PROFILE_CARD.format(
@@ -79,6 +96,7 @@ async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> 
         ubp_total=user.ubp_total,
         tickets_line=_tickets_line(ticket_status),
         total_rolls=user.total_rolls,
+        progress=_progress_block(progress),
     )
 
 

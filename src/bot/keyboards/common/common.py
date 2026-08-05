@@ -12,4 +12,7 @@ def main_menu() -> ReplyKeyboardMarkup:
         [KeyboardButton(text=BTN_PASS), KeyboardButton(text=BTN_DONATE)],
         [KeyboardButton(text=BTN_SETTINGS)],
     ]
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, is_persistent=True)
+    # is_persistent=False (по явной просьбе пользователя 2026-08-06, см. CLAUDE.md) — даёт
+    # клиенту Telegram показать стандартную стрелку сворачивания клавиатуры рядом с полем
+    # ввода. is_persistent=True форсит клавиатуру всегда открытой без возможности свернуть.
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, is_persistent=False)

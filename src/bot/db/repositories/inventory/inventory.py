@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select, text
+from sqlalchemy import case, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,6 +90,45 @@ async def list_owned_stacks_in_universe(session: AsyncSession, *, user_id: int, 
         .order_by(Card.base_ubp.desc(), Card.external_id, UserCard.stars)
     )
     return [OwnedStack(card=card, stars=stars, quantity=qty) for card, stars, qty in result.all()]
+
+
+@dataclass
+class UniverseProgress:
+    code: str
+    title: str
+    owned: int
+    total: int
+
+    @property
+    def percent(self) -> int:
+        return round(100 * self.owned / self.total) if self.total else 0
+
+
+async def get_universe_progress(session: AsyncSession, user_id: int) -> list[UniverseProgress]:
+    """Живая агрегация (не денормализованная колонка — тот же принцип, что и UBP клана,
+    см. CLAUDE.md): для каждой вселенной — сколько УНИКАЛЬНЫХ персонажей у игрока есть
+    хотя бы 1 копия, из скольких существует всего. LEFT JOIN, чтобы вселенные без единой
+    карты игрока тоже попали в список (owned=0), а не выпали из GROUP BY."""
+    from bot.db.models.universe import Universe
+
+    owned_card_id = case((UserCard.quantity > 0, Card.id), else_=None)
+    result = await session.execute(
+        select(
+            Universe.code,
+            Universe.title,
+            func.count(func.distinct(owned_card_id)),
+            func.count(func.distinct(Card.id)),
+        )
+        .select_from(Universe)
+        .join(Card, Card.universe_code == Universe.code)
+        .outerjoin(UserCard, (UserCard.card_id == Card.id) & (UserCard.user_id == user_id))
+        .group_by(Universe.code, Universe.title)
+        .order_by(Universe.title)
+    )
+    return [
+        UniverseProgress(code=code, title=title, owned=owned, total=total)
+        for code, title, owned, total in result.all()
+    ]
 
 
 async def decrement_by(session: AsyncSession, *, user_id: int, card_id: int, stars: int, amount: int) -> bool:
