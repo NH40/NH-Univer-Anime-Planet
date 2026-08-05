@@ -6,12 +6,12 @@ from datetime import datetime, timedelta, timezone
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.constant.admin import CB_ADMIN_PROMO, CB_ADMIN_PROMO_CREATE
 from bot.db.models.enums import PromoCodeType
-from bot.keyboards.admin import promo_menu
+from bot.keyboards.admin import promo_create_prompt_menu, promo_menu
 from bot.services import promo as promo_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
@@ -31,7 +31,10 @@ _TYPES = {"uses": PromoCodeType.uses, "time": PromoCodeType.time, "users": Promo
 
 
 @router.callback_query(F.data == CB_ADMIN_PROMO)
-async def cb_promo(callback: CallbackQuery) -> None:
+async def cb_promo(callback: CallbackQuery, state: FSMContext) -> None:
+    # На случай прихода сюда как "Назад" из waiting_promo_create — иначе FSM-состояние
+    # осталось бы висеть, и следующий текст игрока ошибочно попал бы в apply_promo_create.
+    await state.clear()
     await callback.answer()
     await safe_edit_text(callback.message, PROMO_SCREEN, reply_markup=promo_menu())
 
@@ -40,7 +43,7 @@ async def cb_promo(callback: CallbackQuery) -> None:
 async def cb_promo_create_start(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(AdminStates.waiting_promo_create)
     await callback.answer()
-    await safe_edit_text(callback.message, PROMO_CREATE_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, PROMO_CREATE_PROMPT, reply_markup=promo_create_prompt_menu())
 
 
 @router.message(StateFilter(AdminStates.waiting_promo_create), Command("cancel"))

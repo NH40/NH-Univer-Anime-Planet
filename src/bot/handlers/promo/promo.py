@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command, CommandObject, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.constant.promo import CB_PROMO_REDEEM_CANCEL
 from bot.db.repositories.user import get_by_id
+from bot.keyboards.promo import redeem_prompt_menu
 from bot.services import promo as promo_service
 from bot.states.promo import PromoStates
 from bot.texts.admin import (
@@ -20,6 +22,7 @@ from bot.texts.admin import (
     PROMO_USES_EXHAUSTED,
 )
 from bot.texts.common import NEED_START
+from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="promo")
 
@@ -60,7 +63,7 @@ async def cmd_promo(message: Message, command: CommandObject, state: FSMContext,
     code = (command.args or "").strip()
     if not code:
         await state.set_state(PromoStates.waiting_code)
-        await message.answer(PROMO_REDEEM_PROMPT)
+        await message.answer(PROMO_REDEEM_PROMPT, reply_markup=redeem_prompt_menu())
         return
 
     await _redeem_and_reply(message, session, code)
@@ -70,6 +73,15 @@ async def cmd_promo(message: Message, command: CommandObject, state: FSMContext,
 async def cancel_promo_redeem(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(ACTION_CANCELLED)
+
+
+@router.callback_query(StateFilter(PromoStates.waiting_code), F.data == CB_PROMO_REDEEM_CANCEL)
+async def cb_cancel_promo_redeem(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await callback.answer()
+    # Явно чистим клавиатуру — edit_text без reply_markup её сохраняет, не убирает
+    # (см. CLAUDE.md, правило 11).
+    await safe_edit_text(callback.message, ACTION_CANCELLED, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
 
 
 @router.message(StateFilter(PromoStates.waiting_code))

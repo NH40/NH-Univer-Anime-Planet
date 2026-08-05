@@ -62,15 +62,25 @@ def admin_menu(*, tech_mode_enabled: bool) -> InlineKeyboardMarkup:
     status = STATUS_ON if tech_mode_enabled else STATUS_OFF
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            # Техрежим — отдельной строкой на всю ширину: единственная кнопка с динамическим
+            # статусом в тексте, остальные — по 2 в строке для компактности.
             [InlineKeyboardButton(text=BTN_ADMIN_TECH_MODE.format(status=status), callback_data=CB_ADMIN_TECH_MODE_TOGGLE)],
-            [InlineKeyboardButton(text=BTN_ADMIN_STATS, callback_data=CB_ADMIN_STATS)],
-            [InlineKeyboardButton(text=BTN_ADMIN_FIND_PLAYER, callback_data=CB_ADMIN_FIND_PLAYER_START)],
-            [InlineKeyboardButton(text=BTN_ADMIN_SEASON, callback_data=CB_ADMIN_SEASON)],
-            [InlineKeyboardButton(text=BTN_ADMIN_PROMO, callback_data=CB_ADMIN_PROMO)],
-            [InlineKeyboardButton(text=BTN_ADMIN_REFERRAL, callback_data=CB_ADMIN_REFERRAL)],
-            [InlineKeyboardButton(text=BTN_ADMIN_BROADCAST, callback_data=CB_ADMIN_BROADCAST_START)],
-            [InlineKeyboardButton(text=BTN_ADMIN_MASS_GRANT, callback_data=CB_ADMIN_MASS_GRANT)],
-            [InlineKeyboardButton(text=BTN_ADMIN_DELETE_ACCOUNT, callback_data=CB_ADMIN_DELETE_ACCOUNT_START)],
+            [
+                InlineKeyboardButton(text=BTN_ADMIN_STATS, callback_data=CB_ADMIN_STATS),
+                InlineKeyboardButton(text=BTN_ADMIN_FIND_PLAYER, callback_data=CB_ADMIN_FIND_PLAYER_START),
+            ],
+            [
+                InlineKeyboardButton(text=BTN_ADMIN_SEASON, callback_data=CB_ADMIN_SEASON),
+                InlineKeyboardButton(text=BTN_ADMIN_PROMO, callback_data=CB_ADMIN_PROMO),
+            ],
+            [
+                InlineKeyboardButton(text=BTN_ADMIN_REFERRAL, callback_data=CB_ADMIN_REFERRAL),
+                InlineKeyboardButton(text=BTN_ADMIN_BROADCAST, callback_data=CB_ADMIN_BROADCAST_START),
+            ],
+            [
+                InlineKeyboardButton(text=BTN_ADMIN_MASS_GRANT, callback_data=CB_ADMIN_MASS_GRANT),
+                InlineKeyboardButton(text=BTN_ADMIN_DELETE_ACCOUNT, callback_data=CB_ADMIN_DELETE_ACCOUNT_START),
+            ],
         ]
     )
 
@@ -121,6 +131,10 @@ def promo_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)],
         ]
     )
+
+
+def promo_create_prompt_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_PROMO)]])
 
 
 def referral_menu() -> InlineKeyboardMarkup:
