@@ -5,8 +5,6 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config.game import (
-    BATTLE_PASS_EXTEND_DURATION_DAYS,
-    BATTLE_PASS_FIRST_DURATION_DAYS,
     BATTLE_PASS_PRICE_COINS,
     SHOP_COIN_TICKET_PRICE,
     SHOP_TICKET_PRICE_DUST,
@@ -23,7 +21,7 @@ from bot.db.models.enums import TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import battle_pass as pass_repo
 from bot.db.repositories import season as season_repo
-from bot.db.repositories.user import extend_premium_pass, extend_subscription, spend_coins, spend_dust
+from bot.db.repositories.user import extend_subscription, spend_coins, spend_dust
 from bot.services import ticket
 
 
@@ -35,6 +33,15 @@ class NotEnoughDustError(Exception):
 class NotEnoughCoinsError(Exception):
     def __init__(self, needed: int) -> None:
         self.needed = needed
+
+
+class NoActiveSeasonError(Exception):
+    pass
+
+
+class AlreadyPremiumError(Exception):
+    """Премиум-ветка Battle Pass этого сезона уже открыта — повторная покупка не даёт
+    ничего нового (см. CLAUDE.md, "Сезонный пасс": разовая разблокировка на сезон)."""
 
 
 async def buy_tickets(session: AsyncSession, *, user_id: int, quantity: int) -> int:
@@ -105,26 +112,24 @@ async def buy_subscription(session: AsyncSession, *, user_id: int) -> datetime:
     return new_until
 
 
-async def buy_premium_pass(session: AsyncSession, *, user_id: int) -> datetime:
-    """Покупка/продление Premium Battle Pass: BATTLE_PASS_PRICE_COINS -> +30 дней (первая
-    покупка, нет активного) или +20 дней (пока пасс ещё активен), см. CLAUDE.md. Возвращает
-    новую дату истечения `User.premium_pass_until` (это отдельный от сезона таймер).
+async def buy_premium_pass(session: AsyncSession, *, user_id: int) -> None:
+    """Покупка Premium Battle Pass: BATTLE_PASS_PRICE_COINS -> премиум-ветка сезонного пасса
+    открыта НАВСЕГДА до конца ТЕКУЩЕГО сезона (см. CLAUDE.md, "Сезонный пасс") — разовая
+    покупка, не подписка на дни. Требует активный сезон (иначе покупать нечего) и что
+    премиум ещё не открыт в этом сезоне (повторная покупка ничего бы не добавила)."""
+    season = await season_repo.get_active(session)
+    if season is None:
+        raise NoActiveSeasonError
 
-    Дополнительно — если сейчас есть активный сезон — разово и НАВСЕГДА (до конца этого
-    сезона) открывает премиум-ветку сезонного пасса (`services/battle_pass`), независимо от
-    того, истечёт ли `premium_pass_until` раньше конца сезона (см. `db/models/battle_pass.py`,
-    подтверждено пользователем 2026-08-05). Если активного сезона нет — открывать премиум-ветку
-    нечему, только продление `premium_pass_until` всё равно происходит."""
+    row = await pass_repo.get_or_create(session, user_id=user_id, season_id=season.id)
+    if row.is_premium:
+        raise AlreadyPremiumError
+
     ok = await spend_coins(session, user_id=user_id, amount=BATTLE_PASS_PRICE_COINS)
     if not ok:
         raise NotEnoughCoinsError(needed=BATTLE_PASS_PRICE_COINS)
 
-    new_until = await extend_premium_pass(
-        session,
-        user_id=user_id,
-        first_days=BATTLE_PASS_FIRST_DURATION_DAYS,
-        extend_days=BATTLE_PASS_EXTEND_DURATION_DAYS,
-    )
+    await pass_repo.set_premium(session, user_id=user_id, season_id=season.id)
     session.add(
         Transaction(
             user_id=user_id,
@@ -134,9 +139,4 @@ async def buy_premium_pass(session: AsyncSession, *, user_id: int) -> datetime:
         )
     )
 
-    season = await season_repo.get_active(session)
-    if season is not None:
-        await pass_repo.set_premium(session, user_id=user_id, season_id=season.id)
-
     await session.commit()
-    return new_until

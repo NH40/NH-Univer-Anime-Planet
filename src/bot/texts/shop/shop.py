@@ -47,18 +47,20 @@ SUBSCRIPTION_STATUS_NONE = "не активна"
 BTN_BUY_SUBSCRIPTION = "Купить за {price} коинов"
 SUBSCRIPTION_BOUGHT = "✅ Подписка активна до {until}."
 
-# Battle Pass (только покупка премиум-доступа)
+# Battle Pass (только покупка премиум-доступа) — разовая покупка на весь текущий сезон,
+# не подписка на дни (см. CLAUDE.md, "Сезонный пасс").
 BATTLE_PASS_SCREEN = (
     "🎫 <b>Battle Pass</b>\n\n"
-    "<b>Цена:</b> {price} коинов ({first} дней при первой покупке, +{extend} дней за "
-    "каждую следующую, пока ещё активен)\n\n"
+    "<b>Цена:</b> {price} коинов — открывает премиум-ветку до конца текущего сезона\n\n"
     "<b>Статус:</b> {status}\n"
     "<b>Коины:</b> {coins}"
 )
-BATTLE_PASS_STATUS_ACTIVE = "✅ премиум активен до {until}"
-BATTLE_PASS_STATUS_NONE = "премиум не активен"
+BATTLE_PASS_STATUS_ACTIVE = "✅ премиум открыт в этом сезоне"
+BATTLE_PASS_STATUS_NONE = "премиум не открыт"
 BTN_BUY_BATTLE_PASS = "Купить за {price} коинов"
-BATTLE_PASS_BOUGHT = "✅ Battle Pass активен до {until}."
+BATTLE_PASS_BOUGHT = "✅ Премиум-ветка Battle Pass открыта до конца сезона!"
+BATTLE_PASS_ALREADY_PREMIUM = "Премиум уже открыт в этом сезоне."
+BATTLE_PASS_NO_SEASON = "Сейчас нет активного сезона."
 
 # Тикеты за коины
 COIN_TICKETS_SCREEN = (

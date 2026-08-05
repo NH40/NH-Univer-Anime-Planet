@@ -118,31 +118,6 @@ async def extend_subscription(session: AsyncSession, *, user_id: int, days: int)
     return result.scalar_one()
 
 
-_EXTEND_PREMIUM_PASS_SQL = text(
-    """
-    UPDATE users
-    SET premium_pass_until = CASE
-        WHEN premium_pass_until IS NULL OR premium_pass_until <= now()
-            THEN now() + (:first_days * INTERVAL '1 day')
-        ELSE premium_pass_until + (:extend_days * INTERVAL '1 day')
-    END
-    WHERE id = :user_id
-    RETURNING premium_pass_until
-    """
-)
-
-
-async def extend_premium_pass(session: AsyncSession, *, user_id: int, first_days: int, extend_days: int) -> datetime:
-    """Первая покупка (нет активного премиум-пасса) — активация на `first_days` от сейчас.
-    Пока пасс ещё активен — каждая следующая покупка добавляет `extend_days` (пользователь
-    задал разные числа для активации и продления Battle Pass — см. CLAUDE.md). Не коммитит."""
-    result = await session.execute(
-        _EXTEND_PREMIUM_PASS_SQL,
-        {"user_id": user_id, "first_days": first_days, "extend_days": extend_days},
-    )
-    return result.scalar_one()
-
-
 async def increment_total_rolls(session: AsyncSession, *, user_id: int, amount: int) -> None:
     """Накопительный счётчик "круток за всё время" для профиля. Не коммитит — вызывается
     внутри services/gacha как часть одной композитной операции крутки."""

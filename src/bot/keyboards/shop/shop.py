@@ -85,17 +85,20 @@ def subscription_menu(price: int) -> InlineKeyboardMarkup:
     )
 
 
-def battle_pass_menu(price: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def battle_pass_menu(price: int, *, already_premium: bool) -> InlineKeyboardMarkup:
+    rows = []
+    if not already_premium:
+        # Разовая покупка на сезон — если премиум уже открыт, повторно покупать нечего
+        # (см. services/shop.buy_premium_pass), кнопку не показываем вовсе.
+        rows.append(
             [
                 InlineKeyboardButton(
                     text=BTN_BUY_BATTLE_PASS.format(price=price), callback_data=CB_COINSHOP_BATTLE_PASS_CONFIRM
                 )
-            ],
-            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_COINS)],
-        ]
-    )
+            ]
+        )
+    rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_COINS)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def confirm_cancel_menu(confirm_callback: str) -> InlineKeyboardMarkup:

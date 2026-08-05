@@ -12,8 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
 from bot.config.game import (
-    BATTLE_PASS_EXTEND_DURATION_DAYS,
-    BATTLE_PASS_FIRST_DURATION_DAYS,
     BATTLE_PASS_PRICE_COINS,
     SHOP_COIN_TICKET_MAX_QUANTITY,
     SHOP_COIN_TICKET_PRICE,
@@ -49,11 +47,14 @@ from bot.keyboards.shop import (
     shop_menu,
     subscription_menu,
 )
+from bot.services import battle_pass as pass_service
 from bot.services import shop
 from bot.states.shop import ShopStates
 from bot.texts.common import BTN_SHOP, NEED_START
 from bot.texts.shop import (
+    BATTLE_PASS_ALREADY_PREMIUM,
     BATTLE_PASS_BOUGHT,
+    BATTLE_PASS_NO_SEASON,
     BATTLE_PASS_SCREEN,
     BATTLE_PASS_STATUS_ACTIVE,
     BATTLE_PASS_STATUS_NONE,
@@ -110,16 +111,15 @@ def _subscription_text(user: User) -> str:
     )
 
 
-def _battle_pass_text(user: User) -> str:
-    active_until = _fmt(user.premium_pass_until)
-    status = BATTLE_PASS_STATUS_ACTIVE.format(until=active_until) if active_until else BATTLE_PASS_STATUS_NONE
-    return BATTLE_PASS_SCREEN.format(
-        price=BATTLE_PASS_PRICE_COINS,
-        first=BATTLE_PASS_FIRST_DURATION_DAYS,
-        extend=BATTLE_PASS_EXTEND_DURATION_DAYS,
-        status=status,
-        coins=user.coins,
-    )
+async def _battle_pass_text(session: AsyncSession, user: User) -> tuple[str, bool]:
+    """Возвращает (текст, is_premium) — статус читается из BattlePass.is_premium текущего
+    сезона (services/battle_pass), а не из User.premium_pass_until: премиум-ветка
+    открывается разово на весь сезон, не по дням (см. CLAUDE.md, "Сезонный пасс")."""
+    view = await pass_service.get_pass_view(session, user_id=user.id)
+    is_premium = view.is_premium if view is not None else False
+    status = BATTLE_PASS_STATUS_ACTIVE if is_premium else BATTLE_PASS_STATUS_NONE
+    text = BATTLE_PASS_SCREEN.format(price=BATTLE_PASS_PRICE_COINS, status=status, coins=user.coins)
+    return text, is_premium
 
 
 def _coin_tickets_text(user: User) -> str:
@@ -276,8 +276,9 @@ async def cb_open_battle_pass(callback: CallbackQuery, session: AsyncSession) ->
     if user is None:
         await callback.message.answer(NEED_START)
         return
+    text, is_premium = await _battle_pass_text(session, user)
     await safe_edit_text(
-        callback.message, _battle_pass_text(user), reply_markup=battle_pass_menu(BATTLE_PASS_PRICE_COINS)
+        callback.message, text, reply_markup=battle_pass_menu(BATTLE_PASS_PRICE_COINS, already_premium=is_premium)
     )
 
 
@@ -290,17 +291,24 @@ async def cb_buy_battle_pass(callback: CallbackQuery, session: AsyncSession, red
             return
 
         try:
-            new_until = await shop.buy_premium_pass(session, user_id=user_id)
+            await shop.buy_premium_pass(session, user_id=user_id)
+        except shop.NoActiveSeasonError:
+            await callback.answer(BATTLE_PASS_NO_SEASON, show_alert=True)
+            return
+        except shop.AlreadyPremiumError:
+            await callback.answer(BATTLE_PASS_ALREADY_PREMIUM, show_alert=True)
+            return
         except shop.NotEnoughCoinsError as exc:
             await callback.answer(NOT_ENOUGH_COINS.format(needed=exc.needed), show_alert=True)
             return
 
-        await callback.answer(BATTLE_PASS_BOUGHT.format(until=new_until.strftime(_DATE_FMT)), show_alert=True)
+        await callback.answer(BATTLE_PASS_BOUGHT, show_alert=True)
 
         user = await get_by_id(session, user_id)
         if user is not None:
+            text, is_premium = await _battle_pass_text(session, user)
             await safe_edit_text(
-                callback.message, _battle_pass_text(user), reply_markup=battle_pass_menu(BATTLE_PASS_PRICE_COINS)
+                callback.message, text, reply_markup=battle_pass_menu(BATTLE_PASS_PRICE_COINS, already_premium=is_premium)
             )
 
 
