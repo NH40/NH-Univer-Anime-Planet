@@ -6,13 +6,13 @@ BTN_DAILY_BONUS = "🎁 Ежедневный бонус"
 
 PROFILE_CARD = (
     "👤 <b>Профиль</b>\n\n"
-    "Имя: {name}\n"
-    "Username: {username}\n"
-    "Клан: {clan}\n\n"
-    "⭐ UBP за сезон: <b>{ubp_season}</b> (место в топе: {rank})\n"
-    "🏆 UBP за всё время: <b>{ubp_total}</b>\n\n"
+    "<b>Имя:</b> {name}\n"
+    "<b>Username:</b> {username}\n"
+    "<b>Клан:</b> {clan}\n\n"
+    "⭐ <b>UBP за сезон:</b> {ubp_season} (место в топе: {rank})\n"
+    "🏆 <b>UBP за всё время:</b> {ubp_total}\n\n"
     "{tickets_line}\n"
-    "🎴 Круток за всё время: <b>{total_rolls}</b>\n\n"
+    "🎴 <b>Круток за всё время:</b> {total_rolls}\n\n"
     "{progress}"
 )
 NO_USERNAME = "—"
@@ -21,10 +21,15 @@ NO_RANK = "—"
 
 PROGRESS_HEADER = "📚 <b>Прогресс по вселенным</b>\n"
 PROGRESS_LINE = "🌌 <b>{universe}</b>\n{bar} {percent}% ({owned}/{total})\n"
+# Разворачиваемая цитата Telegram — список вселенных по умолчанию свёрнут (особенно
+# заметно, когда вселенных много), игрок разворачивает сам, если нужно (см. запрос
+# пользователя 2026-08-06).
+PROGRESS_QUOTE_OPEN = "<blockquote expandable>"
+PROGRESS_QUOTE_CLOSE = "</blockquote>"
 PROGRESS_EMPTY = "📚 Пока нет ни одной карты — крутите в «Колоде»!"
 
-TICKETS_LINE_READY = "🎫 Тикеты: <b>{count}/{cap}</b> (бесплатный лимит заполнен)"
-TICKETS_LINE_COUNTDOWN = "🎫 Тикеты: <b>{count}/{cap}</b> (следующий через {mm:02d}:{ss:02d})"
+TICKETS_LINE_READY = "🎫 <b>Тикеты:</b> {count}/{cap} (бесплатный лимит заполнен)"
+TICKETS_LINE_COUNTDOWN = "🎫 <b>Тикеты:</b> {count}/{cap} (следующий через {mm:02d}:{ss:02d})"
 
 STUB_REFERRALS = "🔗 Раздел рефералов скоро появится."
 STUB_DAILY_BONUS = "🎁 Ежедневный бонус скоро появится."

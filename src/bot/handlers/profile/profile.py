@@ -36,6 +36,8 @@ from bot.texts.profile import (
     PROGRESS_EMPTY,
     PROGRESS_HEADER,
     PROGRESS_LINE,
+    PROGRESS_QUOTE_CLOSE,
+    PROGRESS_QUOTE_OPEN,
     RENAME_CANCELLED,
     RENAME_DONE,
     RENAME_INVALID,
@@ -72,7 +74,7 @@ def _progress_block(progress: list[UniverseProgress]) -> str:
         )
         for p in progress
     )
-    return PROGRESS_HEADER + lines
+    return PROGRESS_HEADER + PROGRESS_QUOTE_OPEN + lines + PROGRESS_QUOTE_CLOSE
 
 
 async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> str | None:
