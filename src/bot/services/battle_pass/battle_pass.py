@@ -32,6 +32,25 @@ class NothingToClaimError(Exception):
     pass
 
 
+def _sum_free_reward(from_level_exclusive: int, to_level_inclusive: int) -> tuple[int, int]:
+    total_dust = total_tickets = 0
+    for lvl in range(from_level_exclusive + 1, to_level_inclusive + 1):
+        dust, tickets = battle_pass_free_reward(lvl)
+        total_dust += dust
+        total_tickets += tickets
+    return total_dust, total_tickets
+
+
+def _sum_premium_reward(from_level_exclusive: int, to_level_inclusive: int) -> tuple[int, int, int]:
+    total_dust = total_tickets = total_coins = 0
+    for lvl in range(from_level_exclusive + 1, to_level_inclusive + 1):
+        dust, tickets, coins = battle_pass_premium_reward(lvl)
+        total_dust += dust
+        total_tickets += tickets
+        total_coins += coins
+    return total_dust, total_tickets, total_coins
+
+
 @dataclass
 class PassView:
     level: int
@@ -43,6 +62,15 @@ class PassView:
     claimed_premium_level: int
     free_claimable: bool
     premium_claimable: bool
+    # Сумма НЕЗАБРАННЫХ наград от последнего забранного уровня до текущего — то же самое,
+    # что claim_free/claim_premium реально начислят по кнопке "Забрать" (см. CLAUDE.md,
+    # "Сезонный пасс" — "одной кнопкой сразу все уровни"). Показываем на экране заранее,
+    # чтобы игрок видел, что именно получит, до нажатия.
+    pending_free_dust: int
+    pending_free_tickets: int
+    pending_premium_dust: int
+    pending_premium_tickets: int
+    pending_premium_coins: int
 
 
 async def get_pass_view(session: AsyncSession, *, user_id: int) -> PassView | None:
@@ -57,6 +85,14 @@ async def get_pass_view(session: AsyncSession, *, user_id: int) -> PassView | No
     floor = battle_pass_cumulative_ubp(level)
     ceiling = battle_pass_cumulative_ubp(level + 1) if level < BATTLE_PASS_MAX_LEVEL else None
 
+    pending_free_dust, pending_free_tickets = _sum_free_reward(row.claimed_free_level, level)
+    if row.is_premium:
+        pending_premium_dust, pending_premium_tickets, pending_premium_coins = _sum_premium_reward(
+            row.claimed_premium_level, level
+        )
+    else:
+        pending_premium_dust = pending_premium_tickets = pending_premium_coins = 0
+
     return PassView(
         level=level,
         ubp_season=user.ubp_season,
@@ -67,6 +103,11 @@ async def get_pass_view(session: AsyncSession, *, user_id: int) -> PassView | No
         claimed_premium_level=row.claimed_premium_level,
         free_claimable=level > row.claimed_free_level,
         premium_claimable=row.is_premium and level > row.claimed_premium_level,
+        pending_free_dust=pending_free_dust,
+        pending_free_tickets=pending_free_tickets,
+        pending_premium_dust=pending_premium_dust,
+        pending_premium_tickets=pending_premium_tickets,
+        pending_premium_coins=pending_premium_coins,
     )
 
 
@@ -84,12 +125,7 @@ async def claim_free(session: AsyncSession, *, user_id: int) -> tuple[int, int]:
     if level <= row.claimed_free_level:
         raise NothingToClaimError
 
-    total_dust = 0
-    total_tickets = 0
-    for lvl in range(row.claimed_free_level + 1, level + 1):
-        dust, tickets = battle_pass_free_reward(lvl)
-        total_dust += dust
-        total_tickets += tickets
+    total_dust, total_tickets = _sum_free_reward(row.claimed_free_level, level)
 
     if total_dust:
         await add_dust(session, user_id=user_id, amount=total_dust)
@@ -130,14 +166,7 @@ async def claim_premium(session: AsyncSession, *, user_id: int) -> tuple[int, in
     if level <= row.claimed_premium_level:
         raise NothingToClaimError
 
-    total_dust = 0
-    total_tickets = 0
-    total_coins = 0
-    for lvl in range(row.claimed_premium_level + 1, level + 1):
-        dust, tickets, coins = battle_pass_premium_reward(lvl)
-        total_dust += dust
-        total_tickets += tickets
-        total_coins += coins
+    total_dust, total_tickets, total_coins = _sum_premium_reward(row.claimed_premium_level, level)
 
     if total_dust:
         await add_dust(session, user_id=user_id, amount=total_dust)

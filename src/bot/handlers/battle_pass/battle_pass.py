@@ -29,9 +29,14 @@ from bot.texts.battle_pass import (
     PASS_PREMIUM_ACTIVE,
     PASS_PREMIUM_LOCKED,
     PASS_PROGRESS_LINE,
+    PASS_REWARD_LOCKED,
+    PASS_REWARD_NONE,
+    PASS_REWARD_PENDING,
+    PASS_REWARD_PENDING_PREMIUM,
     PASS_SCREEN,
 )
 from bot.texts.common import BTN_PASS, NEED_START
+from bot.utils.formatting import progress_bar
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="battle_pass")
@@ -39,19 +44,38 @@ router = Router(name="battle_pass")
 
 def _render(view: pass_service.PassView) -> tuple[str, InlineKeyboardMarkup]:
     if view.ubp_next_level_ceiling is None:
+        percent = 100
         progress = PASS_MAX_LEVEL_LINE
     else:
         have = view.ubp_season - view.ubp_level_floor
         need = view.ubp_next_level_ceiling - view.ubp_level_floor
-        progress = PASS_PROGRESS_LINE.format(have=have, need=need)
+        percent = round(100 * have / need) if need else 100
+        progress = PASS_PROGRESS_LINE.format(percent=percent, have=have, need=need)
 
-    premium_status = PASS_PREMIUM_ACTIVE if view.is_premium else PASS_PREMIUM_LOCKED
+    if view.pending_free_dust or view.pending_free_tickets:
+        free_line = PASS_REWARD_PENDING.format(dust=view.pending_free_dust, tickets=view.pending_free_tickets)
+    else:
+        free_line = PASS_REWARD_NONE
+
+    if not view.is_premium:
+        premium_line = PASS_REWARD_LOCKED
+    elif view.pending_premium_dust or view.pending_premium_tickets or view.pending_premium_coins:
+        premium_line = PASS_REWARD_PENDING_PREMIUM.format(
+            dust=view.pending_premium_dust, tickets=view.pending_premium_tickets, coins=view.pending_premium_coins
+        )
+    else:
+        premium_line = PASS_REWARD_NONE
+
     text = PASS_SCREEN.format(
         level=view.level,
         max_level=BATTLE_PASS_MAX_LEVEL,
+        bar=progress_bar(percent),
         progress=progress,
         ubp_season=view.ubp_season,
-        premium_status=premium_status,
+        free_line=free_line,
+        premium_emoji="💎" if view.is_premium else "🔒",
+        premium_status=PASS_PREMIUM_ACTIVE if view.is_premium else PASS_PREMIUM_LOCKED,
+        premium_line=premium_line,
     )
     keyboard = pass_menu(
         free_claimable=view.free_claimable, premium_claimable=view.premium_claimable, is_premium=view.is_premium
