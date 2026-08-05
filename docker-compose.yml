@@ -48,6 +48,11 @@ services:
       REDIS_URL: redis://redis:6379/0
     volumes:
       - ./assets/cards:/app/assets/cards:ro
+      # Без этого монтирования alembic revision --autogenerate, запущенный внутри
+      # контейнера, пишет файл миграции только в его временный слой — тот удаляется
+      # вместе с контейнером (--rm), и следующий `docker compose run` снова видит
+      # пустую migrations/versions/. С bind-mount файл сразу оказывается на хосте.
+      - ./migrations:/app/migrations
     depends_on:
       postgres:
         condition: service_healthy
