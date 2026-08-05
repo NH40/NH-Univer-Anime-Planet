@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+from bot.constant.profile import (
+    CB_PLAYERS_PAGE_PREFIX,
+    CB_PROFILE_DAILY_BONUS,
+    CB_PROFILE_REFERRALS,
+    CB_PROFILE_RENAME,
+)
+from bot.texts.profile import BTN_DAILY_BONUS, BTN_REFERRALS, BTN_RENAME
+
+
+def profile_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_RENAME, callback_data=CB_PROFILE_RENAME)],
+            [
+                InlineKeyboardButton(text=BTN_REFERRALS, callback_data=CB_PROFILE_REFERRALS),
+                InlineKeyboardButton(text=BTN_DAILY_BONUS, callback_data=CB_PROFILE_DAILY_BONUS),
+            ],
+        ]
+    )
+
+
+def players_pager(page: int, total_pages: int) -> InlineKeyboardMarkup:
+    buttons = []
+    if page > 0:
+        buttons.append(
+            InlineKeyboardButton(text="« Назад", callback_data=f"{CB_PLAYERS_PAGE_PREFIX}{page - 1}")
+        )
+    if page < total_pages - 1:
+        buttons.append(
+            InlineKeyboardButton(text="Вперёд »", callback_data=f"{CB_PLAYERS_PAGE_PREFIX}{page + 1}")
+        )
+    return InlineKeyboardMarkup(inline_keyboard=[buttons] if buttons else [])

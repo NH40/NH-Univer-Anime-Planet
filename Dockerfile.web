@@ -1,0 +1,12 @@
+# Мульти-стейдж: собираем статику Vite-фронтенда в node-образе, но в финальном образе
+# остаётся только caddy + готовые файлы — без node_modules и тулчейна сборки в проде.
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY src/web/package.json ./
+RUN npm install
+COPY src/web/ ./
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /app/dist /srv/web

@@ -1,0 +1,22 @@
+# {$DOMAIN} — авто-HTTPS через Let's Encrypt по этому домену (см. .env: DOMAIN=).
+# Один хост отдаёт и статику фронтенда, и картинки карточек, и проксирует /api на
+# FastAPI — same-origin, поэтому CORS в api/main.py не понадобился в проде.
+{$DOMAIN} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle /cards/* {
+		uri strip_prefix /cards
+		root * /srv/cards
+		file_server
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}

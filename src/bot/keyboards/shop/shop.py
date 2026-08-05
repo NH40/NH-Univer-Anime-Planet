@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+from bot.config.game import SHOP_TICKET_PRESETS
+from bot.constant.casino import CB_CASINO_OPEN
+from bot.constant.shop import (
+    CB_COINSHOP_BATTLE_PASS,
+    CB_COINSHOP_BATTLE_PASS_CONFIRM,
+    CB_COINSHOP_CANCEL,
+    CB_COINSHOP_SUBSCRIPTION,
+    CB_COINSHOP_SUBSCRIPTION_CONFIRM,
+    CB_COINSHOP_TICKETS,
+    CB_COINSHOP_TICKETS_CONFIRM,
+    CB_SHOP_BUY_TICKETS_CUSTOM,
+    CB_SHOP_BUY_TICKETS_PREFIX,
+    CB_SHOP_COINS,
+    CB_SHOP_DUST,
+    CB_SHOP_OPEN,
+)
+from bot.texts.common import BTN_BACK
+from bot.texts.shop import (
+    BTN_BATTLE_PASS,
+    BTN_BUY_BATTLE_PASS,
+    BTN_BUY_SUBSCRIPTION,
+    BTN_CANCEL,
+    BTN_CASINO,
+    BTN_COIN_TICKETS,
+    BTN_CONFIRM,
+    BTN_CUSTOM_QUANTITY,
+    BTN_SHOP_COINS,
+    BTN_SHOP_DUST,
+    BTN_SUBSCRIPTION,
+    BTN_TICKET_PRESET,
+)
+
+
+def shop_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_SHOP_DUST, callback_data=CB_SHOP_DUST)],
+            [InlineKeyboardButton(text=BTN_SHOP_COINS, callback_data=CB_SHOP_COINS)],
+        ]
+    )
+
+
+def dust_shop_menu() -> InlineKeyboardMarkup:
+    presets_row = [
+        InlineKeyboardButton(
+            text=BTN_TICKET_PRESET.format(qty=qty), callback_data=f"{CB_SHOP_BUY_TICKETS_PREFIX}{qty}"
+        )
+        for qty in SHOP_TICKET_PRESETS
+    ]
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            presets_row,
+            [InlineKeyboardButton(text=BTN_CUSTOM_QUANTITY, callback_data=CB_SHOP_BUY_TICKETS_CUSTOM)],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_OPEN)],
+        ]
+    )
+
+
+def coin_shop_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_SUBSCRIPTION, callback_data=CB_COINSHOP_SUBSCRIPTION)],
+            [InlineKeyboardButton(text=BTN_BATTLE_PASS, callback_data=CB_COINSHOP_BATTLE_PASS)],
+            [InlineKeyboardButton(text=BTN_COIN_TICKETS, callback_data=CB_COINSHOP_TICKETS)],
+            [InlineKeyboardButton(text=BTN_CASINO, callback_data=CB_CASINO_OPEN)],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_OPEN)],
+        ]
+    )
+
+
+def subscription_menu(price: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=BTN_BUY_SUBSCRIPTION.format(price=price), callback_data=CB_COINSHOP_SUBSCRIPTION_CONFIRM
+                )
+            ],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_COINS)],
+        ]
+    )
+
+
+def battle_pass_menu(price: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=BTN_BUY_BATTLE_PASS.format(price=price), callback_data=CB_COINSHOP_BATTLE_PASS_CONFIRM
+                )
+            ],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_COINS)],
+        ]
+    )
+
+
+def confirm_cancel_menu(confirm_callback: str) -> InlineKeyboardMarkup:
+    """Общая клавиатура "подтвердить/отменить" для флоу с вводом числа (тикеты за коины,
+    масс-крутка казино) — confirm_callback у каждого флоу свой, отмена — одна на всех."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=BTN_CONFIRM, callback_data=confirm_callback),
+                InlineKeyboardButton(text=BTN_CANCEL, callback_data=CB_COINSHOP_CANCEL),
+            ]
+        ]
+    )
+
+
+def coin_tickets_confirm_menu() -> InlineKeyboardMarkup:
+    return confirm_cancel_menu(CB_COINSHOP_TICKETS_CONFIRM)

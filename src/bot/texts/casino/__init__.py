@@ -1,0 +1,25 @@
+from bot.texts.casino.casino import (
+    BTN_MASS_ROLL,
+    BTN_ROLL,
+    CASINO_SCREEN,
+    GAME_NAMES,
+    GAME_SCREEN,
+    MASS_ROLL_CONFIRM,
+    MASS_ROLL_INVALID,
+    MASS_ROLL_PROMPT,
+    MASS_ROLL_RESULT,
+    ROLL_RESULT,
+)
+
+__all__ = [
+    "BTN_MASS_ROLL",
+    "BTN_ROLL",
+    "CASINO_SCREEN",
+    "GAME_NAMES",
+    "GAME_SCREEN",
+    "MASS_ROLL_CONFIRM",
+    "MASS_ROLL_INVALID",
+    "MASS_ROLL_PROMPT",
+    "MASS_ROLL_RESULT",
+    "ROLL_RESULT",
+]

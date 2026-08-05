@@ -1,0 +1,27 @@
+from bot.keyboards.admin.admin import (
+    admin_menu,
+    back_to_admin_menu,
+    broadcast_confirm_menu,
+    delete_account_confirm_menu,
+    mass_grant_confirm_menu,
+    mass_grant_menu,
+    player_card_menu,
+    promo_menu,
+    referral_menu,
+    season_menu,
+    season_new_confirm_menu,
+)
+
+__all__ = [
+    "admin_menu",
+    "back_to_admin_menu",
+    "broadcast_confirm_menu",
+    "delete_account_confirm_menu",
+    "mass_grant_confirm_menu",
+    "mass_grant_menu",
+    "player_card_menu",
+    "promo_menu",
+    "referral_menu",
+    "season_menu",
+    "season_new_confirm_menu",
+]
