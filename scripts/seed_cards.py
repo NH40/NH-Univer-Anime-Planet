@@ -30,6 +30,10 @@ log = logging.getLogger("seed_cards")
 
 UBP_DIR_RE = re.compile(r"^(\d+)UBP$", re.IGNORECASE)
 CARD_FILE_RE = re.compile(r"^(?P<id>\d+)_(?P<name>.+)\.(?P<ext>png|jpg|jpeg|webp)$", re.IGNORECASE)
+# Вставляет пробел на границе "строчная/цифра -> заглавная" — превращает слипшийся
+# PascalCase из имени файла (JongGunSmile) в читаемое "Jong Gun Smile". Подряд идущие
+# заглавные (акронимы вроде TUI) не разбиваются — лукбехайнд требует строчную/цифру перед.
+_PASCAL_CASE_BOUNDARY_RE = re.compile(r"(?<=[a-zа-я0-9])(?=[A-ZА-Я])")
 
 # Человекочитаемые названия для известных вселенных; для новых папок — Title Case по умолчанию.
 KNOWN_UNIVERSE_TITLES = {
@@ -77,7 +81,9 @@ def scan_assets(assets_dir: Path) -> tuple[dict[str, str], list[ParsedCard]]:
                     log.warning("Пропускаю файл с непонятным именем: %s", file)
                     continue
 
-                name = file_match.group("name").replace("_", " ").strip()
+                raw_name = file_match.group("name").replace("_", " ").strip()
+                name = _PASCAL_CASE_BOUNDARY_RE.sub(" ", raw_name)
+                name = re.sub(r" {2,}", " ", name).strip()
                 cards.append(
                     ParsedCard(
                         universe_code=code,
