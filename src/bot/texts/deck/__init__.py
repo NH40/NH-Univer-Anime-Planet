@@ -1,5 +1,7 @@
 from bot.texts.deck.deck import (
+    BTN_BACK_CHANCES,
     BTN_CHANCES,
+    BTN_CHANCES_TIER,
     BTN_COLLECTION,
     BTN_DISENCHANT,
     BTN_MERGE,
@@ -8,7 +10,7 @@ from bot.texts.deck.deck import (
     CARD_CAPTION,
     CHANCES_CARD_LINE,
     CHANCES_HEADER,
-    CHANCES_TIER_LINE,
+    CHANCES_TIER_HEADER,
     CHANCES_UNDISCOVERED,
     DECK_SCREEN,
     NO_ACTIVE_SEASON,
@@ -17,11 +19,15 @@ from bot.texts.deck.deck import (
     NOT_ENOUGH_TICKETS,
     ROLL_TEN_LINE,
     ROLL_TEN_RESULT_HEADER,
+    TIER_EMOJI,
+    TIER_NAMES,
     UNIVERSE_NOT_READY,
 )
 
 __all__ = [
+    "BTN_BACK_CHANCES",
     "BTN_CHANCES",
+    "BTN_CHANCES_TIER",
     "BTN_COLLECTION",
     "BTN_DISENCHANT",
     "BTN_MERGE",
@@ -30,7 +36,7 @@ __all__ = [
     "CARD_CAPTION",
     "CHANCES_CARD_LINE",
     "CHANCES_HEADER",
-    "CHANCES_TIER_LINE",
+    "CHANCES_TIER_HEADER",
     "CHANCES_UNDISCOVERED",
     "DECK_SCREEN",
     "NO_ACTIVE_SEASON",
@@ -39,5 +45,7 @@ __all__ = [
     "NOT_ENOUGH_TICKETS",
     "ROLL_TEN_LINE",
     "ROLL_TEN_RESULT_HEADER",
+    "TIER_EMOJI",
+    "TIER_NAMES",
     "UNIVERSE_NOT_READY",
 ]

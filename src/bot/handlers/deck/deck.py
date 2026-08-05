@@ -12,16 +12,19 @@ from bot.config.game import TICKET_NATURAL_CAP, TIER_CHANCE_PERCENT
 from bot.config.settings import get_settings
 from bot.constant.deck import (
     CB_DECK_CHANCES,
+    CB_DECK_CHANCES_BACK,
+    CB_DECK_CHANCES_TIER_PREFIX,
     CB_DECK_OPEN,
     CB_DECK_ROLL1,
     CB_DECK_ROLL10,
     LOCK_ACTION_ROLL,
 )
 from bot.db.models.card import Card
+from bot.db.models.universe import Universe
 from bot.db.repositories.card import get_discovered_card_ids
 from bot.db.repositories.universe import get_by_code as get_universe
 from bot.db.repositories.user import get_by_id
-from bot.keyboards.deck import back_to_deck, deck_menu
+from bot.keyboards.deck import back_to_deck, chances_menu, chances_tier_menu, deck_menu
 from bot.services import ticket
 from bot.services.card import UniverseNotReadyError, get_tier_map
 from bot.services.gacha import NoActiveSeasonError, NotEnoughTicketsError, RollResult, roll_one, roll_ten
@@ -30,7 +33,7 @@ from bot.texts.deck import (
     CARD_CAPTION,
     CHANCES_CARD_LINE,
     CHANCES_HEADER,
-    CHANCES_TIER_LINE,
+    CHANCES_TIER_HEADER,
     CHANCES_UNDISCOVERED,
     DECK_SCREEN,
     NO_ACTIVE_SEASON,
@@ -39,10 +42,13 @@ from bot.texts.deck import (
     NOT_ENOUGH_TICKETS,
     ROLL_TEN_LINE,
     ROLL_TEN_RESULT_HEADER,
+    TIER_EMOJI,
+    TIER_NAMES,
     UNIVERSE_NOT_READY,
 )
 from bot.utils.card_media import card_photo
 from bot.utils.formatting import esc
+from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="deck")
 
@@ -55,6 +61,8 @@ def _card_caption(card: Card, stars: int, universe_title: str, quantity: int) ->
         ubp=card.base_ubp,
         stars="🌟" * stars,
         quantity=quantity,
+        tier_emoji=TIER_EMOJI.get(card.base_ubp, "🏳️"),
+        tier_name=TIER_NAMES.get(card.base_ubp, card.base_ubp),
         description=esc(card.description) if card.description else NO_DESCRIPTION,
     )
 
@@ -186,6 +194,24 @@ async def cb_roll10(callback: CallbackQuery, session: AsyncSession, redis: Redis
         await callback.message.answer(breakdown, reply_markup=back_to_deck())
 
 
+async def _get_ready_tier_map(callback: CallbackQuery, session: AsyncSession, universe: Universe) -> dict[int, list[Card]] | None:
+    try:
+        return await get_tier_map(session, universe.code)
+    except UniverseNotReadyError as exc:
+        await callback.message.answer(
+            UNIVERSE_NOT_READY.format(universe=esc(universe.title), tiers=", ".join(map(str, exc.missing_tiers)))
+        )
+        return None
+
+
+async def _render_chances_overview(callback: CallbackQuery, session: AsyncSession, universe_code: str) -> tuple[str, object] | None:
+    universe = await get_universe(session, universe_code)
+    tier_map = await _get_ready_tier_map(callback, session, universe)
+    if tier_map is None:
+        return None
+    return CHANCES_HEADER.format(universe=esc(universe.title)), chances_menu(tier_map)
+
+
 @router.callback_query(F.data == CB_DECK_CHANCES)
 async def cb_chances(callback: CallbackQuery, session: AsyncSession) -> None:
     user = await get_by_id(session, callback.from_user.id)
@@ -194,22 +220,53 @@ async def cb_chances(callback: CallbackQuery, session: AsyncSession) -> None:
         return
     await callback.answer()
 
+    rendered = await _render_chances_overview(callback, session, user.universe_selected)
+    if rendered is None:
+        return
+    text, markup = rendered
+    # Вход из "Колоды" — новое сообщение (тот же паттерн, что и у результатов крутки),
+    # родительский экран "Колода" остаётся видимым выше.
+    await callback.message.answer(text, reply_markup=markup)
+
+
+@router.callback_query(F.data == CB_DECK_CHANCES_BACK)
+async def cb_chances_back(callback: CallbackQuery, session: AsyncSession) -> None:
+    user = await get_by_id(session, callback.from_user.id)
+    if user is None or user.universe_selected is None:
+        await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
+        return
+    await callback.answer()
+
+    rendered = await _render_chances_overview(callback, session, user.universe_selected)
+    if rendered is None:
+        return
+    text, markup = rendered
+    # Назад из детального экрана тира — редактируем ТО ЖЕ сообщение, а не плодим новое.
+    await safe_edit_text(callback.message, text, reply_markup=markup)
+
+
+@router.callback_query(F.data.startswith(CB_DECK_CHANCES_TIER_PREFIX))
+async def cb_chances_tier(callback: CallbackQuery, session: AsyncSession) -> None:
+    tier = int(callback.data[len(CB_DECK_CHANCES_TIER_PREFIX) :])
+
+    user = await get_by_id(session, callback.from_user.id)
+    if user is None or user.universe_selected is None:
+        await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
+        return
+    await callback.answer()
+
     universe = await get_universe(session, user.universe_selected)
-    try:
-        tier_map = await get_tier_map(session, user.universe_selected)
-    except UniverseNotReadyError as exc:
-        await callback.message.answer(
-            UNIVERSE_NOT_READY.format(universe=esc(universe.title), tiers=", ".join(map(str, exc.missing_tiers)))
-        )
+    tier_map = await _get_ready_tier_map(callback, session, universe)
+    if tier_map is None or tier not in tier_map:
         return
 
     discovered = await get_discovered_card_ids(session, callback.from_user.id, user.universe_selected)
 
-    parts = [CHANCES_HEADER.format(universe=esc(universe.title))]
-    for tier in sorted(TIER_CHANCE_PERCENT, reverse=True):
-        parts.append(CHANCES_TIER_LINE.format(ubp=tier, chance=TIER_CHANCE_PERCENT[tier]))
-        for card in sorted(tier_map[tier], key=lambda c: c.external_id):
-            name = esc(card.name) if card.id in discovered else CHANCES_UNDISCOVERED
-            parts.append(CHANCES_CARD_LINE.format(external_id=esc(card.external_id), name=name))
-
-    await callback.message.answer("".join(parts), reply_markup=back_to_deck())
+    header = CHANCES_TIER_HEADER.format(
+        emoji=TIER_EMOJI[tier], name=TIER_NAMES[tier], chance=TIER_CHANCE_PERCENT[tier], count=len(tier_map[tier])
+    )
+    lines = "".join(
+        CHANCES_CARD_LINE.format(i=i, name=esc(card.name) if card.id in discovered else CHANCES_UNDISCOVERED)
+        for i, card in enumerate(sorted(tier_map[tier], key=lambda c: c.external_id), start=1)
+    )
+    await safe_edit_text(callback.message, header + lines, reply_markup=chances_tier_menu())

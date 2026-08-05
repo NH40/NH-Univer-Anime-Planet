@@ -1,5 +1,7 @@
 from bot.constant.deck.deck import (
     CB_DECK_CHANCES,
+    CB_DECK_CHANCES_BACK,
+    CB_DECK_CHANCES_TIER_PREFIX,
     CB_DECK_COLLECTION,
     CB_DECK_OPEN,
     CB_DECK_ROLL1,
@@ -9,6 +11,8 @@ from bot.constant.deck.deck import (
 
 __all__ = [
     "CB_DECK_CHANCES",
+    "CB_DECK_CHANCES_BACK",
+    "CB_DECK_CHANCES_TIER_PREFIX",
     "CB_DECK_COLLECTION",
     "CB_DECK_OPEN",
     "CB_DECK_ROLL1",

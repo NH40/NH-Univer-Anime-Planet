@@ -22,10 +22,11 @@ NO_ACTIVE_SEASON = "Сейчас нет активного сезона — кр
 CARD_CAPTION = (
     "🆔 <b>ID:</b> {external_id}\n"
     "🎴 <b>Персонаж:</b> {name}\n"
-    "🌌 <b>Вселенная:</b> {universe}\n\n"
+    "🌌 <b>Вселенная:</b> {universe}\n"
+    "💠 <b>Очки:</b> {ubp}\n\n"
     "📖 {description}\n\n"
     "📦 <b>Количество:</b> {quantity}\n"
-    "💠 <b>Очки:</b> {ubp}\n"
+    "{tier_emoji} <b>Ранг:</b> {tier_name}\n"
     "🌟 <b>Звёзды:</b> {stars}"
 )
 NO_DESCRIPTION = "—"
@@ -33,7 +34,30 @@ NO_DESCRIPTION = "—"
 ROLL_TEN_RESULT_HEADER = "🎰 <b>Результаты крутки x10:</b>\n"
 ROLL_TEN_LINE = "{i}. {name} — {ubp} UBP\n"
 
-CHANCES_HEADER = "🎲 <b>Шансы</b> — {universe}\n\n"
-CHANCES_TIER_LINE = "\n<b>{ubp} UBP — {chance}%</b>\n"
-CHANCES_CARD_LINE = "  id:{external_id} — {name}\n"
+# Названия и цветные кружки тиров (1000-6000 UBP) для экрана "Шансы" — чисто
+# презентационная лесенка редкости, порядок значения не меняет (см. config/game:
+# TIER_CHANCE_PERCENT — та же связка UBP->тир, но с числами шанса, не именами).
+TIER_NAMES = {
+    1000: "Обычный",
+    2000: "Необычный",
+    3000: "Редкий",
+    4000: "Эпический",
+    5000: "Легендарный",
+    6000: "Мифический",
+}
+TIER_EMOJI = {
+    1000: "⚪",
+    2000: "🟢",
+    3000: "🔵",
+    4000: "🟣",
+    5000: "🟠",
+    6000: "🔴",
+}
+
+CHANCES_HEADER = "🎲 <b>Шансы выпадения</b> — {universe}\n\nВыбери тир, чтобы увидеть персонажей:"
+BTN_CHANCES_TIER = "{emoji} {name} — {chance}% ({count})"
+
+CHANCES_TIER_HEADER = "{emoji} <b>{name}</b> — {chance}%\n\nВсего персонажей: {count}\n\n"
+CHANCES_CARD_LINE = "{i}. {name}\n"
 CHANCES_UNDISCOVERED = "???"
+BTN_BACK_CHANCES = "◀️ К шансам"

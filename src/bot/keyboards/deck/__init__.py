@@ -1,3 +1,3 @@
-from bot.keyboards.deck.deck import back_to_deck, deck_menu
+from bot.keyboards.deck.deck import back_to_deck, chances_menu, chances_tier_menu, deck_menu
 
-__all__ = ["back_to_deck", "deck_menu"]
+__all__ = ["back_to_deck", "chances_menu", "chances_tier_menu", "deck_menu"]
