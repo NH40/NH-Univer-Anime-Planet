@@ -30,10 +30,14 @@ log = logging.getLogger("seed_cards")
 
 UBP_DIR_RE = re.compile(r"^(\d+)UBP$", re.IGNORECASE)
 CARD_FILE_RE = re.compile(r"^(?P<id>\d+)_(?P<name>.+)\.(?P<ext>png|jpg|jpeg|webp)$", re.IGNORECASE)
-# Вставляет пробел на границе "строчная/цифра -> заглавная" — превращает слипшийся
-# PascalCase из имени файла (JongGunSmile) в читаемое "Jong Gun Smile". Подряд идущие
-# заглавные (акронимы вроде TUI) не разбиваются — лукбехайнд требует строчную/цифру перед.
-_PASCAL_CASE_BOUNDARY_RE = re.compile(r"(?<=[a-zа-я0-9])(?=[A-ZА-Я])")
+# Вставляет пробел на границах слипшегося PascalCase из имени файла:
+#  1) "строчная/цифра -> заглавная" (JongGunSmile -> Jong Gun Smile);
+#  2) "заглавная -> заглавная+строчная", т.е. конец акронима перед новым словом
+#     (JongGunVSGooKim -> ...VS Goo..., а не ...VSGoo...). Подряд заглавные САМИ ПО
+#     СЕБЕ (акронимы вроде TUI) не разбиваются — только когда следом идёт новое слово.
+_PASCAL_CASE_BOUNDARY_RE = re.compile(
+    r"(?<=[a-zа-я0-9])(?=[A-ZА-Я])" r"|(?<=[A-ZА-Я])(?=[A-ZА-Я][a-zа-я])"
+)
 
 # Человекочитаемые названия для известных вселенных; для новых папок — Title Case по умолчанию.
 KNOWN_UNIVERSE_TITLES = {
