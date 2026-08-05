@@ -24,7 +24,7 @@ from bot.db.repositories.user import (
     set_universe,
 )
 from bot.keyboards.settings import notifications_menu, settings_menu, universe_picker
-from bot.texts.common import NEED_START
+from bot.texts.common import BTN_SETTINGS, NEED_START
 from bot.texts.settings import CHOOSE_UNIVERSE, NOTIFICATIONS_MENU, SETTINGS_MENU, UNIVERSES_EMPTY, UNIVERSE_SAVED
 from bot.utils.safe_edit import safe_edit_text
 
@@ -40,6 +40,7 @@ def _notifications_keyboard(user: User) -> InlineKeyboardMarkup:
 
 
 @router.message(Command("settings"))
+@router.message(F.text == BTN_SETTINGS)
 async def cmd_settings(message: Message) -> None:
     await message.answer(SETTINGS_MENU, reply_markup=settings_menu())
 

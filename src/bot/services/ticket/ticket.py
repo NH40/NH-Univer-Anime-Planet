@@ -23,14 +23,14 @@ _REGEN_AND_SPEND_SQL = text(
             id,
             tickets_count AS old_count,
             tickets_updated_at AS old_ts,
-            CASE WHEN subscription_until > now() THEN :interval_sub::int ELSE :interval_normal::int END AS effective_interval,
+            CASE WHEN subscription_until > now() THEN CAST(:interval_sub AS INTEGER) ELSE CAST(:interval_normal AS INTEGER) END AS effective_interval,
             CASE
                 WHEN tickets_count >= :cap THEN tickets_count
                 ELSE LEAST(
                     :cap,
                     tickets_count + FLOOR(
                         EXTRACT(EPOCH FROM (now() - tickets_updated_at)) /
-                        (CASE WHEN subscription_until > now() THEN :interval_sub::int ELSE :interval_normal::int END)
+                        (CASE WHEN subscription_until > now() THEN CAST(:interval_sub AS INTEGER) ELSE CAST(:interval_normal AS INTEGER) END)
                     )::int
                 )
             END AS new_count
