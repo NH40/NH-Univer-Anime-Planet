@@ -26,6 +26,7 @@ async def get_collection(
             card_id=stack.card.id,
             external_id=stack.card.external_id,
             name=stack.card.name,
+            description=stack.card.description,
             base_ubp=stack.card.base_ubp,
             stars=stack.stars,
             quantity=stack.quantity,

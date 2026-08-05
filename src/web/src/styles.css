@@ -111,3 +111,159 @@ body {
   opacity: 0.7;
   margin-top: 40px;
 }
+
+.view-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.view-tab {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: var(--tg-theme-secondary-bg-color, #eeeeee);
+  color: var(--tg-theme-text-color, #111111);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.view-tab.active {
+  background: var(--tg-theme-button-color, #2ea6ff);
+  color: var(--tg-theme-button-text-color, #ffffff);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--tg-theme-hint-color, #cccccc);
+  background: var(--tg-theme-bg-color, #ffffff);
+  color: var(--tg-theme-text-color, #111111);
+  font-size: 14px;
+}
+
+.tier-select {
+  flex: none;
+  max-width: 42%;
+  padding: 8px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--tg-theme-hint-color, #cccccc);
+  background: var(--tg-theme-bg-color, #ffffff);
+  color: var(--tg-theme-text-color, #111111);
+  font-size: 13px;
+}
+
+.card {
+  display: block;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+}
+
+/* --- Профиль / прогресс --- */
+
+.progress-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.progress-row {
+  background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.progress-row-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.progress-row-title {
+  font-weight: 600;
+}
+
+.progress-row-count {
+  opacity: 0.7;
+}
+
+.progress-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tg-theme-bg-color, #e6e6e6);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--tg-theme-button-color, #2ea6ff);
+  transition: width 0.3s ease;
+}
+
+.progress-row-percent {
+  margin-top: 4px;
+  font-size: 12px;
+  text-align: right;
+  opacity: 0.7;
+}
+
+/* --- Карточка (детальная страница) --- */
+
+.back-button {
+  border: none;
+  background: var(--tg-theme-secondary-bg-color, #eeeeee);
+  color: var(--tg-theme-text-color, #111111);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.card-page-image {
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+}
+
+.card-page-body {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-page-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--tg-theme-secondary-bg-color, #eeeeee);
+}
+
+.card-page-label {
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.card-page-description {
+  font-size: 14px;
+  opacity: 0.85;
+  line-height: 1.4;
+  margin: 4px 0;
+}

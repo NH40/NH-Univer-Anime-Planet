@@ -31,10 +31,19 @@ export interface CardStack {
   card_id: number;
   external_id: string;
   name: string;
+  description: string | null;
   base_ubp: number;
   stars: number;
   quantity: number;
   image_url: string;
+}
+
+export interface UniverseProgress {
+  code: string;
+  title: string;
+  owned: number;
+  total: number;
+  percent: number;
 }
 
 export function fetchProfile(): Promise<Profile> {
@@ -47,4 +56,8 @@ export function fetchUniverses(): Promise<Universe[]> {
 
 export function fetchCollection(universeCode: string): Promise<CardStack[]> {
   return apiFetch<CardStack[]>(`/collection/${encodeURIComponent(universeCode)}`);
+}
+
+export function fetchProgress(): Promise<UniverseProgress[]> {
+  return apiFetch<UniverseProgress[]>("/progress");
 }

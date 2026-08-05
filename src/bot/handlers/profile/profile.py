@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.leaderboard import get_count, get_page, get_rank, get_top
 from bot.config.game import TICKET_NATURAL_CAP
+from bot.config.settings import get_settings
 from bot.constant.profile import (
     CB_PLAYERS_PAGE_PREFIX,
     CB_PROFILE_DAILY_BONUS,
@@ -109,7 +110,8 @@ async def show_profile(message: Message, session: AsyncSession, redis: Redis) ->
     if text is None:
         await message.answer(NEED_START)
         return
-    await message.answer(text, reply_markup=profile_menu())
+    settings = get_settings()
+    await message.answer(text, reply_markup=profile_menu(mini_app_url=settings.mini_app_url or None))
 
 
 @router.callback_query(F.data == CB_PROFILE_RENAME)

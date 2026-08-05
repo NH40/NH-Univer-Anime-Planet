@@ -22,7 +22,16 @@ class CardStackOut(BaseModel):
     card_id: int
     external_id: str
     name: str
+    description: str | None
     base_ubp: int
     stars: int
     quantity: int
     image_url: str
+
+
+class UniverseProgressOut(BaseModel):
+    code: str
+    title: str
+    owned: int
+    total: int
+    percent: int

@@ -10,6 +10,7 @@ BTN_PASS = "🎫 Пасс"
 BTN_DONATE = "💎 Донат"
 BTN_SETTINGS = "⚙️ Настройки"
 BTN_COLLECTION_APP = "🖼 Коллекция (веб)"
+BTN_PROFILE_APP = "👤 Профиль (веб)"
 BTN_BACK = "◀️ Назад"
 
 WELCOME = (
