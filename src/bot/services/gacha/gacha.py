@@ -31,6 +31,7 @@ class NoActiveSeasonError(Exception):
 class RollResult:
     card: Card
     stars: int = 1  # всегда 1 сразу после крутки — звёзды растут только слиянием
+    owned_quantity: int = 1  # сколько копий этой карты (этой звезды) теперь у игрока всего
 
 
 async def _roll(
@@ -56,8 +57,9 @@ async def _roll(
     # Группируем повторки внутри одной крутки x10 в один upsert на card_id — меньше
     # запросов к БД (правило 3), чем по одному апсерту на каждую из 10 карт.
     counts = Counter(card.id for card in cards)
+    owned_quantity_by_card_id: dict[int, int] = {}
     for card_id, qty in counts.items():
-        await add_card(session, user_id=user_id, card_id=card_id, stars=1, qty=qty)
+        owned_quantity_by_card_id[card_id] = await add_card(session, user_id=user_id, card_id=card_id, stars=1, qty=qty)
 
     total_ubp = sum(card.base_ubp for card in cards)
     new_season_ubp = await award_ubp(session, user_id=user_id, amount=total_ubp, reason=TRANSACTION_REASON_ROLL)
@@ -67,7 +69,7 @@ async def _roll(
     # Redis обновляем только после успешного commit в Postgres (см. CLAUDE.md, правило 10).
     await sync_score(redis, season.id, user_id, new_season_ubp)
 
-    return [RollResult(card=card) for card in cards]
+    return [RollResult(card=card, owned_quantity=owned_quantity_by_card_id[card.id]) for card in cards]
 
 
 async def roll_one(session: AsyncSession, redis: Redis, *, user_id: int, universe_code: str) -> RollResult:

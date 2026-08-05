@@ -47,13 +47,14 @@ from bot.utils.formatting import esc
 router = Router(name="deck")
 
 
-def _card_caption(card: Card, stars: int, universe_title: str) -> str:
+def _card_caption(card: Card, stars: int, universe_title: str, quantity: int) -> str:
     return CARD_CAPTION.format(
         external_id=esc(card.external_id),
         name=esc(card.name),
         universe=esc(universe_title),
         ubp=card.base_ubp,
         stars="🌟" * stars,
+        quantity=quantity,
         description=esc(card.description) if card.description else NO_DESCRIPTION,
     )
 
@@ -136,7 +137,7 @@ async def cb_roll1(callback: CallbackQuery, session: AsyncSession, redis: Redis)
             return
 
         universe = await get_universe(session, user.universe_selected)
-        caption = _card_caption(result.card, result.stars, universe.title)
+        caption = _card_caption(result.card, result.stars, universe.title, result.owned_quantity)
         await callback.message.answer_photo(card_photo(result.card), caption=caption, reply_markup=back_to_deck())
 
 
@@ -173,7 +174,7 @@ async def cb_roll10(callback: CallbackQuery, session: AsyncSession, redis: Redis
 
         universe = await get_universe(session, user.universe_selected)
         top = max(results, key=lambda r: r.card.base_ubp)
-        caption = _card_caption(top.card, top.stars, universe.title)
+        caption = _card_caption(top.card, top.stars, universe.title, top.owned_quantity)
         await callback.message.answer_photo(card_photo(top.card), caption=caption)
 
         # Отдельным сообщением, а не в подписи к фото — подпись у Telegram ограничена

@@ -10,11 +10,14 @@ from bot.db.models.card import Card
 from bot.db.models.inventory import UserCard
 
 
-async def add_card(session: AsyncSession, *, user_id: int, card_id: int, stars: int, qty: int = 1) -> None:
+async def add_card(session: AsyncSession, *, user_id: int, card_id: int, stars: int, qty: int = 1) -> int:
     """Апсерт по (user_id, card_id, stars): новая строка с quantity=qty, либо
     quantity += qty если строка уже есть (в том числе если раньше распылили в 0 —
     строка не удаляется, см. `db.repositories.card.get_discovered_card_ids`). Не коммитит —
-    вызывающий сервис коммитит один раз в конце композитной операции."""
+    вызывающий сервис коммитит один раз в конце композитной операции.
+
+    Возвращает итоговое количество копий после апсерта — бесплатно, тем же RETURNING,
+    без отдельного SELECT (нужно для "Количество" в подписи к выпавшей карте)."""
     stmt = (
         pg_insert(UserCard)
         .values(user_id=user_id, card_id=card_id, stars=stars, quantity=qty)
@@ -22,8 +25,10 @@ async def add_card(session: AsyncSession, *, user_id: int, card_id: int, stars: 
             index_elements=[UserCard.user_id, UserCard.card_id, UserCard.stars],
             set_={"quantity": UserCard.quantity + qty},
         )
+        .returning(UserCard.quantity)
     )
-    await session.execute(stmt)
+    result = await session.execute(stmt)
+    return result.scalar_one()
 
 
 @dataclass

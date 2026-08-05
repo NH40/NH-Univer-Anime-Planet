@@ -20,12 +20,12 @@ NOT_ENOUGH_TICKETS = (
 NO_ACTIVE_SEASON = "Сейчас нет активного сезона — крутка временно недоступна."
 
 CARD_CAPTION = (
-    "id: {external_id}\n"
-    "Персонаж: {name}\n"
-    "Вселенная: {universe}\n"
-    "UBP: <b>{ubp}</b>\n"
-    "Звёзды: {stars}\n\n"
-    "Описание: {description}"
+    "🆔 {external_id} · <b>{name}</b>\n"
+    "{universe}\n\n"
+    "{description}\n\n"
+    "Количество: <b>{quantity}</b>\n"
+    "Очки: <b>{ubp}</b>\n"
+    "Звёзды: {stars}"
 )
 NO_DESCRIPTION = "—"
 
