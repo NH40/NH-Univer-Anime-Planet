@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
 from bot.config.game import TICKET_NATURAL_CAP, TIER_CHANCE_PERCENT
+from bot.config.settings import get_settings
 from bot.constant.deck import (
     CB_DECK_CHANCES,
     CB_DECK_OPEN,
@@ -71,7 +72,8 @@ async def _render_deck(session: AsyncSession, user_id: int) -> tuple[str, object
     text = DECK_SCREEN.format(
         universe=esc(universe.title), tickets=tickets, cap=TICKET_NATURAL_CAP, dust=user.dust
     )
-    return text, deck_menu()
+    settings = get_settings()
+    return text, deck_menu(mini_app_url=settings.mini_app_url or None)
 
 
 @router.message(Command("deck"))

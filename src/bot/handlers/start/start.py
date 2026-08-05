@@ -5,7 +5,6 @@ from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.config.settings import get_settings
 from bot.db.repositories.user import upsert_from_telegram
 from bot.keyboards.common import main_menu
 from bot.services import referral as referral_service
@@ -33,5 +32,4 @@ async def cmd_start(message: Message, command: CommandObject, session: AsyncSess
         code = command.args[len(_REFERRAL_PAYLOAD_PREFIX) :]
         await referral_service.record_visit(session, code=code, user_id=message.from_user.id)
 
-    settings = get_settings()
-    await message.answer(WELCOME, reply_markup=main_menu(mini_app_url=settings.mini_app_url or None))
+    await message.answer(WELCOME, reply_markup=main_menu())
