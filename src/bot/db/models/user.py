@@ -26,8 +26,13 @@ class User(Base):
     universe_selected: Mapped[str | None] = mapped_column(
         ForeignKey("universes.code", ondelete="SET NULL"), nullable=True
     )
+    # use_alter=True — разрывает цикл users.clan_id -> clans.id / clans.owner_id -> users.id
+    # для DDL: без этого alembic не может определить порядок CREATE TABLE (см. SAWarning
+    # "Cannot correctly sort tables... cycles between tables clans, users") и создаёт clans
+    # раньше users, что падает на FK clans.owner_id -> users. С use_alter FK на clan_id
+    # добавляется отдельным ALTER TABLE уже после того, как обе таблицы существуют.
     clan_id: Mapped[int | None] = mapped_column(
-        ForeignKey("clans.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("clans.id", ondelete="SET NULL", use_alter=True), nullable=True
     )
 
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
