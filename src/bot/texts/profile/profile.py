@@ -20,7 +20,7 @@ NO_CLAN = "нет клана"
 NO_RANK = "—"
 
 PROGRESS_HEADER = "📚 <b>Прогресс по вселенным</b>\n"
-PROGRESS_LINE = "🌌 {universe}: {bar} <b>{percent}%</b> ({owned}/{total})\n"
+PROGRESS_LINE = "🌌 <b>{universe}</b>\n{bar} {percent}% ({owned}/{total})\n"
 PROGRESS_EMPTY = "📚 Пока нет ни одной карты — крутите в «Колоде»!"
 
 TICKETS_LINE_READY = "🎫 Тикеты: <b>{count}/{cap}</b> (бесплатный лимит заполнен)"
