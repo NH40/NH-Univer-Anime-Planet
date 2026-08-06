@@ -10,6 +10,7 @@ from bot.handlers import (
     deck,
     donate,
     fallback,
+    help,
     profile,
     promo,
     quest,
@@ -35,6 +36,7 @@ def get_routers() -> list[Router]:
         battle_pass.router,
         donate.router,
         promo.router,
+        help.router,
         # Catch-all — обязан быть последним: ловит апдейты, которые не забрал ни один
         # другой роутер (см. handlers/fallback/fallback.py).
         fallback.router,
