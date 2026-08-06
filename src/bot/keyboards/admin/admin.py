@@ -31,6 +31,8 @@ from bot.constant.admin import (
     CB_ADMIN_STATS,
     CB_ADMIN_TECH_MODE_TOGGLE,
     CB_ADMIN_TOGGLE_ADMIN_PREFIX,
+    CB_ADMIN_WIPE_CONFIRM,
+    CB_ADMIN_WIPE_START,
 )
 from bot.texts.admin import (
     BTN_ADMIN_BROADCAST,
@@ -43,6 +45,7 @@ from bot.texts.admin import (
     BTN_ADMIN_SEASON,
     BTN_ADMIN_STATS,
     BTN_ADMIN_TECH_MODE,
+    BTN_ADMIN_WIPE,
     BTN_BAN,
     BTN_CONFIRM,
     BTN_FIND_ANOTHER,
@@ -89,10 +92,11 @@ def admin_menu(*, tech_mode_enabled: bool, is_super_admin: bool = False) -> Inli
         ],
     ]
     if is_super_admin:
-        # Управление правами доступно ТОЛЬКО супер-админам (ADMIN_IDS из .env) — обычные
-        # доп.админы (User.is_admin) даже не видят эту кнопку, тот же принцип "не палить
-        # лишнее", что у всего /admin (см. CLAUDE.md, "Админ-панель").
+        # Управление правами и полный сброс БД доступны ТОЛЬКО супер-админам (ADMIN_IDS из
+        # .env) — обычные доп.админы (User.is_admin) даже не видят эти кнопки, тот же принцип
+        # "не палить лишнее", что у всего /admin (см. CLAUDE.md, "Админ-панель").
         rows.append([InlineKeyboardButton(text=BTN_ADMIN_MANAGE_ADMINS, callback_data=CB_ADMIN_MANAGE_ADMINS)])
+        rows.append([InlineKeyboardButton(text=BTN_ADMIN_WIPE, callback_data=CB_ADMIN_WIPE_START)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -213,6 +217,15 @@ def delete_account_confirm_menu(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=BTN_CONFIRM, callback_data=f"{CB_ADMIN_DELETE_ACCOUNT_CONFIRM_PREFIX}{user_id}")],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)],
+        ]
+    )
+
+
+def wipe_confirm_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_CONFIRM, callback_data=CB_ADMIN_WIPE_CONFIRM)],
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)],
         ]
     )

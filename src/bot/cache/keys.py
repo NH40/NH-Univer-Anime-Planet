@@ -16,6 +16,13 @@ def tech_mode_flag() -> str:
     return "flag:tech_mode"
 
 
+def wipe_confirm_flag(user_id: int) -> str:
+    """Анти-replay для двух последовательных нажатий подтверждения полного сброса БД
+    (см. services/admin/wipe) — короткий TTL, чтобы подтверждение, забытое на часы, не
+    сработало случайно спустя время."""
+    return f"flag:wipe_confirm:{user_id}"
+
+
 def throttle_flag(user_id: int) -> str:
     """Общий антифлуд (см. middlewares/throttling.py) — не путать с action_lock: тот
     защищает конкретное resource-affecting действие от повторного клика (правило 2),

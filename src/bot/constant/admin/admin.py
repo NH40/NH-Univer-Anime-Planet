@@ -42,3 +42,7 @@ CB_ADMIN_DELETE_ACCOUNT_CONFIRM_PREFIX = "admin:delete_confirm:"
 CB_ADMIN_MANAGE_ADMINS = "admin:manage_admins"
 CB_ADMIN_MANAGE_FIND_PLAYER = "admin:manage_find_player"
 CB_ADMIN_TOGGLE_ADMIN_PREFIX = "admin:toggle_admin:"
+
+# Полное удаление БД — только для супер-админов, см. handlers/admin/db_wipe.
+CB_ADMIN_WIPE_START = "admin:wipe_start"
+CB_ADMIN_WIPE_CONFIRM = "admin:wipe_confirm"

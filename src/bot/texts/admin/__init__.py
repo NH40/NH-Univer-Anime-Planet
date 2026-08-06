@@ -18,6 +18,7 @@ from bot.texts.admin.admin import (
     BTN_ADMIN_SEASON,
     BTN_ADMIN_STATS,
     BTN_ADMIN_TECH_MODE,
+    BTN_ADMIN_WIPE,
     BTN_BAN,
     BTN_CONFIRM,
     BTN_FIND_ANOTHER,
@@ -100,6 +101,10 @@ from bot.texts.admin.admin import (
     TECH_MODE_DISABLED,
     TECH_MODE_ENABLED,
     UNBAN_DONE,
+    WIPE_CONFIRM_EXPIRED,
+    WIPE_CONFIRM_PROMPT,
+    WIPE_DONE,
+    WIPE_DONE_BROADCAST,
 )
 
 __all__ = [
@@ -122,6 +127,7 @@ __all__ = [
     "BTN_ADMIN_SEASON",
     "BTN_ADMIN_STATS",
     "BTN_ADMIN_TECH_MODE",
+    "BTN_ADMIN_WIPE",
     "BTN_BAN",
     "BTN_CONFIRM",
     "BTN_FIND_ANOTHER",
@@ -204,4 +210,8 @@ __all__ = [
     "TECH_MODE_DISABLED",
     "TECH_MODE_ENABLED",
     "UNBAN_DONE",
+    "WIPE_CONFIRM_EXPIRED",
+    "WIPE_CONFIRM_PROMPT",
+    "WIPE_DONE",
+    "WIPE_DONE_BROADCAST",
 ]

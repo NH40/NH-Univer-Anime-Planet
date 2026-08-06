@@ -13,6 +13,7 @@ from bot.keyboards.admin.admin import (
     referral_menu,
     season_menu,
     season_new_confirm_menu,
+    wipe_confirm_menu,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "referral_menu",
     "season_menu",
     "season_new_confirm_menu",
+    "wipe_confirm_menu",
 ]
