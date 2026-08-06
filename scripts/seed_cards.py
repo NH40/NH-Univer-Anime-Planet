@@ -2,6 +2,11 @@
 карточки в БД (таблицы universes, cards). Безопасно перезапускать — используется upsert,
 повторный запуск подхватит переименования/новые файлы и не создаст дублей.
 
+Описания карт (необязательно) — один файл assets/cards/<universe>/descriptions.csv на
+вселенную, колонки "id,description" (id — то же число, что в имени файла карты, ведущие
+нули не важны). Значения с запятой берите в кавычки (обычный CSV). Карта, для которой в
+файле нет строки, останется без описания.
+
 Запуск (внутри контейнера бота или локально с тем же DATABASE_URL):
     python scripts/seed_cards.py [--assets-dir assets/cards] [--dry-run]
 """
@@ -10,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
 import logging
 import re
 import sys
@@ -52,6 +58,8 @@ KNOWN_UNIVERSE_TITLES = {
     "genshin": "Genshin Impact",
 }
 
+DESCRIPTIONS_FILENAME = "descriptions.csv"
+
 
 @dataclass
 class ParsedCard:
@@ -60,6 +68,31 @@ class ParsedCard:
     name: str
     base_ubp: int
     image_path: str  # относительно assets-dir, например onepiece/6000UBP/001_Name.png
+    description: str | None = None
+
+
+def load_descriptions(universe_dir: Path) -> dict[str, str]:
+    """Читает <universe_dir>/descriptions.csv (колонки "id,description"), если он есть.
+    Ключ — id, приведённый к int и обратно к строке (чтобы "01" и "1" совпадали с любым
+    написанием id в имени файла карты). CSV — единственный источник правды: карта, у
+    которой в файле нет строки, останется без описания, даже если раньше было другое."""
+    path = universe_dir / DESCRIPTIONS_FILENAME
+    if not path.is_file():
+        return {}
+
+    descriptions: dict[str, str] = {}
+    with path.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None or "id" not in reader.fieldnames or "description" not in reader.fieldnames:
+            log.warning("%s: ожидались колонки 'id,description' в первой строке — файл пропущен", path)
+            return {}
+        for row in reader:
+            raw_id = (row.get("id") or "").strip()
+            text = (row.get("description") or "").strip()
+            if not raw_id.isdigit() or not text:
+                continue
+            descriptions[str(int(raw_id))] = text
+    return descriptions
 
 
 def scan_assets(assets_dir: Path) -> tuple[dict[str, str], list[ParsedCard]]:
@@ -71,6 +104,7 @@ def scan_assets(assets_dir: Path) -> tuple[dict[str, str], list[ParsedCard]]:
         universes[code] = EVENT_UNIVERSE_TITLES.get(
             code, KNOWN_UNIVERSE_TITLES.get(code, code.replace("_", " ").title())
         )
+        descriptions = load_descriptions(universe_dir)
 
         for ubp_dir in sorted(p for p in universe_dir.iterdir() if p.is_dir()):
             match = UBP_DIR_RE.match(ubp_dir.name)
@@ -96,13 +130,15 @@ def scan_assets(assets_dir: Path) -> tuple[dict[str, str], list[ParsedCard]]:
                 raw_name = file_match.group("name").replace("_", " ").strip()
                 name = _PASCAL_CASE_BOUNDARY_RE.sub(" ", raw_name)
                 name = re.sub(r" {2,}", " ", name).strip()
+                card_id = file_match.group("id")
                 cards.append(
                     ParsedCard(
                         universe_code=code,
-                        external_id=file_match.group("id"),
+                        external_id=card_id,
                         name=name,
                         base_ubp=base_ubp,
                         image_path=str(file.relative_to(assets_dir)).replace("\\", "/"),
+                        description=descriptions.get(str(int(card_id))),
                     )
                 )
 
@@ -159,10 +195,16 @@ async def apply(universes: dict[str, str], cards: list[ParsedCard], *, dry_run: 
                     name=card.name,
                     base_ubp=card.base_ubp,
                     image_path=card.image_path,
+                    description=card.description,
                 )
                 .on_conflict_do_update(
                     index_elements=[Card.universe_code, Card.external_id],
-                    set_={"name": card.name, "base_ubp": card.base_ubp, "image_path": card.image_path},
+                    set_={
+                        "name": card.name,
+                        "base_ubp": card.base_ubp,
+                        "image_path": card.image_path,
+                        "description": card.description,
+                    },
                 )
             )
             if not dry_run:
