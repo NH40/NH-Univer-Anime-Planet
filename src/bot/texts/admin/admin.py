@@ -111,15 +111,26 @@ PROMO_USES_EXHAUSTED = "Промокод исчерпан."
 PROMO_ALREADY_REDEEMED = "Вы уже активировали этот промокод."
 PROMO_REDEEM_DONE = "✅ Промокод активирован! Получено: {dust} пыли, {coins} коинов, {tickets} тикетов."
 
-# --- Рефералы ---
-REFERRAL_SCREEN = "🔗 <b>Реферальные ссылки</b>\n\n{lines}"
+# --- Рефералы: список кампаний -> кнопка с названием -> детальная статистика ---
+REFERRAL_SCREEN = "🔗 <b>Реферальные ссылки</b>"
+REFERRAL_CHOOSE = "Выбери кампанию:"
 REFERRAL_EMPTY = "Ссылок пока нет."
-REFERRAL_LINE = "• <code>{code}</code> — перешло {visited}, играет {playing}\n  {url}\n"
 BTN_REFERRAL_CREATE = "➕ Создать ссылку"
 REFERRAL_CREATE_PROMPT = "Введите название кампании (латиница/цифры/подчёркивания, до 32 симв.). /cancel — отменить."
 REFERRAL_CREATE_INVALID = "Только латиница, цифры и подчёркивания, до 32 символов."
 REFERRAL_CREATE_TAKEN = "Кампания с таким названием уже существует."
 REFERRAL_CREATE_DONE = "✅ Ссылка создана:\n{url}"
+
+REFERRAL_DETAIL_SCREEN = (
+    "🔗 <b>Кампания «{code}»</b>\n\n"
+    "<code>{url}</code>\n\n"
+    "<b>Перешло:</b> {visited}\n"
+    "<b>Играет:</b> {playing}\n"
+    "<b>Подписок куплено:</b> {subscriptions_bought}\n"
+    "<b>Battle Pass куплено:</b> {battle_passes_bought}\n\n"
+    "💰 <b>Донат:</b> {donated_coins}₽"
+)
+REFERRAL_DETAIL_NOT_FOUND = "Кампания не найдена — возможно, экран устарел."
 
 # --- Рассылка ---
 BROADCAST_PROMPT = "Введите текст рассылки (уйдёт всем игрокам). /cancel — отменить."

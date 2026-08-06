@@ -8,18 +8,20 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.constant.admin import CB_ADMIN_REFERRAL, CB_ADMIN_REFERRAL_CREATE
-from bot.keyboards.admin import referral_menu
+from bot.constant.admin import CB_ADMIN_REFERRAL, CB_ADMIN_REFERRAL_CREATE, CB_ADMIN_REFERRAL_DETAIL_PREFIX
+from bot.keyboards.admin import referral_detail_menu, referral_menu
 from bot.services import referral as referral_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
     ACTION_CANCELLED,
+    REFERRAL_CHOOSE,
     REFERRAL_CREATE_DONE,
     REFERRAL_CREATE_INVALID,
     REFERRAL_CREATE_PROMPT,
     REFERRAL_CREATE_TAKEN,
+    REFERRAL_DETAIL_NOT_FOUND,
+    REFERRAL_DETAIL_SCREEN,
     REFERRAL_EMPTY,
-    REFERRAL_LINE,
     REFERRAL_SCREEN,
 )
 from bot.utils.safe_edit import safe_edit_text
@@ -29,24 +31,40 @@ router = Router(name="admin_referral")
 _CODE_RE = re.compile(r"^[A-Za-z0-9_]{1,32}$")
 
 
-async def _render_referral(bot: Bot, session: AsyncSession) -> str:
+@router.callback_query(F.data == CB_ADMIN_REFERRAL)
+async def cb_referral(callback: CallbackQuery, session: AsyncSession) -> None:
+    await callback.answer()
     links = await referral_service.list_links_with_stats(session)
     if not links:
-        return REFERRAL_SCREEN.format(lines=REFERRAL_EMPTY)
+        await safe_edit_text(callback.message, f"{REFERRAL_SCREEN}\n\n{REFERRAL_EMPTY}", reply_markup=referral_menu([]))
+        return
+    codes = [code for code, _visited, _playing in links]
+    await safe_edit_text(callback.message, f"{REFERRAL_SCREEN}\n\n{REFERRAL_CHOOSE}", reply_markup=referral_menu(codes))
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_REFERRAL_DETAIL_PREFIX))
+async def cb_referral_detail(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
+    code = callback.data[len(CB_ADMIN_REFERRAL_DETAIL_PREFIX) :]
+    stats = await referral_service.get_campaign_stats(session, code)
+    await callback.answer()
+    if stats is None:
+        await callback.message.answer(REFERRAL_DETAIL_NOT_FOUND)
+        return
 
     me = await bot.get_me()
-    lines = "".join(
-        REFERRAL_LINE.format(code=code, visited=visited, playing=playing, url=f"https://t.me/{me.username}?start=ref_{code}")
-        for code, visited, playing in links
+    await safe_edit_text(
+        callback.message,
+        REFERRAL_DETAIL_SCREEN.format(
+            code=stats.code,
+            url=f"https://t.me/{me.username}?start=ref_{stats.code}",
+            visited=stats.visited,
+            playing=stats.playing,
+            subscriptions_bought=stats.subscriptions_bought,
+            battle_passes_bought=stats.battle_passes_bought,
+            donated_coins=stats.donated_coins,
+        ),
+        reply_markup=referral_detail_menu(),
     )
-    return REFERRAL_SCREEN.format(lines=lines)
-
-
-@router.callback_query(F.data == CB_ADMIN_REFERRAL)
-async def cb_referral(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
-    await callback.answer()
-    text = await _render_referral(bot, session)
-    await safe_edit_text(callback.message, text, reply_markup=referral_menu())
 
 
 @router.callback_query(F.data == CB_ADMIN_REFERRAL_CREATE)

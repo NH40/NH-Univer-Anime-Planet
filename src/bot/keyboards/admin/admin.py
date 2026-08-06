@@ -26,6 +26,7 @@ from bot.constant.admin import (
     CB_ADMIN_PROMO_CREATE,
     CB_ADMIN_REFERRAL,
     CB_ADMIN_REFERRAL_CREATE,
+    CB_ADMIN_REFERRAL_DETAIL_PREFIX,
     CB_ADMIN_SEASON,
     CB_ADMIN_SEASON_BUMP_VERSION,
     CB_ADMIN_SEASON_NEW,
@@ -184,12 +185,22 @@ def promo_create_prompt_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_PROMO)]])
 
 
-def referral_menu() -> InlineKeyboardMarkup:
+def referral_menu(codes: list[str]) -> InlineKeyboardMarkup:
+    """Кнопка на каждую именную кампанию (по названию) — тап открывает детальную
+    статистику (см. handlers/admin/referral: cb_referral_detail), а не сваливает все
+    цифры сразу одним текстом."""
+    rows = [
+        [InlineKeyboardButton(text=code, callback_data=f"{CB_ADMIN_REFERRAL_DETAIL_PREFIX}{code}")]
+        for code in codes
+    ]
+    rows.append([InlineKeyboardButton(text=BTN_REFERRAL_CREATE, callback_data=CB_ADMIN_REFERRAL_CREATE)])
+    rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def referral_detail_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=BTN_REFERRAL_CREATE, callback_data=CB_ADMIN_REFERRAL_CREATE)],
-            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)],
-        ]
+        inline_keyboard=[[InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_REFERRAL)]]
     )
 
 

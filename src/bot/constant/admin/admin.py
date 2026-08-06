@@ -25,6 +25,7 @@ CB_ADMIN_PROMO_CREATE = "admin:promo_create"
 
 CB_ADMIN_REFERRAL = "admin:referral"
 CB_ADMIN_REFERRAL_CREATE = "admin:referral_create"
+CB_ADMIN_REFERRAL_DETAIL_PREFIX = "admin:referral_detail:"
 
 CB_ADMIN_BROADCAST_START = "admin:broadcast"
 CB_ADMIN_BROADCAST_CONFIRM = "admin:broadcast_confirm"
