@@ -7,9 +7,8 @@ from bot.texts.common import BTN_CLAN, BTN_DECK, BTN_DONATE, BTN_PASS, BTN_PROFI
 
 def main_menu() -> ReplyKeyboardMarkup:
     rows = [
-        [KeyboardButton(text=BTN_PROFILE), KeyboardButton(text=BTN_DECK)],
-        [KeyboardButton(text=BTN_SHOP), KeyboardButton(text=BTN_CLAN)],
-        [KeyboardButton(text=BTN_PASS), KeyboardButton(text=BTN_DONATE)],
+        [KeyboardButton(text=BTN_PROFILE), KeyboardButton(text=BTN_DECK), KeyboardButton(text=BTN_SHOP)],
+        [KeyboardButton(text=BTN_CLAN), KeyboardButton(text=BTN_PASS), KeyboardButton(text=BTN_DONATE)],
         [KeyboardButton(text=BTN_QUESTS), KeyboardButton(text=BTN_SETTINGS)],
     ]
     # is_persistent=False (по явной просьбе пользователя 2026-08-06, см. CLAUDE.md) — даёт
