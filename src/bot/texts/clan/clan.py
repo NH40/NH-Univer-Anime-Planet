@@ -101,16 +101,26 @@ EDIT_IMAGE_PROMPT = "Отправьте картинку клана. /cancel —
 EDIT_IMAGE_DONE = "✅ Картинка клана обновлена."
 NOT_AUTHORIZED = "Недостаточно прав."
 
-# --- Обменник пыли ---
+# --- Обменник (пыль/тикеты/коины между участниками одного клана) ---
+BTN_EXCHANGE_DUST = "💨 Пыль"
+BTN_EXCHANGE_TICKETS = "🎫 Тикеты"
+BTN_EXCHANGE_COINS = "🪙 Коины"
+EXCHANGE_CHOOSE_CURRENCY = "🔄 <b>Обменник</b>\n\nЧто передать?"
+
+# Родительный падеж множественного числа — одинаково подходит и для "количество {currency}",
+# и для "Передано {amount} {currency}" (см. CLAUDE.md, "Кланы" — обменник обобщён с пыли
+# на 3 валюты). Ключ — значение TransactionCurrency.
+CURRENCY_NAMES_GENITIVE = {"dust": "пыли", "tickets": "тикетов", "coins": "коинов"}
+
 EXCHANGE_PROMPT = (
-    "Введите @username участника клана и количество пыли через пробел.\n"
+    "Введите @username участника клана и количество {currency} через пробел.\n"
     "Например: <code>@ivan 50</code>\n/cancel — отменить."
 )
 EXCHANGE_INVALID = "Формат: @username количество (целое число больше 0)."
 EXCHANGE_NOT_IN_CLAN = "Этот игрок не в вашем клане."
-EXCHANGE_NOT_ENOUGH_DUST = "Не хватает пыли: нужно {needed}."
-EXCHANGE_DONE = "✅ Передано {amount} пыли игроку @{username}."
-NOTIFY_EXCHANGE_RECEIVED = "🔄 Вам передали {amount} пыли от @{username}."
+EXCHANGE_NOT_ENOUGH = "Не хватает {currency}: нужно {needed}."
+EXCHANGE_DONE = "✅ Передано {amount} {currency} игроку @{username}."
+NOTIFY_EXCHANGE_RECEIVED = "🔄 Вам передали {amount} {currency} от @{username}."
 
 # --- Война ---
 WAR_NONE = "⚔️ Сейчас клан ни с кем не воюет."

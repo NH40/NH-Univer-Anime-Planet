@@ -9,16 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
-from bot.constant.clan import CB_CLAN_EXCHANGE_START, LOCK_ACTION_EXCHANGE_DUST
+from bot.constant.clan import CB_CLAN_EXCHANGE_CURRENCY_PREFIX, CB_CLAN_EXCHANGE_START, LOCK_ACTION_EXCHANGE
+from bot.db.models.enums import TransactionCurrency
 from bot.db.repositories import clan as clan_repo
 from bot.db.repositories.user import get_by_username as get_user_by_username
+from bot.keyboards.clan import exchange_currency_menu
 from bot.services import clan as clan_service
 from bot.states.clan import ClanStates
 from bot.texts.clan import (
     ACTION_CANCELLED,
+    CURRENCY_NAMES_GENITIVE,
+    EXCHANGE_CHOOSE_CURRENCY,
     EXCHANGE_DONE,
     EXCHANGE_INVALID,
-    EXCHANGE_NOT_ENOUGH_DUST,
+    EXCHANGE_NOT_ENOUGH,
     EXCHANGE_NOT_IN_CLAN,
     EXCHANGE_PROMPT,
     INVITE_USER_NOT_FOUND,
@@ -32,14 +36,35 @@ router = Router(name="clan_exchange")
 
 
 @router.callback_query(F.data == CB_CLAN_EXCHANGE_START)
-async def cb_exchange_start(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
+async def cb_exchange_start(callback: CallbackQuery, session: AsyncSession) -> None:
     member = await clan_repo.get_member(session, callback.from_user.id)
     if member is None:
         await callback.answer(NOT_IN_CLAN, show_alert=True)
         return
-    await state.set_state(ClanStates.waiting_exchange_input)
     await callback.answer()
-    await safe_edit_text(callback.message, EXCHANGE_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, EXCHANGE_CHOOSE_CURRENCY, reply_markup=exchange_currency_menu())
+
+
+@router.callback_query(F.data.startswith(CB_CLAN_EXCHANGE_CURRENCY_PREFIX))
+async def cb_exchange_currency(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
+    member = await clan_repo.get_member(session, callback.from_user.id)
+    if member is None:
+        await callback.answer(NOT_IN_CLAN, show_alert=True)
+        return
+
+    currency_value = callback.data[len(CB_CLAN_EXCHANGE_CURRENCY_PREFIX) :]
+    if currency_value not in CURRENCY_NAMES_GENITIVE:
+        await callback.answer()
+        return
+
+    await state.set_state(ClanStates.waiting_exchange_input)
+    await state.update_data(currency=currency_value)
+    await callback.answer()
+    await safe_edit_text(
+        callback.message,
+        EXCHANGE_PROMPT.format(currency=CURRENCY_NAMES_GENITIVE[currency_value]),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
+    )
 
 
 @router.message(StateFilter(ClanStates.waiting_exchange_input), Command("cancel"))
@@ -55,9 +80,19 @@ async def apply_exchange(message: Message, state: FSMContext, session: AsyncSess
         await message.answer(EXCHANGE_INVALID)
         return
 
+    data = await state.get_data()
+    currency_value = data.get("currency")
+    await state.clear()
+    if currency_value not in CURRENCY_NAMES_GENITIVE:
+        # FSM-данные потерялись (например, истёк Redis-стораж) — не должно случаться в
+        # норме, но лучше явно попросить начать заново, чем упасть на TransactionCurrency(...).
+        await message.answer(EXCHANGE_INVALID)
+        return
+    currency = TransactionCurrency(currency_value)
+    currency_name = CURRENCY_NAMES_GENITIVE[currency_value]
+
     username = parts[0].lstrip("@")
     amount = int(parts[1])
-    await state.clear()
 
     sender_id = message.from_user.id
     target = await get_user_by_username(session, username)
@@ -65,22 +100,28 @@ async def apply_exchange(message: Message, state: FSMContext, session: AsyncSess
         await message.answer(INVITE_USER_NOT_FOUND)
         return
 
-    async with try_acquire(redis, action_lock(sender_id, LOCK_ACTION_EXCHANGE_DUST)) as acquired:
+    async with try_acquire(redis, action_lock(sender_id, LOCK_ACTION_EXCHANGE)) as acquired:
         if not acquired:
             return
 
         try:
-            await clan_service.exchange_dust(session, sender_id=sender_id, receiver_id=target.id, amount=amount)
+            await clan_service.exchange_currency(
+                session, sender_id=sender_id, receiver_id=target.id, amount=amount, currency=currency
+            )
         except clan_service.NotInSameClanError:
             await message.answer(EXCHANGE_NOT_IN_CLAN)
             return
-        except clan_service.ExchangeNotEnoughDustError as exc:
-            await message.answer(EXCHANGE_NOT_ENOUGH_DUST.format(needed=exc.needed))
+        except clan_service.ExchangeNotEnoughCurrencyError as exc:
+            await message.answer(EXCHANGE_NOT_ENOUGH.format(currency=currency_name, needed=exc.needed))
             return
 
     display_username = target.username or str(target.id)
-    await message.answer(EXCHANGE_DONE.format(amount=amount, username=display_username))
+    await message.answer(EXCHANGE_DONE.format(amount=amount, currency=currency_name, username=display_username))
 
     if target.notifications_enabled:
         sender_username = message.from_user.username or str(sender_id)
-        await notify(bot, target.id, NOTIFY_EXCHANGE_RECEIVED.format(amount=amount, username=sender_username))
+        await notify(
+            bot,
+            target.id,
+            NOTIFY_EXCHANGE_RECEIVED.format(amount=amount, currency=currency_name, username=sender_username),
+        )

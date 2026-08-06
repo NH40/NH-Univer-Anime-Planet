@@ -29,8 +29,8 @@ from bot.services.clan.clan import (
     set_member_rank,
     transfer_ownership,
 )
-from bot.services.clan.exchange import NotEnoughDustError as ExchangeNotEnoughDustError
-from bot.services.clan.exchange import NotInSameClanError, exchange_dust
+from bot.services.clan.exchange import NotEnoughCurrencyError as ExchangeNotEnoughCurrencyError
+from bot.services.clan.exchange import NotInSameClanError, exchange_currency
 from bot.services.clan.war import AlreadyAtWarError
 from bot.services.clan.war import NotAuthorizedError as WarNotAuthorizedError
 from bot.services.clan.war import WarProgress, get_progress, start_war
@@ -44,7 +44,7 @@ __all__ = [
     "ClanNameTakenError",
     "ClanNotFoundError",
     "ClanView",
-    "ExchangeNotEnoughDustError",
+    "ExchangeNotEnoughCurrencyError",
     "MustTransferOwnershipFirstError",
     "NotAuthorizedError",
     "NotInClanError",
@@ -60,7 +60,7 @@ __all__ = [
     "create_clan",
     "decline_invite",
     "edit_profile",
-    "exchange_dust",
+    "exchange_currency",
     "get_clan_view",
     "get_progress",
     "invite_player",

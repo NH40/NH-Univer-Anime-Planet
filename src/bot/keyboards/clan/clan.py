@@ -13,6 +13,7 @@ from bot.constant.clan import (
     CB_CLAN_EDIT_DESCRIPTION,
     CB_CLAN_EDIT_IMAGE,
     CB_CLAN_EDIT_NAME,
+    CB_CLAN_EXCHANGE_CURRENCY_PREFIX,
     CB_CLAN_EXCHANGE_START,
     CB_CLAN_FIND,
     CB_CLAN_FIND_PAGE_PREFIX,
@@ -49,6 +50,9 @@ from bot.texts.clan import (
     BTN_EDIT_IMAGE,
     BTN_EDIT_NAME,
     BTN_EXCHANGE,
+    BTN_EXCHANGE_COINS,
+    BTN_EXCHANGE_DUST,
+    BTN_EXCHANGE_TICKETS,
     BTN_FIND_CLAN,
     BTN_INVITE,
     BTN_LEAVE,
@@ -83,6 +87,20 @@ def no_clan_menu(*, invite_count: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=BTN_MY_INVITES.format(count=invite_count), callback_data=CB_CLAN_MY_INVITES)]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def exchange_currency_menu() -> InlineKeyboardMarkup:
+    """Шаг выбора валюты перед вводом @username/суммы (см. CLAUDE.md, "Кланы" — обменник
+    обобщён с пыли на пыль/тикеты/коины). Суффикс callback'а — значение TransactionCurrency
+    (см. handlers/clan/exchange.py: cb_exchange_currency)."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_EXCHANGE_DUST, callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}dust")],
+            [InlineKeyboardButton(text=BTN_EXCHANGE_TICKETS, callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}tickets")],
+            [InlineKeyboardButton(text=BTN_EXCHANGE_COINS, callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}coins")],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_OPEN)],
+        ]
+    )
 
 
 def clan_card_menu(*, rank: ClanRank, request_count: int = 0) -> InlineKeyboardMarkup:

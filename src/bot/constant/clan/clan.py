@@ -7,7 +7,7 @@ LOCK_ACTION_CREATE_CLAN = "create_clan"
 LOCK_ACTION_APPLY_CLAN = "apply_clan"
 LOCK_ACTION_ACCEPT_APPLICATION = "accept_clan_application"
 LOCK_ACTION_START_WAR = "start_clan_war"
-LOCK_ACTION_EXCHANGE_DUST = "clan_exchange_dust"
+LOCK_ACTION_EXCHANGE = "clan_exchange_currency"
 LOCK_ACTION_TRANSFER_OWNERSHIP = "transfer_clan_ownership"
 
 CB_CLAN_OPEN = "clan:open"
@@ -38,6 +38,7 @@ CB_CLAN_EDIT_DESCRIPTION = "clan:edit_description"
 CB_CLAN_EDIT_IMAGE = "clan:edit_image"
 
 CB_CLAN_EXCHANGE_START = "clan:exchange_start"
+CB_CLAN_EXCHANGE_CURRENCY_PREFIX = "clan:exchange_currency:"
 
 CB_CLAN_WAR = "clan:war"
 CB_CLAN_WAR_START = "clan:war_start"
