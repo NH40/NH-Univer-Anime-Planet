@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -10,20 +10,28 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.leaderboard import get_count, get_page, get_rank, get_top
-from bot.config.game import TICKET_NATURAL_CAP
+from bot.config.game import (
+    REFERRAL_DONATE_CUT_PERCENT,
+    REFERRAL_FIRST_ROLL_REWARD_COINS,
+    REFERRAL_FIRST_ROLL_REWARD_TICKETS,
+    TICKET_NATURAL_CAP,
+)
 from bot.config.settings import get_settings
 from bot.constant.profile import (
     CB_PLAYERS_PAGE_PREFIX,
     CB_PROFILE_DAILY_BONUS,
+    CB_PROFILE_OPEN,
     CB_PROFILE_REFERRALS,
     CB_PROFILE_RENAME,
 )
+from bot.constant.referral import REFERRAL_DEEPLINK_PREFIX
 from bot.db.repositories.clan import get_name as get_clan_name
 from bot.db.repositories.inventory import UniverseProgress, get_universe_progress
 from bot.db.repositories.season import get_active as get_active_season
-from bot.db.repositories.user import get_by_id, get_many_by_ids, set_display_name
-from bot.keyboards.profile import players_pager, profile_menu
+from bot.db.repositories.user import get_by_id, get_many_by_ids, get_referral_stats, set_display_name
+from bot.keyboards.profile import back_to_profile, players_pager, profile_menu
 from bot.services import ticket
+from bot.services.referral import REFERRAL_REWARD_REASONS
 from bot.states.profile import ProfileStates
 from bot.texts.common import BTN_PROFILE, NEED_START
 from bot.texts.profile import (
@@ -39,12 +47,12 @@ from bot.texts.profile import (
     PROGRESS_LINE,
     PROGRESS_QUOTE_CLOSE,
     PROGRESS_QUOTE_OPEN,
+    REFERRALS_SCREEN,
     RENAME_CANCELLED,
     RENAME_DONE,
     RENAME_INVALID,
     RENAME_PROMPT,
     STUB_DAILY_BONUS,
-    STUB_REFERRALS,
     TICKETS_LINE_COUNTDOWN,
     TICKETS_LINE_READY,
     TOP_EMPTY,
@@ -114,6 +122,21 @@ async def show_profile(message: Message, session: AsyncSession, redis: Redis) ->
     await message.answer(text, reply_markup=profile_menu(mini_app_url=settings.mini_app_url or None))
 
 
+@router.callback_query(F.data == CB_PROFILE_OPEN)
+async def cb_open_profile(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
+    """"Назад" с под-экранов профиля (рефералы и т.п.) — редактирует то же сообщение
+    обратно в карточку профиля, тот же паттерн "_OPEN", что у остальных доменов."""
+    text = await _render_profile(session, redis, callback.from_user.id)
+    await callback.answer()
+    if text is None:
+        await callback.message.answer(NEED_START)
+        return
+    settings = get_settings()
+    await safe_edit_text(
+        callback.message, text, reply_markup=profile_menu(mini_app_url=settings.mini_app_url or None)
+    )
+
+
 @router.callback_query(F.data == CB_PROFILE_RENAME)
 async def cb_rename_start(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(ProfileStates.waiting_new_name)
@@ -122,9 +145,33 @@ async def cb_rename_start(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.callback_query(F.data == CB_PROFILE_REFERRALS)
-async def cb_referrals_stub(callback: CallbackQuery) -> None:
-    """Заглушка — см. TODO.md, план реализации рефералов в профиле."""
-    await callback.answer(STUB_REFERRALS, show_alert=True)
+async def cb_referrals(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
+    user_id = callback.from_user.id
+    season = await get_active_season(session)
+    stats = await get_referral_stats(
+        session, user_id, reward_reasons=REFERRAL_REWARD_REASONS, active_season_id=season.id if season else None
+    )
+    me = await bot.get_me()
+    link = f"https://t.me/{me.username}?start={REFERRAL_DEEPLINK_PREFIX}{user_id}"
+
+    await callback.answer()
+    await safe_edit_text(
+        callback.message,
+        REFERRALS_SCREEN.format(
+            link=link,
+            invited=stats.invited,
+            playing=stats.playing,
+            donors=stats.donors,
+            subscribers=stats.subscribers,
+            battle_pass_owners=stats.battle_pass_owners,
+            coins_earned=stats.coins_earned,
+            tickets_earned=stats.tickets_earned,
+            reward_coins=REFERRAL_FIRST_ROLL_REWARD_COINS,
+            reward_tickets=REFERRAL_FIRST_ROLL_REWARD_TICKETS,
+            cut_percent=REFERRAL_DONATE_CUT_PERCENT,
+        ),
+        reply_markup=back_to_profile(),
+    )
 
 
 @router.callback_query(F.data == CB_PROFILE_DAILY_BONUS)

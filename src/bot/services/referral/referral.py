@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.constant.referral import TRANSACTION_REASON_REFERRAL_DONATE_CUT, TRANSACTION_REASON_REFERRAL_REWARD
 from bot.db.repositories import referral as referral_repo
+
+# Причины transactions.reason, которые считаются "заработком с рефералов" на экране
+# профиля (см. handlers/profile: get_referral_stats) — награда за первую крутку
+# приглашённого + % с его донатов.
+REFERRAL_REWARD_REASONS = (TRANSACTION_REASON_REFERRAL_REWARD, TRANSACTION_REASON_REFERRAL_DONATE_CUT)
 
 
 class ReferralCodeTakenError(Exception):

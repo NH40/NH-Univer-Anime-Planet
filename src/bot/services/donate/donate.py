@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.config.game import DONATE_COINS_PER_RUB
+from bot.config.game import DONATE_COINS_PER_RUB, REFERRAL_DONATE_CUT_PERCENT
 from bot.constant.donate import TRANSACTION_REASON_DONATE
+from bot.constant.referral import TRANSACTION_REASON_REFERRAL_DONATE_CUT
 from bot.db.models.enums import TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import payment as payment_repo
-from bot.db.repositories.user import add_coins
+from bot.db.repositories.user import add_coins, get_by_id
 
 
 async def credit_payment(
@@ -18,7 +19,12 @@ async def credit_payment(
     апдейт `successful_payment` — деньги списаны Telegram один раз, но апдейт может
     прилететь дважды). Идемпотентность — через unique(`telegram_payment_charge_id`) в
     `payments`, не через Redis-лок: лок защищает от повторного КЛИКА игрока, а здесь
-    источник повторов — сервер Telegram, а не UI (см. CLAUDE.md, "Донат")."""
+    источник повторов — сервер Telegram, а не UI (см. CLAUDE.md, "Донат").
+
+    Заодно — если у игрока есть реферер (`User.referred_by_id`), тому начисляется
+    REFERRAL_DONATE_CUT_PERCENT% от начисленных коинов (округление вниз), пока действует
+    связь (см. CLAUDE.md, "Рефералы") — тем же commit'ом, идемпотентность уже гарантирована
+    проверкой выше (повторная доставка апдейта просто не дойдёт до этого места второй раз)."""
     coins = amount_rub * DONATE_COINS_PER_RUB
 
     ok = await payment_repo.create_succeeded(
@@ -37,5 +43,20 @@ async def credit_payment(
             user_id=user_id, currency=TransactionCurrency.coins, amount=coins, reason=TRANSACTION_REASON_DONATE
         )
     )
+
+    payer = await get_by_id(session, user_id)
+    if payer is not None and payer.referred_by_id is not None:
+        cut = coins * REFERRAL_DONATE_CUT_PERCENT // 100
+        if cut > 0:
+            await add_coins(session, user_id=payer.referred_by_id, amount=cut)
+            session.add(
+                Transaction(
+                    user_id=payer.referred_by_id,
+                    currency=TransactionCurrency.coins,
+                    amount=cut,
+                    reason=TRANSACTION_REASON_REFERRAL_DONATE_CUT,
+                )
+            )
+
     await session.commit()
     return coins

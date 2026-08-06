@@ -1,4 +1,5 @@
 from bot.db.repositories.user.user import (
+    ReferralStats,
     add_coins,
     add_dust,
     count_active_since,
@@ -7,6 +8,7 @@ from bot.db.repositories.user.user import (
     get_by_id,
     get_by_username,
     get_many_by_ids,
+    get_referral_stats,
     increment_total_rolls,
     list_all_ids,
     set_clan,
@@ -16,6 +18,7 @@ from bot.db.repositories.user.user import (
     set_notify_clan_requests,
     set_notify_roll_reminder,
     set_notify_tickets_full,
+    set_referred_by,
     set_universe,
     spend_coins,
     spend_dust,
@@ -23,6 +26,7 @@ from bot.db.repositories.user.user import (
 )
 
 __all__ = [
+    "ReferralStats",
     "add_coins",
     "add_dust",
     "count_active_since",
@@ -31,6 +35,7 @@ __all__ = [
     "get_by_id",
     "get_by_username",
     "get_many_by_ids",
+    "get_referral_stats",
     "increment_total_rolls",
     "list_all_ids",
     "set_clan",
@@ -40,6 +45,7 @@ __all__ = [
     "set_notify_clan_requests",
     "set_notify_roll_reminder",
     "set_notify_tickets_full",
+    "set_referred_by",
     "set_universe",
     "spend_coins",
     "spend_dust",

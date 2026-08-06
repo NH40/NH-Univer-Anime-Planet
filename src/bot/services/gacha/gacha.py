@@ -7,12 +7,15 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.leaderboard import sync_score
-from bot.config.game import ROLL_ONE_COST, ROLL_TEN_COST, ROLL_TEN_COUNT
+from bot.config.game import REFERRAL_FIRST_ROLL_REWARD_COINS, REFERRAL_FIRST_ROLL_REWARD_TICKETS, ROLL_ONE_COST, ROLL_TEN_COST, ROLL_TEN_COUNT
 from bot.constant.gacha import TRANSACTION_REASON_ROLL
+from bot.constant.referral import TRANSACTION_REASON_REFERRAL_REWARD
 from bot.db.models.card import Card
+from bot.db.models.enums import TransactionCurrency
+from bot.db.models.transaction import Transaction
 from bot.db.repositories.inventory import add_card
 from bot.db.repositories.season import get_active as get_active_season
-from bot.db.repositories.user import increment_total_rolls
+from bot.db.repositories.user import add_coins, increment_total_rolls
 from bot.services import ticket
 from bot.services.card import get_tier_map, pick_card
 from bot.services.ubp import award_ubp
@@ -63,7 +66,30 @@ async def _roll(
 
     total_ubp = sum(card.base_ubp for card in cards)
     new_season_ubp = await award_ubp(session, user_id=user_id, amount=total_ubp, reason=TRANSACTION_REASON_ROLL)
-    await increment_total_rolls(session, user_id=user_id, amount=count)
+    new_total_rolls, referred_by_id = await increment_total_rolls(session, user_id=user_id, amount=count)
+
+    # new_total_rolls == count означает, что ДО этой крутки было 0 — то есть она первая
+    # вообще (см. CLAUDE.md, "Рефералы": награда рефереру только за первую крутку
+    # приглашённого, не за каждую — анти-абьюз пустыми аккаунтами).
+    if referred_by_id is not None and new_total_rolls == count:
+        await add_coins(session, user_id=referred_by_id, amount=REFERRAL_FIRST_ROLL_REWARD_COINS)
+        await ticket.grant(session, referred_by_id, REFERRAL_FIRST_ROLL_REWARD_TICKETS)
+        session.add(
+            Transaction(
+                user_id=referred_by_id,
+                currency=TransactionCurrency.coins,
+                amount=REFERRAL_FIRST_ROLL_REWARD_COINS,
+                reason=TRANSACTION_REASON_REFERRAL_REWARD,
+            )
+        )
+        session.add(
+            Transaction(
+                user_id=referred_by_id,
+                currency=TransactionCurrency.tickets,
+                amount=REFERRAL_FIRST_ROLL_REWARD_TICKETS,
+                reason=TRANSACTION_REASON_REFERRAL_REWARD,
+            )
+        )
 
     await session.commit()
     # Redis обновляем только после успешного commit в Postgres (см. CLAUDE.md, правило 10).

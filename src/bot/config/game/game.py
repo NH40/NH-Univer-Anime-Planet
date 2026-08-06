@@ -142,6 +142,14 @@ DONATE_PRESETS_RUB: tuple[int, ...] = (50, 100, 300, 500, 1000, 3000)
 # Индекс 0 = 1 место, индекс 9 = 10 место.
 SEASON_TOP10_REWARD_COINS: tuple[int, ...] = (1000, 600, 600, 300, 300, 300, 300, 300, 300, 300)
 
+# --- Рефералы (см. CLAUDE.md, "Рефералы") --- Награда рефереру начисляется после ПЕРВОЙ
+# крутки приглашённого (не сразу при /start) — анти-абьюз пустыми аккаунтами.
+REFERRAL_FIRST_ROLL_REWARD_COINS = 50
+REFERRAL_FIRST_ROLL_REWARD_TICKETS = 50
+# Доля от суммы доната реферала, начисляемая рефереру (в коинах), пока связь referred_by_id
+# не разорвана — округление вниз (см. services/donate.credit_payment).
+REFERRAL_DONATE_CUT_PERCENT = 10
+
 
 def ubp_for_stars(base_ubp: int, stars: int) -> int:
     """UBP карты на уровне `stars` (1★ = base_ubp). Каждая следующая звезда — это одно

@@ -17,6 +17,7 @@ class User(Base):
     __table_args__ = (
         Index("ix_users_clan_id", "clan_id"),
         Index("ix_users_ubp_season", "ubp_season"),
+        Index("ix_users_referred_by_id", "referred_by_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
@@ -33,6 +34,14 @@ class User(Base):
     # добавляется отдельным ALTER TABLE уже после того, как обе таблицы существуют.
     clan_id: Mapped[int | None] = mapped_column(
         ForeignKey("clans.id", ondelete="SET NULL", use_alter=True), nullable=True
+    )
+    # Кто пригласил этого игрока по персональной реферальной ссылке (t.me/<bot>?start=r_<id>,
+    # см. handlers/start) — выставляется один раз при первом /start по такой ссылке
+    # (db/repositories/user: set_referred_by, WHERE referred_by_id IS NULL), дальше не
+    # меняется. Отдельно от ReferralLink/ReferralVisit (db/models/referral.py) — те под
+    # именные кампании админа (см. CLAUDE.md, Этап 10), не под личные ссылки игроков.
+    referred_by_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")

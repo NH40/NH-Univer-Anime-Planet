@@ -5,10 +5,11 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from bot.constant.profile import (
     CB_PLAYERS_PAGE_PREFIX,
     CB_PROFILE_DAILY_BONUS,
+    CB_PROFILE_OPEN,
     CB_PROFILE_REFERRALS,
     CB_PROFILE_RENAME,
 )
-from bot.texts.common import BTN_PROFILE_APP
+from bot.texts.common import BTN_BACK, BTN_PROFILE_APP
 from bot.texts.profile import BTN_DAILY_BONUS, BTN_REFERRALS, BTN_RENAME
 
 
@@ -27,6 +28,10 @@ def profile_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=BTN_PROFILE_APP, web_app=WebAppInfo(url=f"{mini_app_url}?view=profile"))]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def back_to_profile() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=BTN_BACK, callback_data=CB_PROFILE_OPEN)]])
 
 
 def players_pager(page: int, total_pages: int) -> InlineKeyboardMarkup:

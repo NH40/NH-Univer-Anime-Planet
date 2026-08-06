@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import case, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.db.models.transaction import Transaction
 from bot.db.models.user import User
 
 
@@ -118,10 +120,21 @@ async def extend_subscription(session: AsyncSession, *, user_id: int, days: int)
     return result.scalar_one()
 
 
-async def increment_total_rolls(session: AsyncSession, *, user_id: int, amount: int) -> None:
+async def increment_total_rolls(session: AsyncSession, *, user_id: int, amount: int) -> tuple[int, int | None]:
     """Накопительный счётчик "круток за всё время" для профиля. Не коммитит — вызывается
-    внутри services/gacha как часть одной композитной операции крутки."""
-    await session.execute(update(User).where(User.id == user_id).values(total_rolls=User.total_rolls + amount))
+    внутри services/gacha как часть одной композитной операции крутки.
+
+    Возвращает (новый total_rolls, referred_by_id) тем же UPDATE — services/gacha по
+    `new_total_rolls == amount` бесплатно узнаёт "это была самая первая крутка вообще"
+    (старое значение было 0), без отдельного SELECT перед инкрементом — нужно для
+    реферальной награды "50 коинов+50 тикетов за первую крутку приглашённого"."""
+    result = await session.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(total_rolls=User.total_rolls + amount)
+        .returning(User.total_rolls, User.referred_by_id)
+    )
+    return result.one()
 
 
 async def set_notify_tickets_full(session: AsyncSession, *, user_id: int, enabled: bool) -> None:
@@ -179,3 +192,88 @@ async def list_all_ids(session: AsyncSession) -> list[int]:
     игроков список int'ов копеечный по памяти, а тянуть весь User целиком незачем."""
     result = await session.execute(select(User.id))
     return list(result.scalars().all())
+
+
+async def set_referred_by(session: AsyncSession, *, user_id: int, referrer_id: int) -> None:
+    """Выставляет referred_by_id ровно один раз (WHERE referred_by_id IS NULL) — повторный
+    /start по чужой реферальной ссылке уже привязанного игрока ничего не меняет. Нельзя
+    указать себя же реферером (referrer_id == user_id молча игнорируется на уровне вызова,
+    см. handlers/start). Коммитит — самостоятельная операция."""
+    await session.execute(
+        update(User)
+        .where(User.id == user_id, User.referred_by_id.is_(None))
+        .values(referred_by_id=referrer_id)
+    )
+    await session.commit()
+
+
+@dataclass
+class ReferralStats:
+    invited: int
+    playing: int  # total_rolls > 0
+    donors: int  # хотя бы один успешный платёж (payments.status = succeeded)
+    subscribers: int  # subscription_until > now() ПРЯМО СЕЙЧАС (живой снимок, не "когда-либо")
+    battle_pass_owners: int  # BattlePass.is_premium в АКТИВНОМ сезоне
+    coins_earned: int
+    tickets_earned: int
+
+
+async def get_referral_stats(
+    session: AsyncSession, user_id: int, *, reward_reasons: tuple[str, ...], active_season_id: int | None
+) -> ReferralStats:
+    """Подробная статистика по рефералам игрока (см. запрос пользователя 2026-08-06: не
+    только "перешло/играет", а ещё доноры/подписчики/владельцы пасса/заработок). Несколько
+    небольших запросов вместо одного гигантского с кучей LEFT JOIN — это не горячий путь
+    (открывается по кнопке одним игроком за раз), читаемость важнее экономии одного round-trip."""
+    from bot.db.models.battle_pass import BattlePass
+    from bot.db.models.enums import PaymentStatus
+    from bot.db.models.payment import Payment
+
+    base_stmt = select(
+        func.count(User.id),
+        func.count(User.id).filter(User.total_rolls > 0),
+        func.count(User.id).filter(User.subscription_until > func.now()),
+    ).where(User.referred_by_id == user_id)
+    invited, playing, subscribers = (await session.execute(base_stmt)).one()
+
+    donors_stmt = (
+        select(func.count(func.distinct(Payment.user_id)))
+        .select_from(Payment)
+        .join(User, User.id == Payment.user_id)
+        .where(User.referred_by_id == user_id, Payment.status == PaymentStatus.succeeded)
+    )
+    donors = (await session.execute(donors_stmt)).scalar_one()
+
+    battle_pass_owners = 0
+    if active_season_id is not None:
+        bp_stmt = (
+            select(func.count(BattlePass.user_id))
+            .select_from(BattlePass)
+            .join(User, User.id == BattlePass.user_id)
+            .where(
+                User.referred_by_id == user_id,
+                BattlePass.season_id == active_season_id,
+                BattlePass.is_premium.is_(True),
+            )
+        )
+        battle_pass_owners = (await session.execute(bp_stmt)).scalar_one()
+
+    earned_stmt = select(
+        func.coalesce(
+            func.sum(case((Transaction.currency == "coins", Transaction.amount), else_=0)), 0
+        ),
+        func.coalesce(
+            func.sum(case((Transaction.currency == "tickets", Transaction.amount), else_=0)), 0
+        ),
+    ).where(Transaction.user_id == user_id, Transaction.reason.in_(reward_reasons))
+    coins_earned, tickets_earned = (await session.execute(earned_stmt)).one()
+
+    return ReferralStats(
+        invited=int(invited),
+        playing=int(playing),
+        donors=int(donors),
+        subscribers=int(subscribers),
+        battle_pass_owners=int(battle_pass_owners),
+        coins_earned=int(coins_earned),
+        tickets_earned=int(tickets_earned),
+    )
