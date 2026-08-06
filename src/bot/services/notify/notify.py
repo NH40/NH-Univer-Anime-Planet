@@ -13,7 +13,7 @@ from bot.config.game import (
     TICKET_NATURAL_CAP,
     TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED,
 )
-from bot.texts.notify import DAILY_BONUS_READY, ROLL_REMINDER, TICKETS_FULL_REMINDER
+from bot.texts.notify import DAILY_BONUS_READY, QUESTS_REFRESHED, ROLL_REMINDER, TICKETS_FULL_REMINDER
 from bot.utils.notify import notify
 
 log = logging.getLogger(__name__)
@@ -81,6 +81,17 @@ _FIND_DAILY_BONUS_READY_SQL = text(
     """
 )
 
+_FIND_QUESTS_REFRESHED_SQL = text(
+    """
+    UPDATE users
+    SET quests_notified_at = now()
+    WHERE notify_daily_quests = true
+      AND quests_refreshed_at <= now() - INTERVAL '24 hours'
+      AND (quests_notified_at IS NULL OR quests_notified_at < quests_refreshed_at)
+    RETURNING id
+    """
+)
+
 
 async def grant_subscription_tickets(session: AsyncSession) -> list[int]:
     """Начисляет всем активным подписчикам +5 тикетов за каждые полные 24ч, прошедшие с
@@ -135,6 +146,18 @@ async def find_and_notify_daily_bonus_ready(session: AsyncSession) -> list[int]:
     return ids
 
 
+async def find_and_notify_quests_refreshed(session: AsyncSession) -> list[int]:
+    """Раз в сутки с момента последнего обновления набора заданий — напоминание "задания
+    обновились", всем игрокам с включённым тумблером. НЕ трогает quests_refreshed_at (тот
+    остаётся реальным игровым якорем, обновляется только фактическим переигрыванием набора
+    при заходе на экран, см. services/quest.get_status) — отдельный якорь
+    quests_notified_at, тот же анти-порча приём, что и у daily_bonus выше. Коммитит сама."""
+    result = await session.execute(_FIND_QUESTS_REFRESHED_SQL)
+    ids = [row[0] for row in result.all()]
+    await session.commit()
+    return ids
+
+
 async def run_sweep(bot: Bot, session: AsyncSession) -> None:
     """Единственная точка входа фонового таска (см. main.py). Единственное место в проекте,
     где сервисный слой сам зовёт Bot API (см. CLAUDE.md, правило 10) — у периодической
@@ -153,9 +176,14 @@ async def run_sweep(bot: Bot, session: AsyncSession) -> None:
     for user_id in daily_bonus_ids:
         await notify(bot, user_id, DAILY_BONUS_READY)
 
+    quests_refreshed_ids = await find_and_notify_quests_refreshed(session)
+    for user_id in quests_refreshed_ids:
+        await notify(bot, user_id, QUESTS_REFRESHED)
+
     log.info(
-        "notify sweep: tickets_full=%d roll_reminder=%d daily_bonus=%d",
+        "notify sweep: tickets_full=%d roll_reminder=%d daily_bonus=%d quests_refreshed=%d",
         len(tickets_full_ids),
         len(roll_reminder_ids),
         len(daily_bonus_ids),
+        len(quests_refreshed_ids),
     )

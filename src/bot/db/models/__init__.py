@@ -6,6 +6,7 @@ from bot.db.models.clan import Clan, ClanJoinRequest, ClanMember, ClanWar
 from bot.db.models.inventory import UserCard
 from bot.db.models.payment import Payment
 from bot.db.models.promocode import PromoCode, PromoRedemption
+from bot.db.models.quest import DailyQuest
 from bot.db.models.referral import ReferralLink, ReferralVisit
 from bot.db.models.season import Season
 from bot.db.models.transaction import Transaction
@@ -19,6 +20,7 @@ __all__ = [
     "ClanJoinRequest",
     "ClanMember",
     "ClanWar",
+    "DailyQuest",
     "UserCard",
     "Payment",
     "PromoCode",

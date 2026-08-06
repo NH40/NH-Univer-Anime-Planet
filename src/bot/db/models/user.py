@@ -105,6 +105,21 @@ class User(Base):
     # уведомляли про ТЕКУЩЕЕ окно готовности" — естественно сбрасывается каждым новым claim.
     daily_bonus_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Ежедневные задания (см. CLAUDE.md, "Ежедневные задания") — сами 5 активных заданий
+    # лежат в таблице `daily_quests` (db/models/quest.py), здесь — только якоря и счётчики
+    # рероллов, которые сбрасываются вместе с обновлением набора. quests_refreshed_at —
+    # реальный игровой якорь (обновляется ТОЛЬКО когда набор фактически переигран, лениво
+    # при заходе на экран после 24ч, см. services/quest/quest.py). quests_notified_at —
+    # ОТДЕЛЬНЫЙ якорь для пуша "задания обновлены" (services/notify), не трогает
+    # quests_refreshed_at — тот же анти-порча приём, что и у daily_bonus_notified_at выше.
+    quests_refreshed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    quests_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notify_daily_quests: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # 1 "переролл всех" в сутки (флаг, сбрасывается в False при каждом обновлении набора) +
+    # 2 переролла ОТДЕЛЬНОГО задания в сутки (счётчик, сбрасывается в 0 вместе с флагом).
+    daily_quest_reroll_all_used: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    daily_quest_individual_reroll_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
     # "Онлайн" в статистике /admin = активны за последние 24ч. Обновляется одним UPDATE
     # внутри BanCheckMiddleware на каждый апдейт (тот же запрос, что и бан-чек, не второй
     # сверху, см. CLAUDE.md, правило 4 — единичный indexed UPDATE по PK дёшев на 30k онлайн).
