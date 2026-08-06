@@ -12,6 +12,7 @@ BTN_ADMIN_MASS_GRANT = "🎁 Выдать всем"
 BTN_ADMIN_DELETE_ACCOUNT = "🗑 Удалить аккаунт"
 BTN_ADMIN_MANAGE_ADMINS = "👑 Админы"
 BTN_ADMIN_WIPE = "💣 Обнулить БД"
+BTN_ADMIN_EVENTS = "🎉 Ивенты"
 
 TECH_MODE_ENABLED = "🛠 Техрежим включён."
 TECH_MODE_DISABLED = "✅ Техрежим выключен."
@@ -177,3 +178,17 @@ WIPE_CONFIRM_PROMPT = (
 WIPE_CONFIRM_EXPIRED = "Время подтверждения истекло. Начните заново."
 WIPE_DONE = "💣 База данных полностью очищена. Бот работает с чистого листа."
 WIPE_DONE_BROADCAST = "💣 База данных полностью очищена администратором @{name}."
+
+# --- Ивенты (доступно любому админу) ---
+EVENTS_HEADER = (
+    "🎉 <b>Ивенты</b>\n\n"
+    "Активен максимум один ивент одновременно. Пока ивент активен — у каждой крутки есть "
+    "{chance:.2f}% шанс получить ивент-карту (7000 UBP) вместо обычной.\n\n"
+)
+EVENT_STATUS_LINE = "{icon} {title}\n"
+EVENT_ACTIVE_ICON = "🟢"
+EVENT_INACTIVE_ICON = "⚪"
+BTN_EVENT_ACTIVATE_PREFIX = "▶️ Включить: "
+BTN_EVENT_DEACTIVATE_PREFIX = "⏹ Выключить: "
+EVENT_TOGGLED_ON = "✅ Ивент «{title}» включён."
+EVENT_TOGGLED_OFF = "❌ Ивент «{title}» выключен."

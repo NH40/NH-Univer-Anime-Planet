@@ -46,3 +46,7 @@ CB_ADMIN_TOGGLE_ADMIN_PREFIX = "admin:toggle_admin:"
 # Полное удаление БД — только для супер-админов, см. handlers/admin/db_wipe.
 CB_ADMIN_WIPE_START = "admin:wipe_start"
 CB_ADMIN_WIPE_CONFIRM = "admin:wipe_confirm"
+
+# Ивенты — доступно ЛЮБОМУ админу (не только супер-админу), см. handlers/admin/events.
+CB_ADMIN_EVENTS = "admin:events"
+CB_ADMIN_EVENT_TOGGLE_PREFIX = "admin:event_toggle:"

@@ -7,6 +7,8 @@ from bot.constant.admin import (
     CB_ADMIN_BROADCAST_START,
     CB_ADMIN_DELETE_ACCOUNT_CONFIRM_PREFIX,
     CB_ADMIN_DELETE_ACCOUNT_START,
+    CB_ADMIN_EVENT_TOGGLE_PREFIX,
+    CB_ADMIN_EVENTS,
     CB_ADMIN_FIND_PLAYER_START,
     CB_ADMIN_MANAGE_ADMINS,
     CB_ADMIN_MANAGE_FIND_PLAYER,
@@ -37,6 +39,7 @@ from bot.constant.admin import (
 from bot.texts.admin import (
     BTN_ADMIN_BROADCAST,
     BTN_ADMIN_DELETE_ACCOUNT,
+    BTN_ADMIN_EVENTS,
     BTN_ADMIN_FIND_PLAYER,
     BTN_ADMIN_MANAGE_ADMINS,
     BTN_ADMIN_MASS_GRANT,
@@ -48,6 +51,8 @@ from bot.texts.admin import (
     BTN_ADMIN_WIPE,
     BTN_BAN,
     BTN_CONFIRM,
+    BTN_EVENT_ACTIVATE_PREFIX,
+    BTN_EVENT_DEACTIVATE_PREFIX,
     BTN_FIND_ANOTHER,
     BTN_GIVE_CARD,
     BTN_GIVE_COINS,
@@ -64,6 +69,7 @@ from bot.texts.admin import (
     BTN_SEASON_NEW,
     BTN_UNBAN,
 )
+from bot.services.event import EventStatus
 from bot.texts.common import BTN_BACK
 from bot.texts.settings import STATUS_OFF, STATUS_ON
 
@@ -90,6 +96,9 @@ def admin_menu(*, tech_mode_enabled: bool, is_super_admin: bool = False) -> Inli
             InlineKeyboardButton(text=BTN_ADMIN_MASS_GRANT, callback_data=CB_ADMIN_MASS_GRANT),
             InlineKeyboardButton(text=BTN_ADMIN_DELETE_ACCOUNT, callback_data=CB_ADMIN_DELETE_ACCOUNT_START),
         ],
+        # Ивенты — контентная функция, не деструктивная, доступна ЛЮБОМУ админу, не
+        # только супер-админу (в отличие от блока ниже).
+        [InlineKeyboardButton(text=BTN_ADMIN_EVENTS, callback_data=CB_ADMIN_EVENTS)],
     ]
     if is_super_admin:
         # Управление правами и полный сброс БД доступны ТОЛЬКО супер-админам (ADMIN_IDS из
@@ -220,6 +229,20 @@ def delete_account_confirm_menu(user_id: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)],
         ]
     )
+
+
+def events_menu(statuses: list[EventStatus]) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=f"{BTN_EVENT_DEACTIVATE_PREFIX if s.is_active else BTN_EVENT_ACTIVATE_PREFIX}{s.title}",
+                callback_data=f"{CB_ADMIN_EVENT_TOGGLE_PREFIX}{s.code}",
+            )
+        ]
+        for s in statuses
+    ]
+    rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def wipe_confirm_menu() -> InlineKeyboardMarkup:

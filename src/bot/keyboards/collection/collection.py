@@ -6,6 +6,7 @@ from bot.config.game import MERGE_COPIES_REQUIRED, TIER_CHANCE_PERCENT
 from bot.constant.collection import (
     CB_COLL_DUST1_PREFIX,
     CB_COLL_DUSTALL_PREFIX,
+    CB_COLL_EVENTS,
     CB_COLL_MERGE_PREFIX,
     CB_COLL_NAV_PREFIX,
     CB_COLL_TIER_PREFIX,
@@ -15,6 +16,7 @@ from bot.texts.collection import (
     BTN_BACK_TIERS,
     BTN_DUST_ALL,
     BTN_DUST_ONE,
+    BTN_EVENTS_TIER,
     BTN_MERGE,
     BTN_NEXT_1,
     BTN_NEXT_5,
@@ -30,6 +32,10 @@ def tier_picker() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=TIER_BUTTON.format(ubp=tier), callback_data=f"{CB_COLL_TIER_PREFIX}{tier}")]
         for tier in sorted(TIER_CHANCE_PERCENT, reverse=True)
     ]
+    # Отдельная категория "Ивенты" — не тир текущей вселенной, а карточки ИЗ ВСЕХ
+    # ивентовых вселенных сразу (см. CLAUDE.md, "Ивенты"), поэтому не через
+    # CB_COLL_TIER_PREFIX, а отдельный callback.
+    rows.append([InlineKeyboardButton(text=BTN_EVENTS_TIER, callback_data=CB_COLL_EVENTS)])
     rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_DECK_OPEN)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

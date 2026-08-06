@@ -5,6 +5,7 @@ import {
   type Universe,
   type UniverseProgress,
   fetchCollection,
+  fetchEventCollection,
   fetchProfile,
   fetchProgress,
   fetchUniverses,
@@ -22,6 +23,12 @@ const TIER_INFO: Record<number, { name: string; emoji: string }> = {
   5000: { name: "Легендарный", emoji: "🟠" },
   6000: { name: "Мифический", emoji: "🔴" },
 };
+
+// Псевдо-код вселенной для вкладки "Ивенты" — агрегирует карточки СРАЗУ из всех
+// ивентовых вселенных (см. CLAUDE.md, "Ивенты"), а не из одной конкретной, поэтому не
+// берётся из /api/universes (та отдаёт только обычные вселенные) и бьёт в отдельный
+// эндпоинт /api/collection/events.
+const EVENTS_TAB_CODE = "__events__";
 
 type View = "collection" | "profile" | "card";
 
@@ -64,9 +71,8 @@ export function App() {
 
   useEffect(() => {
     if (!selectedUniverse) return;
-    fetchCollection(selectedUniverse)
-      .then(setCards)
-      .catch((err: unknown) => setError(String(err)));
+    const fetcher = selectedUniverse === EVENTS_TAB_CODE ? fetchEventCollection() : fetchCollection(selectedUniverse);
+    fetcher.then(setCards).catch((err: unknown) => setError(String(err)));
   }, [selectedUniverse]);
 
   // Нативная кнопка "Назад" Telegram — видна только на экране карточки, возвращает
@@ -136,78 +142,90 @@ export function App() {
       {view === "card" && selectedCard && (
         <CardPage
           card={selectedCard}
-          universeTitle={universeTitleByCode.get(selectedUniverse ?? "") ?? ""}
+          universeTitle={
+            selectedUniverse === EVENTS_TAB_CODE ? "Ивент" : universeTitleByCode.get(selectedUniverse ?? "") ?? ""
+          }
           onBack={() => setView("collection")}
         />
       )}
 
-      {view === "collection" &&
-        (universes.length === 0 ? (
-          <div class="empty">Пока нет ни одной карточки — крутите в боте!</div>
-        ) : (
-          <>
-            <nav class="universe-tabs">
-              {universes.map((universe) => (
-                <button
-                  key={universe.code}
-                  type="button"
-                  class={universe.code === selectedUniverse ? "tab active" : "tab"}
-                  onClick={() => setSelectedUniverse(universe.code)}
-                >
-                  {universe.title}
-                </button>
-              ))}
-            </nav>
-
-            <div class="filters">
-              <input
-                class="search-input"
-                type="search"
-                placeholder="🔍 Поиск по имени…"
-                value={search}
-                onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
-              />
-              <select
-                class="tier-select"
-                value={String(tierFilter)}
-                onChange={(e) => {
-                  const value = (e.target as HTMLSelectElement).value;
-                  setTierFilter(value === "all" ? "all" : Number(value));
-                }}
+      {view === "collection" && (
+        <>
+          <nav class="universe-tabs">
+            {universes.map((universe) => (
+              <button
+                key={universe.code}
+                type="button"
+                class={universe.code === selectedUniverse ? "tab active" : "tab"}
+                onClick={() => setSelectedUniverse(universe.code)}
               >
-                <option value="all">Все тиры</option>
-                {Object.entries(TIER_INFO)
-                  .sort(([a], [b]) => Number(b) - Number(a))
-                  .map(([ubp, info]) => (
-                    <option key={ubp} value={ubp}>
-                      {info.emoji} {info.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
+                {universe.title}
+              </button>
+            ))}
+            <button
+              type="button"
+              class={selectedUniverse === EVENTS_TAB_CODE ? "tab active" : "tab"}
+              onClick={() => setSelectedUniverse(EVENTS_TAB_CODE)}
+            >
+              🎉 Ивенты
+            </button>
+          </nav>
 
-            {visibleCards.length === 0 ? (
-              <div class="empty">Ничего не найдено.</div>
-            ) : (
-              <div class="grid">
-                {visibleCards.map((card) => (
-                  <button
-                    type="button"
-                    class="card"
-                    key={`${card.card_id}-${card.stars}`}
-                    onClick={() => openCard(card)}
-                  >
-                    <img src={card.image_url} alt={card.name} loading="lazy" />
-                    <div class="card-name">{card.name}</div>
-                    <div class="card-meta">
-                      {"★".repeat(card.stars)} · {card.base_ubp} UBP · x{card.quantity}
-                    </div>
-                  </button>
-                ))}
+          {selectedUniverse === null ? (
+            <div class="empty">Пока нет ни одной карточки — крутите в боте!</div>
+          ) : (
+            <>
+              <div class="filters">
+                <input
+                  class="search-input"
+                  type="search"
+                  placeholder="🔍 Поиск по имени…"
+                  value={search}
+                  onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
+                />
+                <select
+                  class="tier-select"
+                  value={String(tierFilter)}
+                  onChange={(e) => {
+                    const value = (e.target as HTMLSelectElement).value;
+                    setTierFilter(value === "all" ? "all" : Number(value));
+                  }}
+                >
+                  <option value="all">Все тиры</option>
+                  {Object.entries(TIER_INFO)
+                    .sort(([a], [b]) => Number(b) - Number(a))
+                    .map(([ubp, info]) => (
+                      <option key={ubp} value={ubp}>
+                        {info.emoji} {info.name}
+                      </option>
+                    ))}
+                </select>
               </div>
-            )}
-          </>
-        ))}
+
+              {visibleCards.length === 0 ? (
+                <div class="empty">Ничего не найдено.</div>
+              ) : (
+                <div class="grid">
+                  {visibleCards.map((card) => (
+                    <button
+                      type="button"
+                      class="card"
+                      key={`${card.card_id}-${card.stars}`}
+                      onClick={() => openCard(card)}
+                    >
+                      <img src={card.image_url} alt={card.name} loading="lazy" />
+                      <div class="card-name">{card.name}</div>
+                      <div class="card-meta">
+                        {"★".repeat(card.stars)} · {card.base_ubp} UBP · x{card.quantity}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }

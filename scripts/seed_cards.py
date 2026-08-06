@@ -20,11 +20,17 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from bot.config.event import EVENT_DEFS  # noqa: E402
 from bot.config.game import TIER_CHANCE_PERCENT  # noqa: E402
 from bot.config.settings import get_settings  # noqa: E402
 from bot.db.models.card import Card  # noqa: E402
 from bot.db.models.universe import Universe  # noqa: E402
 from bot.db.session import make_engine, make_session_factory  # noqa: E402
+
+# Коды вселенных, зарезервированные под ивенты (см. CLAUDE.md, "Ивенты") — семантика
+# отличается от обычных вселенных двумя вещами ниже: другой источник заголовка и
+# исключение из проверки полноты тиров (у них есть только 7000 UBP, не все 6 обычных).
+EVENT_UNIVERSE_TITLES = {d.universe_code: d.title for d in EVENT_DEFS}
 
 log = logging.getLogger("seed_cards")
 
@@ -62,7 +68,9 @@ def scan_assets(assets_dir: Path) -> tuple[dict[str, str], list[ParsedCard]]:
 
     for universe_dir in sorted(p for p in assets_dir.iterdir() if p.is_dir()):
         code = universe_dir.name
-        universes[code] = KNOWN_UNIVERSE_TITLES.get(code, code.replace("_", " ").title())
+        universes[code] = EVENT_UNIVERSE_TITLES.get(
+            code, KNOWN_UNIVERSE_TITLES.get(code, code.replace("_", " ").title())
+        )
 
         for ubp_dir in sorted(p for p in universe_dir.iterdir() if p.is_dir()):
             match = UBP_DIR_RE.match(ubp_dir.name)
@@ -108,6 +116,11 @@ def check_tier_completeness(universes: dict[str, str], cards: list[ParsedCard]) 
     Возвращает True, если все вселенные полностью укомплектованы."""
     ok = True
     for universe_code in universes:
+        if universe_code in EVENT_UNIVERSE_TITLES:
+            # Ивентовые вселенные не участвуют в обычной крутке по тирам (см. CLAUDE.md,
+            # "Ивенты") — у них ожидаемо только 7000 UBP, полнота TIER_CHANCE_PERCENT
+            # для них не проверяется.
+            continue
         present_tiers = {c.base_ubp for c in cards if c.universe_code == universe_code}
         missing = sorted((t for t in TIER_CHANCE_PERCENT if t not in present_tiers), reverse=True)
         if missing:
@@ -128,10 +141,11 @@ async def apply(universes: dict[str, str], cards: list[ParsedCard], *, dry_run: 
 
     async with session_factory() as session:
         for code, title in universes.items():
+            is_event = code in EVENT_UNIVERSE_TITLES
             stmt = (
                 pg_insert(Universe)
-                .values(code=code, title=title)
-                .on_conflict_do_update(index_elements=[Universe.code], set_={"title": title})
+                .values(code=code, title=title, is_event=is_event)
+                .on_conflict_do_update(index_elements=[Universe.code], set_={"title": title, "is_event": is_event})
             )
             if not dry_run:
                 await session.execute(stmt)

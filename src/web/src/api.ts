@@ -58,6 +58,10 @@ export function fetchCollection(universeCode: string): Promise<CardStack[]> {
   return apiFetch<CardStack[]>(`/collection/${encodeURIComponent(universeCode)}`);
 }
 
+export function fetchEventCollection(): Promise<CardStack[]> {
+  return apiFetch<CardStack[]>("/collection/events");
+}
+
 export function fetchProgress(): Promise<UniverseProgress[]> {
   return apiFetch<UniverseProgress[]>("/progress");
 }

@@ -73,7 +73,7 @@ async def list_owned_universes(session: AsyncSession, user_id: int) -> list[tupl
         select(Card.universe_code, Universe.title)
         .join(UserCard, UserCard.card_id == Card.id)
         .join(Universe, Universe.code == Card.universe_code)
-        .where(UserCard.user_id == user_id, UserCard.quantity > 0)
+        .where(UserCard.user_id == user_id, UserCard.quantity > 0, Universe.is_event.is_(False))
         .distinct()
         .order_by(Universe.title)
     )
@@ -88,6 +88,24 @@ async def list_owned_stacks_in_universe(session: AsyncSession, *, user_id: int, 
         .join(UserCard, UserCard.card_id == Card.id)
         .where(Card.universe_code == universe_code, UserCard.user_id == user_id, UserCard.quantity > 0)
         .order_by(Card.base_ubp.desc(), Card.external_id, UserCard.stars)
+    )
+    return [OwnedStack(card=card, stars=stars, quantity=qty) for card, stars, qty in result.all()]
+
+
+async def list_owned_stacks_in_event_universes(session: AsyncSession, user_id: int) -> list[OwnedStack]:
+    """Как list_owned_stacks_in_universe, но сразу по ВСЕМ вселенным с `is_event=True` —
+    единая категория "Ивенты" в коллекции (бот и Mini App, см. CLAUDE.md, "Ивенты").
+    Ивент-карты остаются в коллекции навсегда, даже если сам ивент уже выключен, и могут
+    быть из разных ивентов — поэтому агрегация по флагу, а не по одному конкретному коду
+    вселенной. Локальный импорт Universe — та же причина, что у list_owned_universes выше."""
+    from bot.db.models.universe import Universe
+
+    result = await session.execute(
+        select(Card, UserCard.stars, UserCard.quantity)
+        .join(UserCard, UserCard.card_id == Card.id)
+        .join(Universe, Universe.code == Card.universe_code)
+        .where(Universe.is_event.is_(True), UserCard.user_id == user_id, UserCard.quantity > 0)
+        .order_by(Card.external_id, UserCard.stars)
     )
     return [OwnedStack(card=card, stars=stars, quantity=qty) for card, stars, qty in result.all()]
 

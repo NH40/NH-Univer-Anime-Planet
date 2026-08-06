@@ -7,10 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
-from bot.config.game import MERGE_COPIES_REQUIRED, ubp_for_stars
+from bot.config.game import EVENT_CARD_UBP, MERGE_COPIES_REQUIRED, ubp_for_stars
 from bot.constant.collection import (
     CB_COLL_DUST1_PREFIX,
     CB_COLL_DUSTALL_PREFIX,
+    CB_COLL_EVENTS,
     CB_COLL_MERGE_PREFIX,
     CB_COLL_NAV_PREFIX,
     CB_COLL_TIER_PREFIX,
@@ -18,7 +19,7 @@ from bot.constant.collection import (
     LOCK_ACTION_MERGE,
 )
 from bot.constant.deck import CB_DECK_COLLECTION
-from bot.db.repositories.inventory import OwnedStack, list_owned_stacks_in_tier
+from bot.db.repositories.inventory import OwnedStack, list_owned_stacks_in_event_universes, list_owned_stacks_in_tier
 from bot.db.repositories.universe import get_by_code as get_universe
 from bot.db.repositories.user import get_by_id
 from bot.keyboards.collection import stack_view, tier_picker
@@ -42,7 +43,14 @@ from bot.utils.safe_edit import safe_edit_media, safe_edit_text
 router = Router(name="collection")
 
 
-async def _stacks(session: AsyncSession, user_id: int, universe_code: str, tier: int) -> list[OwnedStack]:
+async def _stacks(session: AsyncSession, user_id: int, universe_code: str | None, tier: int) -> list[OwnedStack]:
+    """`tier == EVENT_CARD_UBP` — особая категория "Ивенты": карточки из ВСЕХ ивентовых
+    вселенных разом, `universe_code` в этом случае не используется (см. CLAUDE.md,
+    "Ивенты") — 7000 UBP не входит в TIER_CHANCE_PERCENT, так что коллизий с обычными
+    тирами нет, и это значение безопасно "протекает" через тот же tier-based callback_data
+    (nav/dust/merge), что и обычные тиры, без отдельной ветки в каждом хендлере ниже."""
+    if tier == EVENT_CARD_UBP:
+        return await list_owned_stacks_in_event_universes(session, user_id)
     return await list_owned_stacks_in_tier(session, user_id=user_id, universe_code=universe_code, base_ubp=tier)
 
 
@@ -82,6 +90,29 @@ async def cb_open_collection(callback: CallbackQuery, session: AsyncSession) -> 
     )
 
 
+@router.callback_query(F.data == CB_COLL_EVENTS)
+async def cb_open_events(callback: CallbackQuery, session: AsyncSession) -> None:
+    user = await get_by_id(session, callback.from_user.id)
+    if user is None:
+        await callback.answer()
+        await callback.message.answer(NEED_START)
+        return
+
+    # Не требует user.universe_selected — "Ивенты" не привязаны к текущей выбранной
+    # вселенной игрока (см. _stacks).
+    stacks = await _stacks(session, callback.from_user.id, None, EVENT_CARD_UBP)
+    await callback.answer()
+    if not stacks:
+        await safe_edit_text(callback.message, EMPTY_TIER, reply_markup=tier_picker())
+        return
+
+    await callback.message.answer_photo(
+        card_photo(stacks[0].card),
+        caption=_stack_caption(stacks[0], 0, len(stacks)),
+        reply_markup=stack_view(tier=EVENT_CARD_UBP, index=0, total=len(stacks), quantity=stacks[0].quantity),
+    )
+
+
 @router.callback_query(F.data.startswith(CB_COLL_TIER_PREFIX))
 async def cb_open_tier(callback: CallbackQuery, session: AsyncSession) -> None:
     tier = int(callback.data[len(CB_COLL_TIER_PREFIX) :])
@@ -110,7 +141,7 @@ async def cb_open_tier(callback: CallbackQuery, session: AsyncSession) -> None:
 async def cb_navigate(callback: CallbackQuery, session: AsyncSession) -> None:
     tier, index = _parse_tier_index(callback.data, CB_COLL_NAV_PREFIX)
     user = await get_by_id(session, callback.from_user.id)
-    if user is None or user.universe_selected is None:
+    if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
         await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
         return
 
@@ -129,7 +160,9 @@ async def cb_navigate(callback: CallbackQuery, session: AsyncSession) -> None:
     )
 
 
-async def _refresh_after_action(callback: CallbackQuery, session: AsyncSession, universe_code: str, tier: int) -> None:
+async def _refresh_after_action(
+    callback: CallbackQuery, session: AsyncSession, universe_code: str | None, tier: int
+) -> None:
     """После распыления/слияния состав стопок в тире мог измениться — просто
     показываем тир заново с начала, а не пытаемся угадать, куда делась старая позиция."""
     stacks = await _stacks(session, callback.from_user.id, universe_code, tier)
@@ -156,7 +189,7 @@ async def cb_dust(callback: CallbackQuery, session: AsyncSession, redis: Redis) 
             return
 
         user = await get_by_id(session, user_id)
-        if user is None or user.universe_selected is None:
+        if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
             await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
             return
 
@@ -190,7 +223,7 @@ async def cb_merge(callback: CallbackQuery, session: AsyncSession, redis: Redis)
             return
 
         user = await get_by_id(session, user_id)
-        if user is None or user.universe_selected is None:
+        if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
             await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
             return
 

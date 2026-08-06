@@ -7,6 +7,7 @@ from bot.handlers.admin import (
     broadcast,
     db_wipe,
     delete_account,
+    events,
     mass_grant,
     promo,
     referral,
@@ -20,6 +21,7 @@ router.callback_query.filter(IsAdminFilter())
 router.include_router(admin.router)
 router.include_router(admin_manage.router)
 router.include_router(db_wipe.router)
+router.include_router(events.router)
 router.include_router(season.router)
 router.include_router(promo.router)
 router.include_router(referral.router)

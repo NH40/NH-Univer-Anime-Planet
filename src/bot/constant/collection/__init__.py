@@ -1,6 +1,7 @@
 from bot.constant.collection.collection import (
     CB_COLL_DUST1_PREFIX,
     CB_COLL_DUSTALL_PREFIX,
+    CB_COLL_EVENTS,
     CB_COLL_MERGE_PREFIX,
     CB_COLL_NAV_PREFIX,
     CB_COLL_TIER_PREFIX,
@@ -11,6 +12,7 @@ from bot.constant.collection.collection import (
 __all__ = [
     "CB_COLL_DUST1_PREFIX",
     "CB_COLL_DUSTALL_PREFIX",
+    "CB_COLL_EVENTS",
     "CB_COLL_MERGE_PREFIX",
     "CB_COLL_NAV_PREFIX",
     "CB_COLL_TIER_PREFIX",

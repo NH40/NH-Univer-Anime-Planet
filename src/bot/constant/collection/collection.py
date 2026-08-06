@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 CB_COLL_TIER_PREFIX = "coll:tier:"
+CB_COLL_EVENTS = "coll:events"
 CB_COLL_NAV_PREFIX = "coll:nav:"
 CB_COLL_DUST1_PREFIX = "coll:dust1:"
 CB_COLL_DUSTALL_PREFIX = "coll:dustall:"

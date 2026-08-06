@@ -2,6 +2,7 @@ from __future__ import annotations
 
 TIER_PICKER_HEADER = "📚 <b>Коллекция</b> — {universe}\n\nВыбери тир:"
 TIER_BUTTON = "{ubp} UBP"
+BTN_EVENTS_TIER = "🎉 Ивенты"
 
 EMPTY_TIER = "У тебя пока нет карт в этом тире."
 

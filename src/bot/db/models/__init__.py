@@ -3,6 +3,7 @@
 from bot.db.models.battle_pass import BattlePass
 from bot.db.models.card import Card
 from bot.db.models.clan import Clan, ClanJoinRequest, ClanMember, ClanWar
+from bot.db.models.event import Event
 from bot.db.models.inventory import UserCard
 from bot.db.models.payment import Payment
 from bot.db.models.promocode import PromoCode, PromoRedemption
@@ -21,6 +22,7 @@ __all__ = [
     "ClanMember",
     "ClanWar",
     "DailyQuest",
+    "Event",
     "UserCard",
     "Payment",
     "PromoCode",

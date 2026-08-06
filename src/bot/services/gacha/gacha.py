@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from collections import Counter
 from dataclasses import dataclass
 
@@ -7,15 +8,24 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.leaderboard import sync_score
-from bot.config.game import REFERRAL_FIRST_ROLL_REWARD_COINS, REFERRAL_FIRST_ROLL_REWARD_TICKETS, ROLL_ONE_COST, ROLL_TEN_COST, ROLL_TEN_COUNT
+from bot.config.game import (
+    EVENT_CARD_CHANCE,
+    REFERRAL_FIRST_ROLL_REWARD_COINS,
+    REFERRAL_FIRST_ROLL_REWARD_TICKETS,
+    ROLL_ONE_COST,
+    ROLL_TEN_COST,
+    ROLL_TEN_COUNT,
+)
 from bot.constant.gacha import TRANSACTION_REASON_ROLL
 from bot.constant.referral import TRANSACTION_REASON_REFERRAL_REWARD
 from bot.db.models.card import Card
 from bot.db.models.enums import TransactionCurrency
 from bot.db.models.transaction import Transaction
+from bot.db.repositories.card import list_by_universe
 from bot.db.repositories.inventory import add_card
 from bot.db.repositories.season import get_active as get_active_season
 from bot.db.repositories.user import add_coins, increment_total_rolls
+from bot.services import event as event_service
 from bot.services import ticket
 from bot.services.card import get_tier_map, pick_card
 from bot.services.ubp import award_ubp
@@ -51,11 +61,22 @@ async def _roll(
     # намеренно наружу, до списания тикетов (см. решение пользователя про пустые тиры).
     tier_map = await get_tier_map(session, universe_code)
 
+    # Активный ивент действует ПОВЕРХ обычной крутки, независимо от выбранной вселенной
+    # (см. CLAUDE.md, "Ивенты") — если под ивент ещё не залито ни одной карточки,
+    # event_cards пуст и шанс естественно никогда не срабатывает, без отдельной проверки.
+    active_event = await event_service.get_active(session)
+    event_cards = await list_by_universe(session, active_event.universe_code) if active_event else []
+
     new_balance = await ticket.spend(session, user_id, cost)
     if new_balance is None:
         raise NotEnoughTicketsError(needed=cost)
 
-    cards = [pick_card(tier_map) for _ in range(count)]
+    def _pick_one() -> Card:
+        if event_cards and random.random() < EVENT_CARD_CHANCE:
+            return random.choice(event_cards)
+        return pick_card(tier_map)
+
+    cards = [_pick_one() for _ in range(count)]
 
     # Группируем повторки внутри одной крутки x10 в один upsert на card_id — меньше
     # запросов к БД (правило 3), чем по одному апсерту на каждую из 10 карт.

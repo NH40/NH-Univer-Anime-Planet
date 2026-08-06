@@ -14,3 +14,8 @@ class Universe(Base):
     code: Mapped[str] = mapped_column(String(32), primary_key=True)
     title: Mapped[str] = mapped_column(String(64))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # Ивентовая вселенная (см. CLAUDE.md, "Ивенты") — выставляется seed_cards.py по коду
+    # папки (см. config/event.EVENT_DEFS). Не участвует в обычном пикере вселенных
+    # (db/repositories/universe.list_active) и в обычной крутке (get_tier_map/pick_card
+    # её карты просто не видят — там 7000 UBP вне TIER_CHANCE_PERCENT).
+    is_event: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
