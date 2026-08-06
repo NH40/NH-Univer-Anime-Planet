@@ -5,6 +5,7 @@ CB_SHOP_DUST = "shop:dust"
 CB_SHOP_COINS = "shop:coins"
 CB_SHOP_BUY_TICKETS_PREFIX = "shop:buy_tickets:"
 CB_SHOP_BUY_TICKETS_CUSTOM = "shop:buy_tickets_custom"
+CB_SHOP_BUY_TICKETS_MAX = "shop:buy_tickets_max"
 
 # Магазин коинов: подписка / Battle Pass / тикеты за коины
 CB_COINSHOP_SUBSCRIPTION = "cshop:sub"

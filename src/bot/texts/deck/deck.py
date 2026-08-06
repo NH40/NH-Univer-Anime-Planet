@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-BTN_ROLL_1 = "🎴 Крутить 1"
-BTN_ROLL_10 = "🎰 Крутить 10"
+BTN_ROLL_1 = "🎴 Крутить"
+BTN_ROLL_AGAIN = "🎴 Крутить ещё"
 BTN_COLLECTION = "📚 Коллекция"
-BTN_DISENCHANT = "💨 Распылить"
+BTN_DISENCHANT = "✨ Распылить"
 BTN_MERGE = "🔗 Слияние"
 BTN_CHANCES = "🎲 Шансы"
 
@@ -30,9 +30,6 @@ CARD_CAPTION = (
     "🌟 <b>Звёзды:</b> {stars}"
 )
 NO_DESCRIPTION = "—"
-
-ROLL_TEN_RESULT_HEADER = "🎰 <b>Результаты крутки x10:</b>\n"
-ROLL_TEN_LINE = "{i}. {name} — {ubp} UBP\n"
 
 # Названия и цветные кружки тиров (1000-6000 UBP) для экрана "Шансы" — чисто
 # презентационная лесенка редкости, порядок значения не меняет (см. config/game:

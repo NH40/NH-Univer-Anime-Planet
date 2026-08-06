@@ -9,6 +9,7 @@ CB_COLL_NAV_PREFIX = "coll:nav:"
 CB_COLL_DUST1_PREFIX = "coll:dust1:"
 CB_COLL_DUSTALL_PREFIX = "coll:dustall:"
 CB_COLL_MERGE_PREFIX = "coll:merge:"
+CB_COLL_MERGE_ALL_PREFIX = "coll:mergeall:"
 
 LOCK_ACTION_DUST = "dust"
 LOCK_ACTION_MERGE = "merge"

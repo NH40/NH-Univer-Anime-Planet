@@ -11,9 +11,10 @@ TICKET_STARTING_COUNT = 15
 TICKET_REGEN_INTERVAL_SECONDS = 2 * 60 * 60  # 1 тикет за 2 часа
 # Подписка ускоряет пассивный реген вдвое, пока активна (см. CLAUDE.md, "Подписка").
 TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED = 60 * 60
+# Крутка только по одной карте за раз (намеренно, подтверждено пользователем 2026-08-06:
+# x10 убрана — цепочка одиночных круток с кнопкой "Крутить ещё" на экране результата
+# затягивает сильнее, чем пачка результатов разом).
 ROLL_ONE_COST = 1
-ROLL_TEN_COST = 10
-ROLL_TEN_COUNT = 10
 
 # --- Подписка (см. CLAUDE.md, "Подписка") ---
 SUBSCRIPTION_DAILY_TICKETS = 5
@@ -152,10 +153,12 @@ DONATE_PRESETS_RUB: tuple[int, ...] = (50, 100, 300, 500, 1000, 3000)
 # Индекс 0 = 1 место, индекс 9 = 10 место.
 SEASON_TOP10_REWARD_COINS: tuple[int, ...] = (1000, 600, 600, 300, 300, 300, 300, 300, 300, 300)
 
-# --- Рефералы (см. CLAUDE.md, "Рефералы") --- Награда рефереру начисляется после ПЕРВОЙ
-# крутки приглашённого (не сразу при /start) — анти-абьюз пустыми аккаунтами.
-REFERRAL_FIRST_ROLL_REWARD_COINS = 50
-REFERRAL_FIRST_ROLL_REWARD_TICKETS = 50
+# --- Рефералы (см. CLAUDE.md, "Рефералы") --- Награда рефереру начисляется после того, как
+# приглашённый сделает REFERRAL_ROLL_THRESHOLD круток (не сразу при /start и не после
+# первой — порог подняли 2026-08-06, чтобы не давать награду за пустые/брошенные аккаунты).
+REFERRAL_ROLL_THRESHOLD = 30
+REFERRAL_ROLL_REWARD_COINS = 50
+REFERRAL_ROLL_REWARD_TICKETS = 50
 # Доля от суммы доната реферала, начисляемая рефереру (в коинах), пока связь referred_by_id
 # не разорвана — округление вниз (см. services/donate.credit_payment).
 REFERRAL_DONATE_CUT_PERCENT = 10

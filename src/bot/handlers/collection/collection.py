@@ -12,6 +12,7 @@ from bot.constant.collection import (
     CB_COLL_DUST1_PREFIX,
     CB_COLL_DUSTALL_PREFIX,
     CB_COLL_EVENTS,
+    CB_COLL_MERGE_ALL_PREFIX,
     CB_COLL_MERGE_PREFIX,
     CB_COLL_NAV_PREFIX,
     CB_COLL_TIER_PREFIX,
@@ -28,6 +29,7 @@ from bot.texts.collection import (
     DUST_NOTHING,
     DUST_RESULT,
     EMPTY_TIER,
+    MERGE_ALL_RESULT,
     MERGE_NOT_ENOUGH,
     MERGE_RESULT,
     NO_ACTIVE_SEASON,
@@ -257,6 +259,47 @@ async def cb_merge(callback: CallbackQuery, session: AsyncSession, redis: Redis)
         await callback.answer(
             MERGE_RESULT.format(
                 name=result.card.name, stars="🌟" * result.new_stars, ubp=result.new_ubp, bonus=result.bonus_ubp
+            ),
+            show_alert=True,
+        )
+        await _refresh_after_action(callback, session, redis, user.universe_selected, tier)
+
+
+@router.callback_query(F.data.startswith(CB_COLL_MERGE_ALL_PREFIX))
+async def cb_merge_all(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
+    tier, index = _parse_tier_index(callback.data, CB_COLL_MERGE_ALL_PREFIX)
+    user_id = callback.from_user.id
+
+    async with try_acquire(redis, action_lock(user_id, LOCK_ACTION_MERGE)) as acquired:
+        if not acquired:
+            await callback.answer()
+            return
+
+        user = await get_by_id(session, user_id)
+        if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
+            await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
+            return
+
+        stacks = await _stacks(session, user_id, user.universe_selected, tier)
+        if index >= len(stacks):
+            await callback.answer(MERGE_NOT_ENOUGH.format(needed=MERGE_COPIES_REQUIRED), show_alert=True)
+            return
+        stack = stacks[index]
+
+        try:
+            results = await merge.merge_all(session, redis, user_id=user_id, card_id=stack.card.id, stars=stack.stars)
+        except merge.NotEnoughCopiesError as exc:
+            await callback.answer(MERGE_NOT_ENOUGH.format(needed=exc.needed), show_alert=True)
+            return
+        except merge.NoActiveSeasonError:
+            await callback.answer(NO_ACTIVE_SEASON, show_alert=True)
+            return
+
+        last = results[-1]
+        total_bonus = sum(r.bonus_ubp for r in results)
+        await callback.answer(
+            MERGE_ALL_RESULT.format(
+                count=len(results), name=last.card.name, stars="🌟" * last.new_stars, bonus=total_bonus
             ),
             show_alert=True,
         )

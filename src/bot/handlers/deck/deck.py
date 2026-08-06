@@ -16,7 +16,6 @@ from bot.constant.deck import (
     CB_DECK_CHANCES_TIER_PREFIX,
     CB_DECK_OPEN,
     CB_DECK_ROLL1,
-    CB_DECK_ROLL10,
     LOCK_ACTION_ROLL,
 )
 from bot.db.models.card import Card
@@ -24,10 +23,10 @@ from bot.db.models.universe import Universe
 from bot.db.repositories.card import get_discovered_card_ids
 from bot.db.repositories.universe import get_by_code as get_universe
 from bot.db.repositories.user import get_by_id
-from bot.keyboards.deck import back_to_deck, chances_menu, chances_tier_menu, deck_menu
+from bot.keyboards.deck import chances_menu, chances_tier_menu, deck_menu, roll_result_menu
 from bot.services import ticket
 from bot.services.card import UniverseNotReadyError, get_tier_map
-from bot.services.gacha import NoActiveSeasonError, NotEnoughTicketsError, RollResult, roll_one, roll_ten
+from bot.services.gacha import NoActiveSeasonError, NotEnoughTicketsError, roll_one
 from bot.texts.common import BTN_DECK, NEED_START
 from bot.texts.deck import (
     CARD_CAPTION,
@@ -40,8 +39,6 @@ from bot.texts.deck import (
     NO_DESCRIPTION,
     NO_UNIVERSE_SELECTED,
     NOT_ENOUGH_TICKETS,
-    ROLL_TEN_LINE,
-    ROLL_TEN_RESULT_HEADER,
     TIER_EMOJI,
     TIER_NAMES,
     UNIVERSE_NOT_READY,
@@ -102,7 +99,7 @@ async def cb_open_deck(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 async def _get_ready_user(callback: CallbackQuery, session: AsyncSession):
-    """Общая проверка для roll1/roll10: игрок зарегистрирован и выбрал вселенную.
+    """Общая проверка перед круткой: игрок зарегистрирован и выбрал вселенную.
     Возвращает User либо None, если уже ответили пользователю и на этом выходим."""
     user = await get_by_id(session, callback.from_user.id)
     if user is None:
@@ -147,55 +144,8 @@ async def cb_roll1(callback: CallbackQuery, session: AsyncSession, redis: Redis)
         universe = await get_universe(session, user.universe_selected)
         caption = _card_caption(result.card, result.stars, universe.title, result.owned_quantity)
         photo = await get_card_photo(redis, result.card)
-        sent = await callback.message.answer_photo(photo, caption=caption, reply_markup=back_to_deck())
+        sent = await callback.message.answer_photo(photo, caption=caption, reply_markup=roll_result_menu())
         await cache_card_photo(redis, result.card.id, sent)
-
-
-@router.callback_query(F.data == CB_DECK_ROLL10)
-async def cb_roll10(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
-    user_id = callback.from_user.id
-    async with try_acquire(redis, action_lock(user_id, LOCK_ACTION_ROLL), ttl_ms=8000) as acquired:
-        if not acquired:
-            await callback.answer()
-            return
-
-        user = await _get_ready_user(callback, session)
-        if user is None:
-            return
-        await callback.answer()
-
-        try:
-            results: list[RollResult] = await roll_ten(
-                session, redis, user_id=user_id, universe_code=user.universe_selected
-            )
-        except NoActiveSeasonError:
-            await callback.message.answer(NO_ACTIVE_SEASON)
-            return
-        except UniverseNotReadyError as exc:
-            await callback.message.answer(
-                UNIVERSE_NOT_READY.format(
-                    universe=esc(user.universe_selected), tiers=", ".join(map(str, exc.missing_tiers))
-                )
-            )
-            return
-        except NotEnoughTicketsError as exc:
-            await callback.message.answer(NOT_ENOUGH_TICKETS.format(needed=exc.needed, cap=TICKET_NATURAL_CAP))
-            return
-
-        universe = await get_universe(session, user.universe_selected)
-        top = max(results, key=lambda r: r.card.base_ubp)
-        caption = _card_caption(top.card, top.stars, universe.title, top.owned_quantity)
-        photo = await get_card_photo(redis, top.card)
-        sent = await callback.message.answer_photo(photo, caption=caption)
-        await cache_card_photo(redis, top.card.id, sent)
-
-        # Отдельным сообщением, а не в подписи к фото — подпись у Telegram ограничена
-        # 1024 символами, а с описаниями карт список из 10 строк легко её превысит.
-        breakdown = ROLL_TEN_RESULT_HEADER + "".join(
-            ROLL_TEN_LINE.format(i=i + 1, name=esc(r.card.name), ubp=r.card.base_ubp)
-            for i, r in enumerate(results)
-        )
-        await callback.message.answer(breakdown, reply_markup=back_to_deck())
 
 
 async def _get_ready_tier_map(callback: CallbackQuery, session: AsyncSession, universe: Universe) -> dict[int, list[Card]] | None:

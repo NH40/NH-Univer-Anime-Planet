@@ -102,9 +102,9 @@ EDIT_IMAGE_DONE = "✅ Картинка клана обновлена."
 NOT_AUTHORIZED = "Недостаточно прав."
 
 # --- Обменник (пыль/тикеты/коины между участниками одного клана) ---
-BTN_EXCHANGE_DUST = "💨 Пыль"
+BTN_EXCHANGE_DUST = "✨ Пыль"
 BTN_EXCHANGE_TICKETS = "🎫 Тикеты"
-BTN_EXCHANGE_COINS = "🪙 Коины"
+BTN_EXCHANGE_COINS = "💎 Коины"
 EXCHANGE_CHOOSE_CURRENCY = "🔄 <b>Обменник</b>\n\nЧто передать?"
 
 # Родительный падеж множественного числа — одинаково подходит и для "количество {currency}",

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 CB_DECK_OPEN = "deck:open"
 CB_DECK_ROLL1 = "deck:roll1"
-CB_DECK_ROLL10 = "deck:roll10"
 CB_DECK_CHANCES = "deck:chances"
 CB_DECK_CHANCES_TIER_PREFIX = "deck:chances_tier:"
 # Отдельно от CB_DECK_CHANCES: вход в "Шансы" из "Колоды" открывает НОВОЕ сообщение (как
@@ -16,6 +15,5 @@ CB_DECK_CHANCES_TIER_PREFIX = "deck:chances_tier:"
 CB_DECK_CHANCES_BACK = "deck:chances_back"
 CB_DECK_COLLECTION = "deck:collection"
 
-# Ключ антидубликат-лока (см. cache/lock.py) для кнопок "Крутить 1"/"Крутить 10" —
-# общий на оба действия намеренно: они делят один и тот же баланс тикетов.
+# Ключ антидубликат-лока (см. cache/lock.py) для кнопки "Крутить".
 LOCK_ACTION_ROLL = "roll"

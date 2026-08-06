@@ -13,6 +13,7 @@ from bot.constant.shop import (
     CB_COINSHOP_TICKETS,
     CB_COINSHOP_TICKETS_CONFIRM,
     CB_SHOP_BUY_TICKETS_CUSTOM,
+    CB_SHOP_BUY_TICKETS_MAX,
     CB_SHOP_BUY_TICKETS_PREFIX,
     CB_SHOP_COINS,
     CB_SHOP_DUST,
@@ -22,6 +23,7 @@ from bot.texts.common import BTN_BACK
 from bot.texts.shop import (
     BTN_BATTLE_PASS,
     BTN_BUY_BATTLE_PASS,
+    BTN_BUY_MAX,
     BTN_BUY_SUBSCRIPTION,
     BTN_CANCEL,
     BTN_CASINO,
@@ -54,7 +56,10 @@ def dust_shop_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             presets_row,
-            [InlineKeyboardButton(text=BTN_CUSTOM_QUANTITY, callback_data=CB_SHOP_BUY_TICKETS_CUSTOM)],
+            [
+                InlineKeyboardButton(text=BTN_BUY_MAX, callback_data=CB_SHOP_BUY_TICKETS_MAX),
+                InlineKeyboardButton(text=BTN_CUSTOM_QUANTITY, callback_data=CB_SHOP_BUY_TICKETS_CUSTOM),
+            ],
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_OPEN)],
         ]
     )

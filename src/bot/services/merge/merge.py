@@ -74,3 +74,40 @@ async def merge_stack(
         new_ubp=ubp_for_stars(card.base_ubp, new_stars),
         bonus_ubp=bonus,
     )
+
+
+async def merge_all(
+    session: AsyncSession, redis: Redis, *, user_id: int, card_id: int, stars: int
+) -> list[MergeResult]:
+    """Сливает (card_id, stars) сколько раз подряд получится из имеющихся копий, БЕЗ
+    каскада в следующую звезду — если после этого у (card_id, stars+1) тоже накопится 5+,
+    слить их можно отдельным нажатием уже на ЕЁ стопке (та же граница, что у обычного
+    "Слить 5→1", просто повторённая). Одна логическая операция на весь пакет — один
+    commit в конце и одно начисление UBP суммой, а не по одному на слияние (правило 10)."""
+    card = await get_card_by_id(session, card_id)
+    if card is None:
+        raise CardNotFoundError(card_id)
+
+    season = await get_active_season(session)
+    if season is None:
+        raise NoActiveSeasonError
+
+    new_stars = stars + 1
+    bonus = ubp_for_stars(card.base_ubp, stars)  # UBP одной исходной карты — см. CLAUDE.md
+    results: list[MergeResult] = []
+    total_bonus = 0
+
+    while await decrement_by(session, user_id=user_id, card_id=card_id, stars=stars, amount=MERGE_COPIES_REQUIRED):
+        await add_card(session, user_id=user_id, card_id=card_id, stars=new_stars, qty=1)
+        total_bonus += bonus
+        results.append(
+            MergeResult(card=card, new_stars=new_stars, new_ubp=ubp_for_stars(card.base_ubp, new_stars), bonus_ubp=bonus)
+        )
+
+    if not results:
+        raise NotEnoughCopiesError(needed=MERGE_COPIES_REQUIRED)
+
+    new_season_ubp = await award_ubp(session, user_id=user_id, amount=total_bonus, reason=TRANSACTION_REASON_MERGE)
+    await session.commit()
+    await sync_score(redis, season.id, user_id, new_season_ubp)
+    return results

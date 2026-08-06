@@ -7,6 +7,7 @@ from bot.constant.collection import (
     CB_COLL_DUST1_PREFIX,
     CB_COLL_DUSTALL_PREFIX,
     CB_COLL_EVENTS,
+    CB_COLL_MERGE_ALL_PREFIX,
     CB_COLL_MERGE_PREFIX,
     CB_COLL_NAV_PREFIX,
     CB_COLL_TIER_PREFIX,
@@ -18,6 +19,7 @@ from bot.texts.collection import (
     BTN_DUST_ONE,
     BTN_EVENTS_TIER,
     BTN_MERGE,
+    BTN_MERGE_ALL,
     BTN_NEXT_1,
     BTN_NEXT_5,
     BTN_PREV_1,
@@ -64,9 +66,14 @@ def stack_view(*, tier: int, index: int, total: int, quantity: int) -> InlineKey
     rows.append(action_row)
 
     if quantity >= MERGE_COPIES_REQUIRED:
-        rows.append(
-            [InlineKeyboardButton(text=BTN_MERGE, callback_data=f"{CB_COLL_MERGE_PREFIX}{tier}:{index}")]
-        )
+        merge_row = [InlineKeyboardButton(text=BTN_MERGE, callback_data=f"{CB_COLL_MERGE_PREFIX}{tier}:{index}")]
+        # "Слить всё" — только когда есть смысл (2+ группы по 5), иначе это была бы
+        # дублирующая кнопка с тем же эффектом, что обычное "Слить 5→1★".
+        if quantity >= MERGE_COPIES_REQUIRED * 2:
+            merge_row.append(
+                InlineKeyboardButton(text=BTN_MERGE_ALL, callback_data=f"{CB_COLL_MERGE_ALL_PREFIX}{tier}:{index}")
+            )
+        rows.append(merge_row)
 
     rows.append([InlineKeyboardButton(text=BTN_BACK_TIERS, callback_data=CB_DECK_COLLECTION)])
     return InlineKeyboardMarkup(inline_keyboard=rows)

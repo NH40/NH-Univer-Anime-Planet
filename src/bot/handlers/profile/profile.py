@@ -12,8 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.cache.leaderboard import get_count, get_page, get_rank, get_top
 from bot.config.game import (
     REFERRAL_DONATE_CUT_PERCENT,
-    REFERRAL_FIRST_ROLL_REWARD_COINS,
-    REFERRAL_FIRST_ROLL_REWARD_TICKETS,
+    REFERRAL_ROLL_REWARD_COINS,
+    REFERRAL_ROLL_REWARD_TICKETS,
+    REFERRAL_ROLL_THRESHOLD,
     TICKET_NATURAL_CAP,
 )
 from bot.config.settings import get_settings
@@ -57,7 +58,7 @@ from bot.texts.profile import (
     TOP_HEADER,
     TOP_LINE,
 )
-from bot.utils.formatting import esc, progress_bar
+from bot.utils.formatting import esc, format_countdown, progress_bar
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="profile")
@@ -68,8 +69,9 @@ PLAYERS_PAGE_SIZE = 20
 def _tickets_line(status: ticket.TicketStatus) -> str:
     if status.seconds_until_next is None:
         return TICKETS_LINE_READY.format(count=status.count, cap=TICKET_NATURAL_CAP)
-    mm, ss = divmod(status.seconds_until_next, 60)
-    return TICKETS_LINE_COUNTDOWN.format(count=status.count, cap=TICKET_NATURAL_CAP, mm=mm, ss=ss)
+    return TICKETS_LINE_COUNTDOWN.format(
+        count=status.count, cap=TICKET_NATURAL_CAP, time=format_countdown(status.seconds_until_next)
+    )
 
 
 def _progress_block(progress: list[UniverseProgress]) -> str:
@@ -165,8 +167,9 @@ async def cb_referrals(callback: CallbackQuery, session: AsyncSession, bot: Bot)
             battle_pass_owners=stats.battle_pass_owners,
             coins_earned=stats.coins_earned,
             tickets_earned=stats.tickets_earned,
-            reward_coins=REFERRAL_FIRST_ROLL_REWARD_COINS,
-            reward_tickets=REFERRAL_FIRST_ROLL_REWARD_TICKETS,
+            reward_coins=REFERRAL_ROLL_REWARD_COINS,
+            reward_tickets=REFERRAL_ROLL_REWARD_TICKETS,
+            threshold=REFERRAL_ROLL_THRESHOLD,
             cut_percent=REFERRAL_DONATE_CUT_PERCENT,
         ),
         reply_markup=back_to_profile(),

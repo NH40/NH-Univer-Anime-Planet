@@ -33,7 +33,7 @@ PROGRESS_QUOTE_CLOSE = "</blockquote>"
 PROGRESS_EMPTY = "📚 Пока нет ни одной карты — крутите в «Колоде»!"
 
 TICKETS_LINE_READY = "🎫 <b>Тикеты:</b> {count}/{cap} (бесплатный лимит заполнен)"
-TICKETS_LINE_COUNTDOWN = "🎫 <b>Тикеты:</b> {count}/{cap} (следующий через {mm:02d}:{ss:02d})"
+TICKETS_LINE_COUNTDOWN = "🎫 <b>Тикеты:</b> {count}/{cap} (следующий через {time})"
 
 REFERRALS_SCREEN = (
     "🔗 <b>Рефералы</b>\n\n"
@@ -45,7 +45,7 @@ REFERRALS_SCREEN = (
     "<b>С Battle Pass:</b> {battle_pass_owners}\n\n"
     "💰 <b>Заработано с рефералов:</b> {coins_earned} коинов, {tickets_earned} тикетов\n\n"
     "За каждого приглашённого — {reward_coins} коинов и {reward_tickets} тикетов после его "
-    "первой крутки, плюс {cut_percent}% с каждого его доната — пока действует связь."
+    "{threshold}-й крутки, плюс {cut_percent}% с каждого его доната — пока действует связь."
 )
 
 RENAME_PROMPT = "Введите новое имя (2-32 символа, без переносов строк). /cancel — отменить."

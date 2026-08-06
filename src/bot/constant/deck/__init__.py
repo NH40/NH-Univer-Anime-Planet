@@ -5,7 +5,6 @@ from bot.constant.deck.deck import (
     CB_DECK_COLLECTION,
     CB_DECK_OPEN,
     CB_DECK_ROLL1,
-    CB_DECK_ROLL10,
     LOCK_ACTION_ROLL,
 )
 
@@ -16,6 +15,5 @@ __all__ = [
     "CB_DECK_COLLECTION",
     "CB_DECK_OPEN",
     "CB_DECK_ROLL1",
-    "CB_DECK_ROLL10",
     "LOCK_ACTION_ROLL",
 ]

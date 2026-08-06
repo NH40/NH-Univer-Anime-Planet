@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import random
-from collections import Counter
 from dataclasses import dataclass
 
 from redis.asyncio import Redis
@@ -10,11 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.cache.leaderboard import sync_score
 from bot.config.game import (
     EVENT_CARD_CHANCE,
-    REFERRAL_FIRST_ROLL_REWARD_COINS,
-    REFERRAL_FIRST_ROLL_REWARD_TICKETS,
+    REFERRAL_ROLL_REWARD_COINS,
+    REFERRAL_ROLL_REWARD_TICKETS,
+    REFERRAL_ROLL_THRESHOLD,
     ROLL_ONE_COST,
-    ROLL_TEN_COST,
-    ROLL_TEN_COUNT,
 )
 from bot.constant.gacha import TRANSACTION_REASON_ROLL
 from bot.constant.referral import TRANSACTION_REASON_REFERRAL_REWARD
@@ -47,12 +45,14 @@ class RollResult:
     owned_quantity: int = 1  # сколько копий этой карты (этой звезды) теперь у игрока всего
 
 
-async def _roll(
-    session: AsyncSession, redis: Redis, *, user_id: int, universe_code: str, count: int, cost: int
-) -> list[RollResult]:
+async def roll_one(session: AsyncSession, redis: Redis, *, user_id: int, universe_code: str) -> RollResult:
     """Одна логическая операция — один commit в конце (см. CLAUDE.md, "Границы
-    транзакций"): списание тикетов, добавление карт в инвентарь и начисление UBP либо
-    случаются все вместе, либо (при любой ошибке) откатываются все вместе."""
+    транзакций"): списание тикета, добавление карты в инвентарь и начисление UBP либо
+    случаются все вместе, либо (при любой ошибке) откатываются все вместе.
+
+    Крутка только по одной карте за раз — намеренно, x10 убрана (подтверждено
+    пользователем 2026-08-06): цепочка одиночных круток с кнопкой "Крутить ещё" на экране
+    результата затягивает сильнее, чем пачка результатов разом."""
     season = await get_active_season(session)
     if season is None:
         raise NoActiveSeasonError
@@ -67,39 +67,31 @@ async def _roll(
     active_event = await event_service.get_active(session)
     event_cards = await list_by_universe(session, active_event.universe_code) if active_event else []
 
-    new_balance = await ticket.spend(session, user_id, cost)
+    new_balance = await ticket.spend(session, user_id, ROLL_ONE_COST)
     if new_balance is None:
-        raise NotEnoughTicketsError(needed=cost)
+        raise NotEnoughTicketsError(needed=ROLL_ONE_COST)
 
-    def _pick_one() -> Card:
-        if event_cards and random.random() < EVENT_CARD_CHANCE:
-            return random.choice(event_cards)
-        return pick_card(tier_map)
+    if event_cards and random.random() < EVENT_CARD_CHANCE:
+        card = random.choice(event_cards)
+    else:
+        card = pick_card(tier_map)
 
-    cards = [_pick_one() for _ in range(count)]
+    owned_quantity = await add_card(session, user_id=user_id, card_id=card.id, stars=1, qty=1)
 
-    # Группируем повторки внутри одной крутки x10 в один upsert на card_id — меньше
-    # запросов к БД (правило 3), чем по одному апсерту на каждую из 10 карт.
-    counts = Counter(card.id for card in cards)
-    owned_quantity_by_card_id: dict[int, int] = {}
-    for card_id, qty in counts.items():
-        owned_quantity_by_card_id[card_id] = await add_card(session, user_id=user_id, card_id=card_id, stars=1, qty=qty)
+    new_season_ubp = await award_ubp(session, user_id=user_id, amount=card.base_ubp, reason=TRANSACTION_REASON_ROLL)
+    new_total_rolls, referred_by_id = await increment_total_rolls(session, user_id=user_id, amount=1)
 
-    total_ubp = sum(card.base_ubp for card in cards)
-    new_season_ubp = await award_ubp(session, user_id=user_id, amount=total_ubp, reason=TRANSACTION_REASON_ROLL)
-    new_total_rolls, referred_by_id = await increment_total_rolls(session, user_id=user_id, amount=count)
-
-    # new_total_rolls == count означает, что ДО этой крутки было 0 — то есть она первая
-    # вообще (см. CLAUDE.md, "Рефералы": награда рефереру только за первую крутку
-    # приглашённого, не за каждую — анти-абьюз пустыми аккаунтами).
-    if referred_by_id is not None and new_total_rolls == count:
-        await add_coins(session, user_id=referred_by_id, amount=REFERRAL_FIRST_ROLL_REWARD_COINS)
-        await ticket.grant(session, referred_by_id, REFERRAL_FIRST_ROLL_REWARD_TICKETS)
+    # new_total_rolls == REFERRAL_ROLL_THRESHOLD означает, что именно ЭТА крутка довела
+    # приглашённого до порога — награда рефереру выдаётся ровно один раз (см. CLAUDE.md,
+    # "Рефералы": порог, а не первая крутка — анти-абьюз пустыми/брошенными аккаунтами).
+    if referred_by_id is not None and new_total_rolls == REFERRAL_ROLL_THRESHOLD:
+        await add_coins(session, user_id=referred_by_id, amount=REFERRAL_ROLL_REWARD_COINS)
+        await ticket.grant(session, referred_by_id, REFERRAL_ROLL_REWARD_TICKETS)
         session.add(
             Transaction(
                 user_id=referred_by_id,
                 currency=TransactionCurrency.coins,
-                amount=REFERRAL_FIRST_ROLL_REWARD_COINS,
+                amount=REFERRAL_ROLL_REWARD_COINS,
                 reason=TRANSACTION_REASON_REFERRAL_REWARD,
             )
         )
@@ -107,7 +99,7 @@ async def _roll(
             Transaction(
                 user_id=referred_by_id,
                 currency=TransactionCurrency.tickets,
-                amount=REFERRAL_FIRST_ROLL_REWARD_TICKETS,
+                amount=REFERRAL_ROLL_REWARD_TICKETS,
                 reason=TRANSACTION_REASON_REFERRAL_REWARD,
             )
         )
@@ -116,19 +108,4 @@ async def _roll(
     # Redis обновляем только после успешного commit в Postgres (см. CLAUDE.md, правило 10).
     await sync_score(redis, season.id, user_id, new_season_ubp)
 
-    return [RollResult(card=card, owned_quantity=owned_quantity_by_card_id[card.id]) for card in cards]
-
-
-async def roll_one(session: AsyncSession, redis: Redis, *, user_id: int, universe_code: str) -> RollResult:
-    results = await _roll(
-        session, redis, user_id=user_id, universe_code=universe_code, count=1, cost=ROLL_ONE_COST
-    )
-    return results[0]
-
-
-async def roll_ten(
-    session: AsyncSession, redis: Redis, *, user_id: int, universe_code: str
-) -> list[RollResult]:
-    return await _roll(
-        session, redis, user_id=user_id, universe_code=universe_code, count=ROLL_TEN_COUNT, cost=ROLL_TEN_COST
-    )
+    return RollResult(card=card, owned_quantity=owned_quantity)

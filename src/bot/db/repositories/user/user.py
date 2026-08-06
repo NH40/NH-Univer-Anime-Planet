@@ -126,10 +126,9 @@ async def increment_total_rolls(session: AsyncSession, *, user_id: int, amount: 
     """Накопительный счётчик "круток за всё время" для профиля. Не коммитит — вызывается
     внутри services/gacha как часть одной композитной операции крутки.
 
-    Возвращает (новый total_rolls, referred_by_id) тем же UPDATE — services/gacha по
-    `new_total_rolls == amount` бесплатно узнаёт "это была самая первая крутка вообще"
-    (старое значение было 0), без отдельного SELECT перед инкрементом — нужно для
-    реферальной награды "50 коинов+50 тикетов за первую крутку приглашённого"."""
+    Возвращает (новый total_rolls, referred_by_id) тем же UPDATE — services/gacha сверяет
+    `new_total_rolls == REFERRAL_ROLL_THRESHOLD`, чтобы выдать рефереру награду ровно один
+    раз, когда приглашённый достигает порога круток (см. CLAUDE.md, "Рефералы")."""
     result = await session.execute(
         update(User)
         .where(User.id == user_id)

@@ -3,6 +3,7 @@ from bot.services.merge.merge import (
     MergeResult,
     NoActiveSeasonError,
     NotEnoughCopiesError,
+    merge_all,
     merge_stack,
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "MergeResult",
     "NoActiveSeasonError",
     "NotEnoughCopiesError",
+    "merge_all",
     "merge_stack",
 ]

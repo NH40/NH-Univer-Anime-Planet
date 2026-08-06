@@ -29,6 +29,7 @@ from bot.constant.shop import (
     CB_COINSHOP_TICKETS,
     CB_COINSHOP_TICKETS_CONFIRM,
     CB_SHOP_BUY_TICKETS_CUSTOM,
+    CB_SHOP_BUY_TICKETS_MAX,
     CB_SHOP_BUY_TICKETS_PREFIX,
     CB_SHOP_COINS,
     CB_SHOP_DUST,
@@ -58,6 +59,7 @@ from bot.texts.shop import (
     BATTLE_PASS_SCREEN,
     BATTLE_PASS_STATUS_ACTIVE,
     BATTLE_PASS_STATUS_NONE,
+    BUY_MAX_NOTHING,
     BUY_TICKETS_RESULT,
     CANCELLED,
     COIN_SHOP_SCREEN,
@@ -193,6 +195,20 @@ async def _buy_tickets_and_refresh(
 @router.callback_query(F.data.startswith(CB_SHOP_BUY_TICKETS_PREFIX))
 async def cb_buy_tickets_preset(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
     quantity = int(callback.data[len(CB_SHOP_BUY_TICKETS_PREFIX) :])
+    await _buy_tickets_and_refresh(callback, session, redis, quantity)
+
+
+@router.callback_query(F.data == CB_SHOP_BUY_TICKETS_MAX)
+async def cb_buy_tickets_max(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
+    user = await get_by_id(session, callback.from_user.id)
+    if user is None:
+        await callback.answer(NEED_START, show_alert=True)
+        return
+
+    quantity = min(user.dust // SHOP_TICKET_PRICE_DUST, SHOP_TICKET_MAX_QUANTITY)
+    if quantity < 1:
+        await callback.answer(BUY_MAX_NOTHING, show_alert=True)
+        return
     await _buy_tickets_and_refresh(callback, session, redis, quantity)
 
 
