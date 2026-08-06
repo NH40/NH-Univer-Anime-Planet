@@ -5,6 +5,7 @@ from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.config.game import TICKET_STARTING_COUNT
 from bot.constant.referral import REFERRAL_DEEPLINK_PREFIX
 from bot.db.repositories.user import get_by_id, set_referred_by, upsert_from_telegram
 from bot.keyboards.common import main_menu
@@ -25,6 +26,7 @@ async def cmd_start(message: Message, command: CommandObject, session: AsyncSess
         user_id=user_id,
         username=message.from_user.username,
         display_name=display_name,
+        starting_tickets=TICKET_STARTING_COUNT,
     )
 
     # Именная реф. кампания из /admin (t.me/<bot>?start=ref_<код>) — не путать с личными

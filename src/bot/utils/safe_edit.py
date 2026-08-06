@@ -34,12 +34,15 @@ async def safe_edit_text(message: Message, text: str, **kwargs: Any) -> None:
         raise
 
 
-async def safe_edit_media(message: Message, media: InputMedia, **kwargs: Any) -> None:
+async def safe_edit_media(message: Message, media: InputMedia, **kwargs: Any) -> Message | None:
     """Аналог safe_edit_text для сообщений с фото (навигация по коллекции) — меняет и
     картинку, и подпись атомарно одним вызовом Telegram API, вместо спама новыми
-    сообщениями на каждый клик -1/+1."""
+    сообщениями на каждый клик -1/+1. Возвращает отредактированное сообщение (нужно
+    вызывающему коду, чтобы закэшировать новый file_id, см. utils/card_media) — либо
+    None, если Telegram счёл, что менять нечего (тогда file_id уже актуален в кэше)."""
     try:
-        await message.edit_media(media, **kwargs)
+        return await message.edit_media(media, **kwargs)
     except TelegramBadRequest as exc:
         if "message is not modified" not in str(exc).lower():
             raise
+        return None

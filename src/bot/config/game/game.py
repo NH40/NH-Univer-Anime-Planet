@@ -5,6 +5,9 @@ from __future__ import annotations
 
 # --- Тикеты (см. CLAUDE.md, "Модель тикетов") ---
 TICKET_NATURAL_CAP = 3
+# Стартовый баланс нового игрока — сверх капа регена, тот же принцип, что докупка/подарок
+# (см. CLAUDE.md: баланс не ограничен сверху, ограничен только пассивный реген).
+TICKET_STARTING_COUNT = 15
 TICKET_REGEN_INTERVAL_SECONDS = 2 * 60 * 60  # 1 тикет за 2 часа
 # Подписка ускоряет пассивный реген вдвое, пока активна (см. CLAUDE.md, "Подписка").
 TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED = 60 * 60

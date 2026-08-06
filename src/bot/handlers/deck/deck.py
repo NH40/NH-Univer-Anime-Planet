@@ -46,7 +46,7 @@ from bot.texts.deck import (
     TIER_NAMES,
     UNIVERSE_NOT_READY,
 )
-from bot.utils.card_media import card_photo
+from bot.utils.card_media import cache_card_photo, get_card_photo
 from bot.utils.formatting import esc
 from bot.utils.safe_edit import safe_edit_text
 
@@ -146,7 +146,9 @@ async def cb_roll1(callback: CallbackQuery, session: AsyncSession, redis: Redis)
 
         universe = await get_universe(session, user.universe_selected)
         caption = _card_caption(result.card, result.stars, universe.title, result.owned_quantity)
-        await callback.message.answer_photo(card_photo(result.card), caption=caption, reply_markup=back_to_deck())
+        photo = await get_card_photo(redis, result.card)
+        sent = await callback.message.answer_photo(photo, caption=caption, reply_markup=back_to_deck())
+        await cache_card_photo(redis, result.card.id, sent)
 
 
 @router.callback_query(F.data == CB_DECK_ROLL10)
@@ -183,7 +185,9 @@ async def cb_roll10(callback: CallbackQuery, session: AsyncSession, redis: Redis
         universe = await get_universe(session, user.universe_selected)
         top = max(results, key=lambda r: r.card.base_ubp)
         caption = _card_caption(top.card, top.stars, universe.title, top.owned_quantity)
-        await callback.message.answer_photo(card_photo(top.card), caption=caption)
+        photo = await get_card_photo(redis, top.card)
+        sent = await callback.message.answer_photo(photo, caption=caption)
+        await cache_card_photo(redis, top.card.id, sent)
 
         # Отдельным сообщением, а не в подписи к фото — подпись у Telegram ограничена
         # 1024 символами, а с описаниями карт список из 10 строк легко её превысит.

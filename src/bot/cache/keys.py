@@ -16,6 +16,12 @@ def tech_mode_flag() -> str:
     return "flag:tech_mode"
 
 
+def card_file_id(card_id: int) -> str:
+    """Кэш Telegram file_id по карточке (см. utils/card_media) — картинка одна и та же
+    независимо от звезды, поэтому ключ только по card_id, не по (card_id, stars)."""
+    return f"cache:card_file_id:{card_id}"
+
+
 def wipe_confirm_flag(user_id: int) -> str:
     """Анти-replay для двух последовательных нажатий подтверждения полного сброса БД
     (см. services/admin/wipe) — короткий TTL, чтобы подтверждение, забытое на часы, не

@@ -61,7 +61,10 @@ class User(Base):
 
     # Integer, а не SmallInteger — тикеты можно докупать за коины/промокоды сверх
     # "естественного" капа регена (см. CLAUDE.md, "Модель тикетов"), сумма не должна
-    # рисковать переполнением smallint.
+    # рисковать переполнением smallint. default=3 здесь — только схемный fallback:
+    # реальный стартовый баланс новых игроков (TICKET_STARTING_COUNT=15) выставляется
+    # явно в db/repositories/user.upsert_from_telegram (единственная точка создания
+    # User), не отсюда.
     tickets_count: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
     tickets_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Накопительный счётчик — сколько карт всего выбито круткой (x1+x10), для профиля.

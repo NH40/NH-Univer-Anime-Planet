@@ -31,13 +31,15 @@ async def get_by_username(session: AsyncSession, username: str) -> User | None:
 
 
 async def upsert_from_telegram(
-    session: AsyncSession, *, user_id: int, username: str | None, display_name: str
+    session: AsyncSession, *, user_id: int, username: str | None, display_name: str, starting_tickets: int
 ) -> User:
     """Регистрация/обновление игрока при каждом /start. Атомарный upsert одним запросом —
-    без гонки "проверили что нет — вставили" при параллельных апдейтах от одного пользователя."""
+    без гонки "проверили что нет — вставили" при параллельных апдейтах от одного пользователя.
+    `starting_tickets` попадает только в INSERT (см. `on_conflict_do_update` ниже — там его
+    нет): при повторных /start уже существующего игрока баланс тикетов трогать нельзя."""
     stmt = (
         pg_insert(User)
-        .values(id=user_id, username=username, display_name=display_name)
+        .values(id=user_id, username=username, display_name=display_name, tickets_count=starting_tickets)
         .on_conflict_do_update(
             index_elements=[User.id],
             set_={"username": username},

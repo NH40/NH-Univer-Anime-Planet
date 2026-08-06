@@ -32,7 +32,7 @@ from bot.keyboards.profile import back_to_profile, players_pager, profile_menu
 from bot.services import ticket
 from bot.services.referral import REFERRAL_REWARD_REASONS
 from bot.states.profile import ProfileStates
-from bot.texts.common import BTN_PROFILE, NEED_START
+from bot.texts.common import BTN_PROFILE, DIVIDER, NEED_START
 from bot.texts.profile import (
     NO_CLAN,
     NO_RANK,
@@ -100,6 +100,7 @@ async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> 
         name=esc(user.display_name or "—"),
         username=f"@{esc(user.username)}" if user.username else NO_USERNAME,
         clan=esc(clan_name) if clan_name else NO_CLAN,
+        divider=DIVIDER,
         ubp_season=user.ubp_season,
         rank=rank if rank else NO_RANK,
         ubp_total=user.ubp_total,

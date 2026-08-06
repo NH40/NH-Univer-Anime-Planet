@@ -36,7 +36,7 @@ from bot.texts.collection import (
 )
 from bot.texts.common import NEED_START
 from bot.texts.deck import NO_UNIVERSE_SELECTED
-from bot.utils.card_media import card_photo
+from bot.utils.card_media import cache_card_photo, get_card_photo
 from bot.utils.formatting import esc
 from bot.utils.safe_edit import safe_edit_media, safe_edit_text
 
@@ -91,7 +91,7 @@ async def cb_open_collection(callback: CallbackQuery, session: AsyncSession) -> 
 
 
 @router.callback_query(F.data == CB_COLL_EVENTS)
-async def cb_open_events(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_open_events(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
     user = await get_by_id(session, callback.from_user.id)
     if user is None:
         await callback.answer()
@@ -106,15 +106,17 @@ async def cb_open_events(callback: CallbackQuery, session: AsyncSession) -> None
         await safe_edit_text(callback.message, EMPTY_TIER, reply_markup=tier_picker())
         return
 
-    await callback.message.answer_photo(
-        card_photo(stacks[0].card),
+    photo = await get_card_photo(redis, stacks[0].card)
+    sent = await callback.message.answer_photo(
+        photo,
         caption=_stack_caption(stacks[0], 0, len(stacks)),
         reply_markup=stack_view(tier=EVENT_CARD_UBP, index=0, total=len(stacks), quantity=stacks[0].quantity),
     )
+    await cache_card_photo(redis, stacks[0].card.id, sent)
 
 
 @router.callback_query(F.data.startswith(CB_COLL_TIER_PREFIX))
-async def cb_open_tier(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_open_tier(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
     tier = int(callback.data[len(CB_COLL_TIER_PREFIX) :])
     user = await get_by_id(session, callback.from_user.id)
     if user is None or user.universe_selected is None:
@@ -130,15 +132,17 @@ async def cb_open_tier(callback: CallbackQuery, session: AsyncSession) -> None:
 
     # Тир-пикер — текст, карточка — фото, редактировать на месте нельзя (разные типы
     # контента у Telegram), поэтому новое сообщение.
-    await callback.message.answer_photo(
-        card_photo(stacks[0].card),
+    photo = await get_card_photo(redis, stacks[0].card)
+    sent = await callback.message.answer_photo(
+        photo,
         caption=_stack_caption(stacks[0], 0, len(stacks)),
         reply_markup=stack_view(tier=tier, index=0, total=len(stacks), quantity=stacks[0].quantity),
     )
+    await cache_card_photo(redis, stacks[0].card.id, sent)
 
 
 @router.callback_query(F.data.startswith(CB_COLL_NAV_PREFIX))
-async def cb_navigate(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_navigate(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
     tier, index = _parse_tier_index(callback.data, CB_COLL_NAV_PREFIX)
     user = await get_by_id(session, callback.from_user.id)
     if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
@@ -153,15 +157,18 @@ async def cb_navigate(callback: CallbackQuery, session: AsyncSession) -> None:
 
     index = max(0, min(index, len(stacks) - 1))
     stack = stacks[index]
-    await safe_edit_media(
+    photo = await get_card_photo(redis, stack.card)
+    edited = await safe_edit_media(
         callback.message,
-        InputMediaPhoto(media=card_photo(stack.card), caption=_stack_caption(stack, index, len(stacks))),
+        InputMediaPhoto(media=photo, caption=_stack_caption(stack, index, len(stacks))),
         reply_markup=stack_view(tier=tier, index=index, total=len(stacks), quantity=stack.quantity),
     )
+    if edited is not None:
+        await cache_card_photo(redis, stack.card.id, edited)
 
 
 async def _refresh_after_action(
-    callback: CallbackQuery, session: AsyncSession, universe_code: str | None, tier: int
+    callback: CallbackQuery, session: AsyncSession, redis: Redis, universe_code: str | None, tier: int
 ) -> None:
     """После распыления/слияния состав стопок в тире мог измениться — просто
     показываем тир заново с начала, а не пытаемся угадать, куда делась старая позиция."""
@@ -169,11 +176,14 @@ async def _refresh_after_action(
     if not stacks:
         await callback.message.answer(EMPTY_TIER, reply_markup=tier_picker())
         return
-    await safe_edit_media(
+    photo = await get_card_photo(redis, stacks[0].card)
+    edited = await safe_edit_media(
         callback.message,
-        InputMediaPhoto(media=card_photo(stacks[0].card), caption=_stack_caption(stacks[0], 0, len(stacks))),
+        InputMediaPhoto(media=photo, caption=_stack_caption(stacks[0], 0, len(stacks))),
         reply_markup=stack_view(tier=tier, index=0, total=len(stacks), quantity=stacks[0].quantity),
     )
+    if edited is not None:
+        await cache_card_photo(redis, stacks[0].card.id, edited)
 
 
 @router.callback_query(F.data.startswith(CB_COLL_DUST1_PREFIX) | F.data.startswith(CB_COLL_DUSTALL_PREFIX))
@@ -209,7 +219,7 @@ async def cb_dust(callback: CallbackQuery, session: AsyncSession, redis: Redis) 
 
         dusted_count = stack.quantity - (1 if keep_one else 0)
         await callback.answer(DUST_RESULT.format(count=dusted_count, reward=reward), show_alert=True)
-        await _refresh_after_action(callback, session, user.universe_selected, tier)
+        await _refresh_after_action(callback, session, redis, user.universe_selected, tier)
 
 
 @router.callback_query(F.data.startswith(CB_COLL_MERGE_PREFIX))
@@ -250,4 +260,4 @@ async def cb_merge(callback: CallbackQuery, session: AsyncSession, redis: Redis)
             ),
             show_alert=True,
         )
-        await _refresh_after_action(callback, session, user.universe_selected, tier)
+        await _refresh_after_action(callback, session, redis, user.universe_selected, tier)
