@@ -37,3 +37,8 @@ CB_ADMIN_MASS_GRANT_CONFIRM = "admin:mass_confirm"
 
 CB_ADMIN_DELETE_ACCOUNT_START = "admin:delete_account"
 CB_ADMIN_DELETE_ACCOUNT_CONFIRM_PREFIX = "admin:delete_confirm:"
+
+# Управление доп.админами — только для супер-админов (ADMIN_IDS), см. handlers/admin/admin_manage.
+CB_ADMIN_MANAGE_ADMINS = "admin:manage_admins"
+CB_ADMIN_MANAGE_FIND_PLAYER = "admin:manage_find_player"
+CB_ADMIN_TOGGLE_ADMIN_PREFIX = "admin:toggle_admin:"

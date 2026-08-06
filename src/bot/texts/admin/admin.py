@@ -10,6 +10,7 @@ BTN_ADMIN_REFERRAL = "🔗 Рефералы"
 BTN_ADMIN_BROADCAST = "📣 Рассылка"
 BTN_ADMIN_MASS_GRANT = "🎁 Выдать всем"
 BTN_ADMIN_DELETE_ACCOUNT = "🗑 Удалить аккаунт"
+BTN_ADMIN_MANAGE_ADMINS = "👑 Админы"
 
 TECH_MODE_ENABLED = "🛠 Техрежим включён."
 TECH_MODE_DISABLED = "✅ Техрежим выключен."
@@ -147,3 +148,20 @@ DELETE_ACCOUNT_OWNER_BLOCKED = (
     "или распустите клан (если он там один)."
 )
 DELETE_ACCOUNT_DONE = "🗑 Аккаунт {name} (id {id}) удалён."
+
+# --- Управление админами (только для супер-админов из ADMIN_IDS) ---
+MANAGE_ADMINS_HEADER = "👑 <b>Администраторы</b>\n\nСупер-админы (ADMIN_IDS в .env) сюда не входят.\n\n"
+MANAGE_ADMINS_LINE = "• {name} (id <code>{id}</code>{username})\n"
+MANAGE_ADMINS_EMPTY = "Пока нет ни одного дополнительного админа."
+BTN_MANAGE_FIND_PLAYER = "🔍 Найти игрока"
+MANAGE_FIND_PLAYER_PROMPT = "Введите username (с @ или без) или id игрока. /cancel — отменить."
+
+MANAGE_ADMIN_CARD = "👤 <b>{name}</b> (id <code>{id}</code>{username})\n\n<b>Права админа:</b> {status}"
+BTN_GRANT_ADMIN = "👑 Выдать админку"
+BTN_REVOKE_ADMIN = "❌ Забрать админку"
+
+ADMIN_GRANTED = "✅ {name} теперь администратор."
+ADMIN_REVOKED = "❌ У {name} забраны права администратора."
+NOTIFY_ADMIN_GRANTED = "👑 Вам выданы права администратора. Откройте /admin."
+NOTIFY_ADMIN_REVOKED = "❌ У вас отозваны права администратора."
+NOT_SUPER_ADMIN = "Эта функция доступна только главному администратору."

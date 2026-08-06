@@ -199,6 +199,13 @@ async def list_all_ids(session: AsyncSession) -> list[int]:
     return list(result.scalars().all())
 
 
+async def list_admins(session: AsyncSession) -> list[User]:
+    """Доп.админы сверх ADMIN_IDS (см. handlers/admin/admin_manage) — список принципиально
+    небольшой (горстка доверенных людей), без пагинации."""
+    result = await session.execute(select(User).where(User.is_admin.is_(True)).order_by(User.id))
+    return list(result.scalars().all())
+
+
 async def set_referred_by(session: AsyncSession, *, user_id: int, referrer_id: int) -> None:
     """Выставляет referred_by_id ровно один раз (WHERE referred_by_id IS NULL) — повторный
     /start по чужой реферальной ссылке уже привязанного игрока ничего не меняет. Нельзя

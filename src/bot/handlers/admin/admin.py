@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.config.settings import get_settings
 from bot.constant.admin import (
     CB_ADMIN_FIND_PLAYER_START,
     CB_ADMIN_OPEN,
@@ -90,22 +91,31 @@ async def _render_player_card(session: AsyncSession, user: User) -> tuple[str, I
 @router.message(Command("admin"))
 async def cmd_admin(message: Message, redis: Redis) -> None:
     tech_mode = await admin_service.get_tech_mode(redis)
-    await message.answer(ADMIN_MENU, reply_markup=admin_menu(tech_mode_enabled=tech_mode))
+    is_super_admin = admin_service.is_config_admin(message.from_user.id, get_settings())
+    await message.answer(
+        ADMIN_MENU, reply_markup=admin_menu(tech_mode_enabled=tech_mode, is_super_admin=is_super_admin)
+    )
 
 
 @router.callback_query(F.data == CB_ADMIN_OPEN)
 async def cb_admin_open(callback: CallbackQuery, redis: Redis) -> None:
     tech_mode = await admin_service.get_tech_mode(redis)
+    is_super_admin = admin_service.is_config_admin(callback.from_user.id, get_settings())
     await callback.answer()
-    await safe_edit_text(callback.message, ADMIN_MENU, reply_markup=admin_menu(tech_mode_enabled=tech_mode))
+    await safe_edit_text(
+        callback.message, ADMIN_MENU, reply_markup=admin_menu(tech_mode_enabled=tech_mode, is_super_admin=is_super_admin)
+    )
 
 
 @router.callback_query(F.data == CB_ADMIN_TECH_MODE_TOGGLE)
 async def cb_toggle_tech_mode(callback: CallbackQuery, redis: Redis) -> None:
     new_value = not await admin_service.get_tech_mode(redis)
     await admin_service.set_tech_mode(redis, new_value)
+    is_super_admin = admin_service.is_config_admin(callback.from_user.id, get_settings())
     await callback.answer(TECH_MODE_ENABLED if new_value else TECH_MODE_DISABLED, show_alert=True)
-    await safe_edit_text(callback.message, ADMIN_MENU, reply_markup=admin_menu(tech_mode_enabled=new_value))
+    await safe_edit_text(
+        callback.message, ADMIN_MENU, reply_markup=admin_menu(tech_mode_enabled=new_value, is_super_admin=is_super_admin)
+    )
 
 
 @router.callback_query(F.data == CB_ADMIN_STATS)

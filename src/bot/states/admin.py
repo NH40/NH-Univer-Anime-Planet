@@ -15,3 +15,4 @@ class AdminStates(StatesGroup):
     waiting_broadcast_text = State()
     waiting_mass_grant_amount = State()
     waiting_delete_account = State()
+    waiting_manage_admin_search = State()
