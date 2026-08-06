@@ -1,0 +1,3 @@
+from bot.constant.daily_bonus.daily_bonus import CB_DAILY_BONUS_CLAIM, TRANSACTION_REASON_DAILY_BONUS
+
+__all__ = ["CB_DAILY_BONUS_CLAIM", "TRANSACTION_REASON_DAILY_BONUS"]

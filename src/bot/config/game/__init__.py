@@ -18,6 +18,8 @@ from bot.config.game.game import (
     CLAN_TOP_IMAGE_ELIGIBLE_COUNT,
     CLAN_WAR_DURATION_HOURS,
     CLAN_WAR_REWARD_DUST,
+    DAILY_BONUS_MAX_STREAK,
+    DAILY_BONUS_REWARDS,
     DONATE_COINS_PER_RUB,
     DONATE_MAX_RUB,
     DONATE_MIN_RUB,
@@ -50,6 +52,7 @@ from bot.config.game.game import (
     battle_pass_free_reward,
     battle_pass_level_from_ubp,
     battle_pass_premium_reward,
+    daily_bonus_reward,
     dust_for_stars,
     ubp_for_stars,
 )
@@ -74,6 +77,8 @@ __all__ = [
     "CLAN_TOP_IMAGE_ELIGIBLE_COUNT",
     "CLAN_WAR_DURATION_HOURS",
     "CLAN_WAR_REWARD_DUST",
+    "DAILY_BONUS_MAX_STREAK",
+    "DAILY_BONUS_REWARDS",
     "DONATE_COINS_PER_RUB",
     "DONATE_MAX_RUB",
     "DONATE_MIN_RUB",
@@ -106,6 +111,7 @@ __all__ = [
     "battle_pass_free_reward",
     "battle_pass_level_from_ubp",
     "battle_pass_premium_reward",
+    "daily_bonus_reward",
     "dust_for_stars",
     "ubp_for_stars",
 ]

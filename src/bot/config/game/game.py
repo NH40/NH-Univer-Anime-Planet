@@ -169,3 +169,24 @@ def dust_for_stars(base_ubp: int, stars: int) -> int:
     слияния). Обобщаем на более высокие звёзды тем же множителем 5 за каждый шаг слияния
     (MERGE_COPIES_REQUIRED, а не MERGE_MULTIPLIER)."""
     return (base_ubp // DUST_DIVISOR) * (MERGE_COPIES_REQUIRED ** (stars - 1))
+
+
+# --- Ежедневный бонус (streak 1-7 дней, см. CLAUDE.md, "Ежедневный бонус") ---
+DAILY_BONUS_MAX_STREAK = 7
+# (пыль, тикеты) по дню серии — индекс 0 = день 1. Растущая шкала, день 7 — самый ценный
+# (~5 тикетов, как просил пользователь) — числа не продиктованы, посчитаны для баланса
+# (масштаб пыли ориентирован на SHOP_TICKET_PRICE_DUST = 20 пыли/тикет).
+DAILY_BONUS_REWARDS: tuple[tuple[int, int], ...] = (
+    (20, 0),
+    (30, 0),
+    (40, 1),
+    (60, 1),
+    (80, 2),
+    (100, 2),
+    (150, 5),
+)
+
+
+def daily_bonus_reward(day: int) -> tuple[int, int]:
+    """(пыль, тикеты) за день `day` серии (1..DAILY_BONUS_MAX_STREAK)."""
+    return DAILY_BONUS_REWARDS[day - 1]

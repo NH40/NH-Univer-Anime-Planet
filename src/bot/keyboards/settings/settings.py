@@ -7,6 +7,7 @@ from bot.constant.settings import (
     CB_SETTINGS_NOTIFICATIONS_OPEN,
     CB_SETTINGS_OPEN,
     CB_SETTINGS_TOGGLE_CLAN_REQUESTS,
+    CB_SETTINGS_TOGGLE_DAILY_BONUS,
     CB_SETTINGS_TOGGLE_ROLL_REMINDER,
     CB_SETTINGS_TOGGLE_TICKETS_FULL,
     CB_SETTINGS_UNIVERSE_OPEN,
@@ -15,6 +16,7 @@ from bot.db.models.universe import Universe
 from bot.texts.common import BTN_BACK
 from bot.texts.settings import (
     BTN_NOTIFY_CLAN_REQUESTS,
+    BTN_NOTIFY_DAILY_BONUS,
     BTN_NOTIFY_ROLL_REMINDER,
     BTN_NOTIFY_TICKETS_FULL,
     BTN_SETTINGS_NOTIFICATIONS,
@@ -42,10 +44,13 @@ def universe_picker(universes: list[Universe]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def notifications_menu(*, tickets_full: bool, roll_reminder: bool, clan_requests: bool) -> InlineKeyboardMarkup:
+def notifications_menu(
+    *, tickets_full: bool, roll_reminder: bool, clan_requests: bool, daily_bonus: bool
+) -> InlineKeyboardMarkup:
     tickets_full_status = STATUS_ON if tickets_full else STATUS_OFF
     roll_reminder_status = STATUS_ON if roll_reminder else STATUS_OFF
     clan_requests_status = STATUS_ON if clan_requests else STATUS_OFF
+    daily_bonus_status = STATUS_ON if daily_bonus else STATUS_OFF
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -64,6 +69,12 @@ def notifications_menu(*, tickets_full: bool, roll_reminder: bool, clan_requests
                 InlineKeyboardButton(
                     text=BTN_NOTIFY_CLAN_REQUESTS.format(status=clan_requests_status),
                     callback_data=CB_SETTINGS_TOGGLE_CLAN_REQUESTS,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=BTN_NOTIFY_DAILY_BONUS.format(status=daily_bonus_status),
+                    callback_data=CB_SETTINGS_TOGGLE_DAILY_BONUS,
                 )
             ],
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SETTINGS_OPEN)],

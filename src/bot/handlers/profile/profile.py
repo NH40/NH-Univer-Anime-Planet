@@ -19,7 +19,6 @@ from bot.config.game import (
 from bot.config.settings import get_settings
 from bot.constant.profile import (
     CB_PLAYERS_PAGE_PREFIX,
-    CB_PROFILE_DAILY_BONUS,
     CB_PROFILE_OPEN,
     CB_PROFILE_REFERRALS,
     CB_PROFILE_RENAME,
@@ -52,7 +51,6 @@ from bot.texts.profile import (
     RENAME_DONE,
     RENAME_INVALID,
     RENAME_PROMPT,
-    STUB_DAILY_BONUS,
     TICKETS_LINE_COUNTDOWN,
     TICKETS_LINE_READY,
     TOP_EMPTY,
@@ -172,12 +170,6 @@ async def cb_referrals(callback: CallbackQuery, session: AsyncSession, bot: Bot)
         ),
         reply_markup=back_to_profile(),
     )
-
-
-@router.callback_query(F.data == CB_PROFILE_DAILY_BONUS)
-async def cb_daily_bonus_stub(callback: CallbackQuery) -> None:
-    """Заглушка — см. TODO.md, план реализации ежедневного бонуса."""
-    await callback.answer(STUB_DAILY_BONUS, show_alert=True)
 
 
 @router.message(StateFilter(ProfileStates.waiting_new_name), Command("cancel"))

@@ -92,6 +92,19 @@ class User(Base):
     # чтобы первое напоминание пришло через 12ч ПОСЛЕ регистрации, а не сразу же.
     roll_reminder_sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # Ежедневный бонус (см. CLAUDE.md, "Ежедневный бонус") — streak 1..7,
+    # services/daily_bonus.claim: заберёт в течение 24-48ч с прошлого раза -> +1 (макс 7);
+    # пропустил день (>48ч) -> сброс на 1 при следующем сборе. claimed_at=NULL — ни разу
+    # не забирал, следующий сбор — день 1.
+    daily_bonus_streak: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    daily_bonus_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notify_daily_bonus: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # Отдельный якорь для пуша "бонус готов" (services/notify) — НЕ переиспользует
+    # daily_bonus_claimed_at (тронуть его означало бы исказить логику claim() выше).
+    # Сравнивается с daily_bonus_claimed_at: notified_at < claimed_at значит "ещё не
+    # уведомляли про ТЕКУЩЕЕ окно готовности" — естественно сбрасывается каждым новым claim.
+    daily_bonus_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # "Онлайн" в статистике /admin = активны за последние 24ч. Обновляется одним UPDATE
     # внутри BanCheckMiddleware на каждый апдейт (тот же запрос, что и бан-чек, не второй
     # сверху, см. CLAUDE.md, правило 4 — единичный indexed UPDATE по PK дёшев на 30k онлайн).

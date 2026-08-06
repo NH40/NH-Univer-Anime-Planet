@@ -1,5 +1,6 @@
 from bot.texts.settings.settings import (
     BTN_NOTIFY_CLAN_REQUESTS,
+    BTN_NOTIFY_DAILY_BONUS,
     BTN_NOTIFY_ROLL_REMINDER,
     BTN_NOTIFY_TICKETS_FULL,
     BTN_SETTINGS_NOTIFICATIONS,
@@ -15,6 +16,7 @@ from bot.texts.settings.settings import (
 
 __all__ = [
     "BTN_NOTIFY_CLAN_REQUESTS",
+    "BTN_NOTIFY_DAILY_BONUS",
     "BTN_NOTIFY_ROLL_REMINDER",
     "BTN_NOTIFY_TICKETS_FULL",
     "BTN_SETTINGS_NOTIFICATIONS",

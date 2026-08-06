@@ -154,6 +154,11 @@ async def set_notify_clan_requests(session: AsyncSession, *, user_id: int, enabl
     await session.commit()
 
 
+async def set_notify_daily_bonus(session: AsyncSession, *, user_id: int, enabled: bool) -> None:
+    await session.execute(update(User).where(User.id == user_id).values(notify_daily_bonus=enabled))
+    await session.commit()
+
+
 async def set_is_admin(session: AsyncSession, *, user_id: int, enabled: bool) -> bool:
     """True — обновили (юзер существует), False — юзера с таким id нет (см. handlers/admin,
     выдача админки по username сначала резолвит username в id через get_by_username)."""

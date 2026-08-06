@@ -10,6 +10,7 @@ from bot.constant.settings import (
     CB_SETTINGS_NOTIFICATIONS_OPEN,
     CB_SETTINGS_OPEN,
     CB_SETTINGS_TOGGLE_CLAN_REQUESTS,
+    CB_SETTINGS_TOGGLE_DAILY_BONUS,
     CB_SETTINGS_TOGGLE_ROLL_REMINDER,
     CB_SETTINGS_TOGGLE_TICKETS_FULL,
     CB_SETTINGS_UNIVERSE_OPEN,
@@ -19,6 +20,7 @@ from bot.db.repositories.universe import get_by_code, list_active
 from bot.db.repositories.user import (
     get_by_id,
     set_notify_clan_requests,
+    set_notify_daily_bonus,
     set_notify_roll_reminder,
     set_notify_tickets_full,
     set_universe,
@@ -36,6 +38,7 @@ def _notifications_keyboard(user: User) -> InlineKeyboardMarkup:
         tickets_full=user.notify_tickets_full,
         roll_reminder=user.notify_roll_reminder,
         clan_requests=user.notify_clan_requests,
+        daily_bonus=user.notify_daily_bonus,
     )
 
 
@@ -98,7 +101,10 @@ async def cb_toggle_tickets_full(callback: CallbackQuery, session: AsyncSession)
         callback.message,
         NOTIFICATIONS_MENU,
         reply_markup=notifications_menu(
-            tickets_full=new_value, roll_reminder=user.notify_roll_reminder, clan_requests=user.notify_clan_requests
+            tickets_full=new_value,
+            roll_reminder=user.notify_roll_reminder,
+            clan_requests=user.notify_clan_requests,
+            daily_bonus=user.notify_daily_bonus,
         ),
     )
 
@@ -117,7 +123,10 @@ async def cb_toggle_roll_reminder(callback: CallbackQuery, session: AsyncSession
         callback.message,
         NOTIFICATIONS_MENU,
         reply_markup=notifications_menu(
-            tickets_full=user.notify_tickets_full, roll_reminder=new_value, clan_requests=user.notify_clan_requests
+            tickets_full=user.notify_tickets_full,
+            roll_reminder=new_value,
+            clan_requests=user.notify_clan_requests,
+            daily_bonus=user.notify_daily_bonus,
         ),
     )
 
@@ -136,6 +145,31 @@ async def cb_toggle_clan_requests(callback: CallbackQuery, session: AsyncSession
         callback.message,
         NOTIFICATIONS_MENU,
         reply_markup=notifications_menu(
-            tickets_full=user.notify_tickets_full, roll_reminder=user.notify_roll_reminder, clan_requests=new_value
+            tickets_full=user.notify_tickets_full,
+            roll_reminder=user.notify_roll_reminder,
+            clan_requests=new_value,
+            daily_bonus=user.notify_daily_bonus,
+        ),
+    )
+
+
+@router.callback_query(F.data == CB_SETTINGS_TOGGLE_DAILY_BONUS)
+async def cb_toggle_daily_bonus(callback: CallbackQuery, session: AsyncSession) -> None:
+    user = await get_by_id(session, callback.from_user.id)
+    if user is None:
+        await callback.answer(NEED_START, show_alert=True)
+        return
+
+    new_value = not user.notify_daily_bonus
+    await set_notify_daily_bonus(session, user_id=callback.from_user.id, enabled=new_value)
+    await callback.answer()
+    await safe_edit_text(
+        callback.message,
+        NOTIFICATIONS_MENU,
+        reply_markup=notifications_menu(
+            tickets_full=user.notify_tickets_full,
+            roll_reminder=user.notify_roll_reminder,
+            clan_requests=user.notify_clan_requests,
+            daily_bonus=new_value,
         ),
     )

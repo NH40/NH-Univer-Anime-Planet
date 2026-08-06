@@ -31,8 +31,6 @@ PROGRESS_EMPTY = "📚 Пока нет ни одной карты — крути
 TICKETS_LINE_READY = "🎫 <b>Тикеты:</b> {count}/{cap} (бесплатный лимит заполнен)"
 TICKETS_LINE_COUNTDOWN = "🎫 <b>Тикеты:</b> {count}/{cap} (следующий через {mm:02d}:{ss:02d})"
 
-STUB_DAILY_BONUS = "🎁 Ежедневный бонус скоро появится."
-
 REFERRALS_SCREEN = (
     "🔗 <b>Рефералы</b>\n\n"
     "Ваша персональная ссылка:\n<code>{link}</code>\n\n"
