@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from bot.constant.battle_pass import (
     CB_BATTLE_PASS_CLAIM_FREE,
@@ -12,6 +12,7 @@ from bot.constant.battle_pass import (
 )
 from bot.constant.shop import CB_COINSHOP_BATTLE_PASS
 from bot.texts.battle_pass import (
+    BTN_PASS_APP,
     BTN_PASS_BACK,
     BTN_PASS_BUY,
     BTN_PASS_CLAIM_FREE,
@@ -22,7 +23,9 @@ from bot.texts.battle_pass import (
 )
 
 
-def pass_menu(*, free_claimable: bool, premium_claimable: bool, is_premium: bool) -> InlineKeyboardMarkup:
+def pass_menu(
+    *, free_claimable: bool, premium_claimable: bool, is_premium: bool, mini_app_url: str | None = None
+) -> InlineKeyboardMarkup:
     rows = []
     if free_claimable:
         rows.append([InlineKeyboardButton(text=BTN_PASS_CLAIM_FREE, callback_data=CB_BATTLE_PASS_CLAIM_FREE)])
@@ -33,6 +36,11 @@ def pass_menu(*, free_claimable: bool, premium_claimable: bool, is_premium: bool
         # (handlers/shop) — не дублируем флоу оплаты здесь.
         rows.append([InlineKeyboardButton(text=BTN_PASS_BUY, callback_data=CB_COINSHOP_BATTLE_PASS)])
     rows.append([InlineKeyboardButton(text=BTN_PASS_LEVELS, callback_data=f"{CB_BATTLE_PASS_LEVELS_PAGE_PREFIX}1")])
+    if mini_app_url:
+        # ?view=battlepass — src/web/src/App.tsx читает это при загрузке и сразу открывает
+        # вкладку Battle Pass вместо коллекции по умолчанию (тот же паттерн, что
+        # ?view=profile у keyboards/profile.profile_menu).
+        rows.append([InlineKeyboardButton(text=BTN_PASS_APP, web_app=WebAppInfo(url=f"{mini_app_url}?view=battlepass"))])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

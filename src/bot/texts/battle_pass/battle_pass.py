@@ -23,6 +23,7 @@ BTN_PASS_CLAIM_FREE = "🎁 Забрать бесплатные награды"
 BTN_PASS_CLAIM_PREMIUM = "💎 Забрать премиум-награды"
 BTN_PASS_BUY = "🛒 Купить Battle Pass"
 BTN_PASS_LEVELS = "📜 Все уровни"
+BTN_PASS_APP = "🎫 Battle Pass (веб)"
 
 PASS_CLAIM_FREE_DONE = "✅ Получено: {dust} пыли, {tickets} тикетов."
 PASS_CLAIM_PREMIUM_DONE = "✅ Получено: {dust} пыли, {tickets} тикетов, {coins} коинов."

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import random
+
 # --- Тикеты (см. CLAUDE.md, "Модель тикетов") ---
 TICKET_NATURAL_CAP = 3
 # Стартовый баланс нового игрока — сверх капа регена, тот же принцип, что докупка/подарок
@@ -112,19 +114,31 @@ def battle_pass_level_cost(level: int) -> int:
 
 
 # Награды циклятся каждые BATTLE_PASS_CYCLE_LEVELS уровней (см. battle_pass_free_reward) —
-# формула берёт ПОЗИЦИЮ в цикле, не абсолютный уровень, иначе награды росли бы бесконечно
-# вместо повторения паттерна. Премиум-ветка ДОПОЛНЯЕТ бесплатную (не заменяет).
-BATTLE_PASS_BASE_DUST_PER_LEVEL = 1
-BATTLE_PASS_MINOR_MILESTONE_MOD = 5  # уровни вида pos % 10 == 5 — "минорный" чекпоинт
-BATTLE_PASS_MAJOR_MILESTONE_MOD = 10  # уровни вида pos % 10 == 0 — "мажорный" чекпоинт
-# Коэффициент мажора — ×3, не ×2: при ×2 награда 15-го уровня РАВНЯЛАСЬ бы награде
-# 10-го (30=30), а пользователь явно потребовал "15 больше 5, но меньше 10; 20 больше
-# 10" буквально по номерам уровней. ×3 даёт строгое соблюдение для любого k (проверено).
-BATTLE_PASS_MINOR_BONUS_COEF = 1
-BATTLE_PASS_MAJOR_BONUS_COEF = 3
-BATTLE_PASS_MILESTONE_TICKETS = 1  # на мажорных чекпоинтах, в каждой ветке (free/premium)
+# формула берёт ПОЗИЦИЮ в цикле, не абсолютный уровень. НЕ РАСТУТ с уровнем (изменено
+# 2026-08-08 по запросу пользователя — исходная растущая формула с минор/мажор-чекпоинтами
+# снова показалась "слишком большой" на дальних уровнях цикла): каждый уровень цикла даёт
+# ЛИБО немного тикетов, ЛИБО немного пыли — выбор и величина детерминированы от позиции
+# (`_battle_pass_roll`, seed = pos), поэтому один и тот же уровень всегда даёт одну и ту же
+# награду (и в ленте-превью, и при реальном клейме), просто "вперемешку", а не по формуле
+# от номера уровня. Премиум-ветка бросает свой НЕЗАВИСИМЫЙ ролл (другой seed) поверх
+# бесплатной — ДОПОЛНЯЕТ, не заменяет.
+BATTLE_PASS_TICKET_MIN = 1
+BATTLE_PASS_TICKET_MAX = 3
+BATTLE_PASS_DUST_MIN = 10
+BATTLE_PASS_DUST_MAX = 50
+_BATTLE_PASS_PREMIUM_SEED_OFFSET = 10_000  # разный seed от free — независимый ролл
 BATTLE_PASS_COIN_MILESTONE_MOD = 50  # только премиум-ветка, каждый 50-й уровень цикла
 BATTLE_PASS_MILESTONE_COINS = 15
+
+
+def _battle_pass_roll(seed: int) -> tuple[int, int]:
+    """(пыль, тикеты) — детерминированный по seed выбор 50/50: либо
+    BATTLE_PASS_TICKET_MIN..MAX тикетов, либо BATTLE_PASS_DUST_MIN..MAX пыли. Один и тот же
+    seed всегда даёт один и тот же результат (не хранится в БД, пересчитывается на лету)."""
+    rng = random.Random(seed)
+    if rng.random() < 0.5:
+        return 0, rng.randint(BATTLE_PASS_TICKET_MIN, BATTLE_PASS_TICKET_MAX)
+    return rng.randint(BATTLE_PASS_DUST_MIN, BATTLE_PASS_DUST_MAX), 0
 
 
 def battle_pass_cumulative(level: int) -> int:
@@ -153,31 +167,19 @@ def battle_pass_level_from_progress(progress: int) -> int:
     return level
 
 
-def _battle_pass_reward_at_position(pos: int) -> tuple[int, int]:
-    """(пыль, тикеты) одной ветки за позицию В ЦИКЛЕ (1..BATTLE_PASS_CYCLE_LEVELS)."""
-    dust = pos * BATTLE_PASS_BASE_DUST_PER_LEVEL
-    tickets = 0
-    if pos % BATTLE_PASS_MAJOR_MILESTONE_MOD == 0:
-        dust += pos * BATTLE_PASS_MAJOR_BONUS_COEF
-        tickets = BATTLE_PASS_MILESTONE_TICKETS
-    elif pos % BATTLE_PASS_MINOR_MILESTONE_MOD == 0:
-        dust += pos * BATTLE_PASS_MINOR_BONUS_COEF
-    return dust, tickets
-
-
 def battle_pass_free_reward(level: int) -> tuple[int, int]:
     """(пыль, тикеты) за конкретный АБСОЛЮТНЫЙ уровень бесплатной ветки — награда циклится
-    по позиции внутри BATTLE_PASS_CYCLE_LEVELS."""
+    по позиции внутри BATTLE_PASS_CYCLE_LEVELS, не растёт с уровнем (см. комментарий выше)."""
     pos = ((level - 1) % BATTLE_PASS_CYCLE_LEVELS) + 1
-    return _battle_pass_reward_at_position(pos)
+    return _battle_pass_roll(pos)
 
 
 def battle_pass_premium_reward(level: int) -> tuple[int, int, int]:
     """(пыль, тикеты, коины) за конкретный уровень премиум-ветки — ДОПОЛНИТЕЛЬНО к
-    бесплатной (та же формула ещё раз), плюс коины на каждом BATTLE_PASS_COIN_MILESTONE_MOD-м
-    уровне цикла."""
+    бесплатной (независимый ролл, другой seed), плюс коины на каждом
+    BATTLE_PASS_COIN_MILESTONE_MOD-м уровне цикла."""
     pos = ((level - 1) % BATTLE_PASS_CYCLE_LEVELS) + 1
-    dust, tickets = _battle_pass_reward_at_position(pos)
+    dust, tickets = _battle_pass_roll(pos + _BATTLE_PASS_PREMIUM_SEED_OFFSET)
     coins = BATTLE_PASS_MILESTONE_COINS if pos % BATTLE_PASS_COIN_MILESTONE_MOD == 0 else 0
     return dust, tickets, coins
 

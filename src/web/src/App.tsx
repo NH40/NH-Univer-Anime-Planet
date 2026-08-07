@@ -37,7 +37,9 @@ type View = "collection" | "profile" | "card" | "battlepass";
 
 function initialView(): View {
   const params = new URLSearchParams(window.location.search);
-  return params.get("view") === "profile" ? "profile" : "collection";
+  const view = params.get("view");
+  if (view === "profile" || view === "battlepass") return view;
+  return "collection";
 }
 
 export function App() {
@@ -301,6 +303,38 @@ function ProgressPage({ progress }: { progress: UniverseProgress[] }) {
   );
 }
 
+type TileState = "locked" | "claimed" | "ready";
+
+function tileState(unlocked: boolean, claimed: boolean): TileState {
+  if (!unlocked) return "locked";
+  return claimed ? "claimed" : "ready";
+}
+
+function rewardLabel(dust: number, tickets: number): string {
+  // Награда теперь не растёт с уровнем — на каждом уровне либо немного тикетов, либо
+  // немного пыли (см. CLAUDE.md, "Сезонный пасс"), никогда оба разом.
+  return tickets > 0 ? `🎫${tickets}` : `✨${dust}`;
+}
+
+function BattlePassTile({
+  reward,
+  state,
+  premium,
+  onClick,
+}: {
+  reward: string;
+  state: TileState;
+  premium: boolean;
+  onClick?: () => void;
+}) {
+  const cls = ["bp-tile", premium ? "bp-tile-premium" : "bp-tile-free", `bp-tile-${state}`].join(" ");
+  return (
+    <button type="button" class={cls} disabled={state !== "ready"} onClick={onClick}>
+      {state === "locked" ? "🔒" : state === "claimed" ? "✅" : reward}
+    </button>
+  );
+}
+
 function BattlePassPageView({
   data,
   loading,
@@ -323,47 +357,36 @@ function BattlePassPageView({
     return <div class="empty">Сейчас нет активного сезона.</div>;
   }
 
-  const freeClaimable = data.entries.some((e) => e.unlocked && !e.free_claimed);
-  const premiumClaimable = data.is_premium && data.entries.some((e) => e.unlocked && !e.premium_claimed);
-
   return (
     <div class="battle-pass-page">
       <div class="battle-pass-summary">
         Текущий уровень: <b>{data.current_level}</b> · стр. {data.page}/{data.total_pages}
       </div>
 
-      {(freeClaimable || premiumClaimable) && (
-        <div class="battle-pass-claim-row">
-          {freeClaimable && (
-            <button type="button" class="battle-pass-claim-btn" disabled={claiming} onClick={() => onClaim("free")}>
-              🎁 Забрать бесплатные
-            </button>
-          )}
-          {premiumClaimable && (
-            <button type="button" class="battle-pass-claim-btn" disabled={claiming} onClick={() => onClaim("premium")}>
-              💎 Забрать премиум
-            </button>
-          )}
-        </div>
-      )}
-
-      <div class="battle-pass-list">
+      {/* Горизонтальная лента: колонка на уровень, в колонке — квадратик премиум-ветки
+          сверху (стилизован "круче" — золотая рамка/градиент, см. styles.css) и
+          бесплатной снизу. Тап по доступному квадратику сразу забирает награду —
+          claim_free/claim_premium и так забирают ВСЁ накопленное до текущего уровня
+          разом, так что тап по любому доступному квадратику своей ветки эквивалентен. */}
+      <div class="battle-pass-track">
         {data.entries.map((entry) => {
-          const icon = !entry.unlocked ? "🔒" : entry.free_claimed && (!data.is_premium || entry.premium_claimed) ? "✅" : "🎁";
+          const freeState = tileState(entry.unlocked, entry.free_claimed);
+          const premiumState: TileState = !data.is_premium ? "locked" : tileState(entry.unlocked, entry.premium_claimed);
           return (
-            <div class="battle-pass-row" key={entry.level}>
-              <div class="battle-pass-row-level">
-                {icon} Ур. {entry.level}
-              </div>
-              <div class="battle-pass-row-rewards">
-                <span>
-                  Free: {entry.free_dust}✨{entry.free_tickets ? ` ${entry.free_tickets}🎫` : ""}
-                </span>
-                <span>
-                  Premium: +{entry.premium_dust}✨{entry.premium_tickets ? ` ${entry.premium_tickets}🎫` : ""}
-                  {entry.premium_coins ? ` ${entry.premium_coins}💎` : ""}
-                </span>
-              </div>
+            <div class="bp-column" key={entry.level}>
+              <BattlePassTile
+                reward={rewardLabel(entry.premium_dust, entry.premium_tickets) + (entry.premium_coins ? ` 💎${entry.premium_coins}` : "")}
+                state={premiumState}
+                premium
+                onClick={!claiming && premiumState === "ready" ? () => onClaim("premium") : undefined}
+              />
+              <BattlePassTile
+                reward={rewardLabel(entry.free_dust, entry.free_tickets)}
+                state={freeState}
+                premium={false}
+                onClick={!claiming && freeState === "ready" ? () => onClaim("free") : undefined}
+              />
+              <div class="bp-level-label">{entry.level}</div>
             </div>
           );
         })}

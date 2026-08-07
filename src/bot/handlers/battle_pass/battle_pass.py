@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
+from bot.config.settings import get_settings
 from bot.constant.battle_pass import (
     CB_BATTLE_PASS_CLAIM_FREE,
     CB_BATTLE_PASS_CLAIM_PREMIUM,
@@ -40,7 +41,7 @@ from bot.utils.safe_edit import safe_edit_text
 router = Router(name="battle_pass")
 
 
-def _render(view: pass_service.PassView) -> tuple[str, InlineKeyboardMarkup]:
+def _render(view: pass_service.PassView, *, mini_app_url: str | None) -> tuple[str, InlineKeyboardMarkup]:
     have = view.progress - view.progress_level_floor
     need = view.progress_next_level_ceiling - view.progress_level_floor
     percent = round(100 * have / need) if need else 100
@@ -70,7 +71,10 @@ def _render(view: pass_service.PassView) -> tuple[str, InlineKeyboardMarkup]:
         premium_line=premium_line,
     )
     keyboard = pass_menu(
-        free_claimable=view.free_claimable, premium_claimable=view.premium_claimable, is_premium=view.is_premium
+        free_claimable=view.free_claimable,
+        premium_claimable=view.premium_claimable,
+        is_premium=view.is_premium,
+        mini_app_url=mini_app_url,
     )
     return text, keyboard
 
@@ -79,7 +83,8 @@ async def _show(session: AsyncSession, user_id: int) -> tuple[str, InlineKeyboar
     view = await pass_service.get_pass_view(session, user_id=user_id)
     if view is None:
         return None
-    return _render(view)
+    settings = get_settings()
+    return _render(view, mini_app_url=settings.mini_app_url or None)
 
 
 @router.message(Command("pass"))

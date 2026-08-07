@@ -1,4 +1,5 @@
 from bot.texts.battle_pass.battle_pass import (
+    BTN_PASS_APP,
     BTN_PASS_BACK,
     BTN_PASS_BUY,
     BTN_PASS_CLAIM_ALL,
@@ -31,6 +32,7 @@ from bot.texts.battle_pass.battle_pass import (
 )
 
 __all__ = [
+    "BTN_PASS_APP",
     "BTN_PASS_BACK",
     "BTN_PASS_BUY",
     "BTN_PASS_CLAIM_ALL",
