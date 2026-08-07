@@ -100,13 +100,18 @@ BATTLE_PASS_LEVEL_UBP_COST: tuple[int, ...] = (
 
 # Награды за уровень — формулой (см. CLAUDE.md, правило 8), не статичной таблицей.
 # Премиум-ветка ДОПОЛНЯЕТ бесплатную (не заменяет), см. TODO Этап 8.
-BATTLE_PASS_FREE_DUST_PER_LEVEL = 10
-BATTLE_PASS_PREMIUM_DUST_PER_LEVEL = 20
+# Дуст/коины за уровень урезаны ~вдвое (2026-08-07, жалоба тестера "слишком большие
+# награды в пассе") — было 10/20 пыли за уровень и 50 коинов на монетных чекпоинтах,
+# что на 30 уровне давало почти 14000 пыли суммарно по обеим веткам. Тикеты на
+# чекпоинтах не тронуты — они и так минимальны (1-2 шт.), урезать дальше значило бы
+# фактически убрать их из награды, а не "порезать".
+BATTLE_PASS_FREE_DUST_PER_LEVEL = 5
+BATTLE_PASS_PREMIUM_DUST_PER_LEVEL = 10
 BATTLE_PASS_MILESTONE_LEVELS = (5, 10, 15, 20, 25, 30)
 BATTLE_PASS_FREE_MILESTONE_TICKETS = 1
 BATTLE_PASS_PREMIUM_MILESTONE_TICKETS = 2
 BATTLE_PASS_COIN_MILESTONE_LEVELS = (10, 20, 30)
-BATTLE_PASS_MILESTONE_COINS = 50
+BATTLE_PASS_MILESTONE_COINS = 25
 
 
 def battle_pass_cumulative_ubp(level: int) -> int:
