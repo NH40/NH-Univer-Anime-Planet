@@ -35,3 +35,33 @@ class UniverseProgressOut(BaseModel):
     owned: int
     total: int
     percent: int
+
+
+class BattlePassLevelOut(BaseModel):
+    level: int
+    free_dust: int
+    free_tickets: int
+    premium_dust: int
+    premium_tickets: int
+    premium_coins: int
+    unlocked: bool
+    free_claimed: bool
+    premium_claimed: bool
+
+
+class BattlePassPageOut(BaseModel):
+    entries: list[BattlePassLevelOut]
+    page: int
+    total_pages: int
+    current_level: int
+    is_premium: bool
+
+
+class BattlePassClaimIn(BaseModel):
+    track: str  # "free" | "premium"
+
+
+class BattlePassClaimOut(BaseModel):
+    dust: int
+    tickets: int
+    coins: int

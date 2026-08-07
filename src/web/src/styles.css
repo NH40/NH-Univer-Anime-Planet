@@ -267,3 +267,81 @@ body {
   line-height: 1.4;
   margin: 4px 0;
 }
+
+/* --- Battle Pass --- */
+
+.battle-pass-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.battle-pass-summary {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.battle-pass-claim-row {
+  display: flex;
+  gap: 8px;
+}
+
+.battle-pass-claim-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: var(--tg-theme-button-color, #2ea6ff);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.battle-pass-claim-btn:disabled {
+  opacity: 0.6;
+}
+
+.battle-pass-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.battle-pass-row {
+  background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.battle-pass-row-level {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.battle-pass-row-rewards {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.battle-pass-nav {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.battle-pass-nav button {
+  padding: 8px 20px;
+  border-radius: 10px;
+  border: none;
+  background: var(--tg-theme-secondary-bg-color, #eeeeee);
+  color: var(--tg-theme-text-color, #111111);
+  font-size: 14px;
+}
+
+.battle-pass-nav button:disabled {
+  opacity: 0.4;
+}

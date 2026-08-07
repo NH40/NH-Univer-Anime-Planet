@@ -12,6 +12,7 @@ from bot.db.models.card import Card
 from bot.db.repositories.card import get_by_id as get_card_by_id
 from bot.db.repositories.inventory import add_card, decrement_by
 from bot.db.repositories.season import get_active as get_active_season
+from bot.services import battle_pass as pass_service
 from bot.services.ubp import award_ubp
 
 
@@ -63,6 +64,7 @@ async def merge_stack(
 
     bonus = ubp_for_stars(card.base_ubp, stars)  # UBP одной исходной карты — см. CLAUDE.md
     new_season_ubp = await award_ubp(session, user_id=user_id, amount=bonus, reason=TRANSACTION_REASON_MERGE)
+    await pass_service.add_progress(session, user_id=user_id, season_id=season.id, real_ubp=bonus)
 
     await session.commit()
     # Redis обновляем только после успешного commit в Postgres (см. CLAUDE.md, правило 10).
@@ -104,6 +106,7 @@ async def merge_all(
     while await decrement_by(session, user_id=user_id, card_id=card_id, stars=stars, amount=MERGE_COPIES_REQUIRED):
         await add_card(session, user_id=user_id, card_id=card_id, stars=new_stars, qty=1)
         new_season_ubp = await award_ubp(session, user_id=user_id, amount=bonus, reason=TRANSACTION_REASON_MERGE)
+        await pass_service.add_progress(session, user_id=user_id, season_id=season.id, real_ubp=bonus)
         results.append(
             MergeResult(card=card, new_stars=new_stars, new_ubp=ubp_for_stars(card.base_ubp, new_stars), bonus_ubp=bonus)
         )

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import {
+  type BattlePassPage as BattlePassPageData,
   type CardStack,
   type Profile,
   type Universe,
   type UniverseProgress,
+  claimBattlePass,
+  fetchBattlePassPage,
   fetchCollection,
   fetchEventCollection,
   fetchProfile,
@@ -30,7 +33,7 @@ const TIER_INFO: Record<number, { name: string; emoji: string }> = {
 // эндпоинт /api/collection/events.
 const EVENTS_TAB_CODE = "__events__";
 
-type View = "collection" | "profile" | "card";
+type View = "collection" | "profile" | "card" | "battlepass";
 
 function initialView(): View {
   const params = new URLSearchParams(window.location.search);
@@ -49,6 +52,10 @@ export function App() {
   const [selectedCard, setSelectedCard] = useState<CardStack | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [battlePassPage, setBattlePassPage] = useState<BattlePassPageData | null>(null);
+  const [battlePassPageNum, setBattlePassPageNum] = useState(1);
+  const [battlePassLoading, setBattlePassLoading] = useState(false);
+  const [battlePassClaiming, setBattlePassClaiming] = useState(false);
 
   useEffect(() => {
     applyTelegramTheme();
@@ -74,6 +81,24 @@ export function App() {
     const fetcher = selectedUniverse === EVENTS_TAB_CODE ? fetchEventCollection() : fetchCollection(selectedUniverse);
     fetcher.then(setCards).catch((err: unknown) => setError(String(err)));
   }, [selectedUniverse]);
+
+  useEffect(() => {
+    if (view !== "battlepass") return;
+    setBattlePassLoading(true);
+    fetchBattlePassPage(battlePassPageNum)
+      .then(setBattlePassPage)
+      .catch((err: unknown) => setError(String(err)))
+      .finally(() => setBattlePassLoading(false));
+  }, [view, battlePassPageNum]);
+
+  function claimTrack(track: "free" | "premium") {
+    setBattlePassClaiming(true);
+    claimBattlePass(track)
+      .then(() => fetchBattlePassPage(battlePassPageNum))
+      .then(setBattlePassPage)
+      .catch((err: unknown) => setError(String(err)))
+      .finally(() => setBattlePassClaiming(false));
+  }
 
   // Нативная кнопка "Назад" Telegram — видна только на экране карточки, возвращает
   // в коллекцию. Работает поверх обычной on-page кнопки (та остаётся и как fallback
@@ -129,15 +154,37 @@ export function App() {
       </header>
 
       <nav class="view-tabs">
-        <button type="button" class={view !== "profile" ? "view-tab active" : "view-tab"} onClick={() => setView("collection")}>
+        <button
+          type="button"
+          class={view === "collection" || view === "card" ? "view-tab active" : "view-tab"}
+          onClick={() => setView("collection")}
+        >
           📚 Коллекция
         </button>
         <button type="button" class={view === "profile" ? "view-tab active" : "view-tab"} onClick={() => setView("profile")}>
           👤 Профиль
         </button>
+        <button
+          type="button"
+          class={view === "battlepass" ? "view-tab active" : "view-tab"}
+          onClick={() => setView("battlepass")}
+        >
+          🎫 Battle Pass
+        </button>
       </nav>
 
       {view === "profile" && <ProgressPage progress={progress} />}
+
+      {view === "battlepass" && (
+        <BattlePassPageView
+          data={battlePassPage}
+          loading={battlePassLoading}
+          claiming={battlePassClaiming}
+          onPrev={() => setBattlePassPageNum((p) => Math.max(1, p - 1))}
+          onNext={() => setBattlePassPageNum((p) => (battlePassPage ? Math.min(battlePassPage.total_pages, p + 1) : p))}
+          onClaim={claimTrack}
+        />
+      )}
 
       {view === "card" && selectedCard && (
         <CardPage
@@ -250,6 +297,86 @@ function ProgressPage({ progress }: { progress: UniverseProgress[] }) {
           <div class="progress-row-percent">{p.percent}%</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function BattlePassPageView({
+  data,
+  loading,
+  claiming,
+  onPrev,
+  onNext,
+  onClaim,
+}: {
+  data: BattlePassPageData | null;
+  loading: boolean;
+  claiming: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  onClaim: (track: "free" | "premium") => void;
+}) {
+  if (loading && !data) {
+    return <div class="empty">Загрузка…</div>;
+  }
+  if (!data) {
+    return <div class="empty">Сейчас нет активного сезона.</div>;
+  }
+
+  const freeClaimable = data.entries.some((e) => e.unlocked && !e.free_claimed);
+  const premiumClaimable = data.is_premium && data.entries.some((e) => e.unlocked && !e.premium_claimed);
+
+  return (
+    <div class="battle-pass-page">
+      <div class="battle-pass-summary">
+        Текущий уровень: <b>{data.current_level}</b> · стр. {data.page}/{data.total_pages}
+      </div>
+
+      {(freeClaimable || premiumClaimable) && (
+        <div class="battle-pass-claim-row">
+          {freeClaimable && (
+            <button type="button" class="battle-pass-claim-btn" disabled={claiming} onClick={() => onClaim("free")}>
+              🎁 Забрать бесплатные
+            </button>
+          )}
+          {premiumClaimable && (
+            <button type="button" class="battle-pass-claim-btn" disabled={claiming} onClick={() => onClaim("premium")}>
+              💎 Забрать премиум
+            </button>
+          )}
+        </div>
+      )}
+
+      <div class="battle-pass-list">
+        {data.entries.map((entry) => {
+          const icon = !entry.unlocked ? "🔒" : entry.free_claimed && (!data.is_premium || entry.premium_claimed) ? "✅" : "🎁";
+          return (
+            <div class="battle-pass-row" key={entry.level}>
+              <div class="battle-pass-row-level">
+                {icon} Ур. {entry.level}
+              </div>
+              <div class="battle-pass-row-rewards">
+                <span>
+                  Free: {entry.free_dust}✨{entry.free_tickets ? ` ${entry.free_tickets}🎫` : ""}
+                </span>
+                <span>
+                  Premium: +{entry.premium_dust}✨{entry.premium_tickets ? ` ${entry.premium_tickets}🎫` : ""}
+                  {entry.premium_coins ? ` ${entry.premium_coins}💎` : ""}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div class="battle-pass-nav">
+        <button type="button" disabled={data.page <= 1} onClick={onPrev}>
+          ◀️
+        </button>
+        <button type="button" disabled={data.page >= data.total_pages} onClick={onNext}>
+          ▶️
+        </button>
+      </div>
     </div>
   );
 }

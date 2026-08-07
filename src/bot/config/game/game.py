@@ -87,65 +87,118 @@ CLAN_WAR_DURATION_HOURS = 6
 CLAN_WAR_REWARD_DUST = 200
 CLAN_TOP_IMAGE_ELIGIBLE_COUNT = 10  # картинку клана можно ставить только топ-N по UBP всего
 
-# --- Сезонный пасс (подтверждено пользователем 2026-08-05) ---
-BATTLE_PASS_MAX_LEVEL = 30
-# Стоимость перехода НА уровень N (индекс N-1) в UBP сезона — продиктовано пользователем
-# как явные числа, не единая формула: дёшево до 10 уровня (2000 UBP/уровень), скачок на
-# 11, дальше растущий шаг сначала до 20 уровня, затем до 30.
-BATTLE_PASS_LEVEL_UBP_COST: tuple[int, ...] = (
-    1, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000,
-    15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000, 60000,
-    70000, 80000, 90000, 100000, 110000, 120000, 130000, 140000, 150000, 160000,
-)
-
-# Награды за уровень — формулой (см. CLAUDE.md, правило 8), не статичной таблицей.
-# Премиум-ветка ДОПОЛНЯЕТ бесплатную (не заменяет), см. TODO Этап 8.
-# Дуст/коины за уровень урезаны ~вдвое (2026-08-07, жалоба тестера "слишком большие
-# награды в пассе") — было 10/20 пыли за уровень и 50 коинов на монетных чекпоинтах,
-# что на 30 уровне давало почти 14000 пыли суммарно по обеим веткам. Тикеты на
-# чекпоинтах не тронуты — они и так минимальны (1-2 шт.), урезать дальше значило бы
-# фактически убрать их из награды, а не "порезать".
-BATTLE_PASS_FREE_DUST_PER_LEVEL = 5
-BATTLE_PASS_PREMIUM_DUST_PER_LEVEL = 10
-BATTLE_PASS_MILESTONE_LEVELS = (5, 10, 15, 20, 25, 30)
-BATTLE_PASS_FREE_MILESTONE_TICKETS = 1
-BATTLE_PASS_PREMIUM_MILESTONE_TICKETS = 2
-BATTLE_PASS_COIN_MILESTONE_LEVELS = (10, 20, 30)
-BATTLE_PASS_MILESTONE_COINS = 25
+# --- Сезонный пасс: 500-уровневый бесконечный цикл (переработано 2026-08-08 по запросу
+# пользователя — предыдущая 30-уровневая модель с ручной таблицей стоимости признана
+# "слишком большой", см. CLAUDE.md, "Сезонный пасс: 500 циклических уровней").
+#
+# Стоимость перехода на уровень — от АБСОЛЮТНОГО номера уровня (не циклится): линейная
+# рампа от BATTLE_PASS_COST_START (уровень 1) до BATTLE_PASS_COST_ENDLESS (уровень 500),
+# дальше — плоская BATTLE_PASS_COST_ENDLESS навсегда (без разрыва в точке 500, т.к. рампа
+# и так достигает этого значения к этому уровню). Подтверждено пользователем: "бесконечный
+# цикл, 30000 UBP/уровень навсегда" после первого прохождения 500 уровней.
+BATTLE_PASS_CYCLE_LEVELS = 500
+BATTLE_PASS_COST_START = 300
+BATTLE_PASS_COST_ENDLESS = 30000
 
 
-def battle_pass_cumulative_ubp(level: int) -> int:
-    """Суммарный UBP сезона, нужный чтобы ДОСТИЧЬ уровня `level` (0 -> 0 UBP)."""
-    return sum(BATTLE_PASS_LEVEL_UBP_COST[:level])
+def battle_pass_level_cost(level: int) -> int:
+    """UBP-стоимость перехода С уровня level-1 НА уровень level (level >= 1)."""
+    if level >= BATTLE_PASS_CYCLE_LEVELS:
+        return BATTLE_PASS_COST_ENDLESS
+    return round(
+        BATTLE_PASS_COST_START
+        + (BATTLE_PASS_COST_ENDLESS - BATTLE_PASS_COST_START) * (level - 1) / (BATTLE_PASS_CYCLE_LEVELS - 1)
+    )
 
 
-def battle_pass_level_from_ubp(ubp_season: int) -> int:
-    """Текущий уровень пасса по накопленному UBP сезона — уровень считается на лету,
-    не хранится отдельной колонкой (как и UBP клана, см. CLAUDE.md, "Кланы")."""
+# Награды циклятся каждые BATTLE_PASS_CYCLE_LEVELS уровней (см. battle_pass_free_reward) —
+# формула берёт ПОЗИЦИЮ в цикле, не абсолютный уровень, иначе награды росли бы бесконечно
+# вместо повторения паттерна. Премиум-ветка ДОПОЛНЯЕТ бесплатную (не заменяет).
+BATTLE_PASS_BASE_DUST_PER_LEVEL = 1
+BATTLE_PASS_MINOR_MILESTONE_MOD = 5  # уровни вида pos % 10 == 5 — "минорный" чекпоинт
+BATTLE_PASS_MAJOR_MILESTONE_MOD = 10  # уровни вида pos % 10 == 0 — "мажорный" чекпоинт
+# Коэффициент мажора — ×3, не ×2: при ×2 награда 15-го уровня РАВНЯЛАСЬ бы награде
+# 10-го (30=30), а пользователь явно потребовал "15 больше 5, но меньше 10; 20 больше
+# 10" буквально по номерам уровней. ×3 даёт строгое соблюдение для любого k (проверено).
+BATTLE_PASS_MINOR_BONUS_COEF = 1
+BATTLE_PASS_MAJOR_BONUS_COEF = 3
+BATTLE_PASS_MILESTONE_TICKETS = 1  # на мажорных чекпоинтах, в каждой ветке (free/premium)
+BATTLE_PASS_COIN_MILESTONE_MOD = 50  # только премиум-ветка, каждый 50-й уровень цикла
+BATTLE_PASS_MILESTONE_COINS = 15
+
+
+def battle_pass_cumulative(level: int) -> int:
+    """Суммарный прогресс (UBP-эквивалент), нужный чтобы ДОСТИЧЬ уровня `level` (0 -> 0).
+    За пределами первого прохождения (level > 500) считается в O(1), не циклом."""
+    if level <= BATTLE_PASS_CYCLE_LEVELS:
+        return sum(battle_pass_level_cost(lvl) for lvl in range(1, level + 1))
+    base = sum(battle_pass_level_cost(lvl) for lvl in range(1, BATTLE_PASS_CYCLE_LEVELS + 1))
+    return base + (level - BATTLE_PASS_CYCLE_LEVELS) * BATTLE_PASS_COST_ENDLESS
+
+
+def battle_pass_level_from_progress(progress: int) -> int:
+    """Текущий уровень пасса по накопленному прогрессу (см. `BattlePass.progress` —
+    ОТДЕЛЬНЫЙ от `User.ubp_season` счётчик, см. CLAUDE.md). Уровни > 500 считаются в O(1)."""
+    cap_total = battle_pass_cumulative(BATTLE_PASS_CYCLE_LEVELS)
+    if progress >= cap_total:
+        return BATTLE_PASS_CYCLE_LEVELS + (progress - cap_total) // BATTLE_PASS_COST_ENDLESS
+
     level = 0
     total = 0
-    for cost in BATTLE_PASS_LEVEL_UBP_COST:
-        total += cost
-        if ubp_season < total:
+    for lvl in range(1, BATTLE_PASS_CYCLE_LEVELS + 1):
+        total += battle_pass_level_cost(lvl)
+        if progress < total:
             break
         level += 1
     return level
 
 
-def battle_pass_free_reward(level: int) -> tuple[int, int]:
-    """(пыль, тикеты) за конкретный уровень бесплатной ветки."""
-    dust = level * BATTLE_PASS_FREE_DUST_PER_LEVEL
-    tickets = BATTLE_PASS_FREE_MILESTONE_TICKETS if level in BATTLE_PASS_MILESTONE_LEVELS else 0
+def _battle_pass_reward_at_position(pos: int) -> tuple[int, int]:
+    """(пыль, тикеты) одной ветки за позицию В ЦИКЛЕ (1..BATTLE_PASS_CYCLE_LEVELS)."""
+    dust = pos * BATTLE_PASS_BASE_DUST_PER_LEVEL
+    tickets = 0
+    if pos % BATTLE_PASS_MAJOR_MILESTONE_MOD == 0:
+        dust += pos * BATTLE_PASS_MAJOR_BONUS_COEF
+        tickets = BATTLE_PASS_MILESTONE_TICKETS
+    elif pos % BATTLE_PASS_MINOR_MILESTONE_MOD == 0:
+        dust += pos * BATTLE_PASS_MINOR_BONUS_COEF
     return dust, tickets
 
 
+def battle_pass_free_reward(level: int) -> tuple[int, int]:
+    """(пыль, тикеты) за конкретный АБСОЛЮТНЫЙ уровень бесплатной ветки — награда циклится
+    по позиции внутри BATTLE_PASS_CYCLE_LEVELS."""
+    pos = ((level - 1) % BATTLE_PASS_CYCLE_LEVELS) + 1
+    return _battle_pass_reward_at_position(pos)
+
+
 def battle_pass_premium_reward(level: int) -> tuple[int, int, int]:
-    """(пыль, тикеты, коины) за конкретный уровень премиум-ветки — ДОПОЛНИТЕЛЬНО к бесплатной,
-    не вместо неё."""
-    dust = level * BATTLE_PASS_PREMIUM_DUST_PER_LEVEL
-    tickets = BATTLE_PASS_PREMIUM_MILESTONE_TICKETS if level in BATTLE_PASS_MILESTONE_LEVELS else 0
-    coins = BATTLE_PASS_MILESTONE_COINS if level in BATTLE_PASS_COIN_MILESTONE_LEVELS else 0
+    """(пыль, тикеты, коины) за конкретный уровень премиум-ветки — ДОПОЛНИТЕЛЬНО к
+    бесплатной (та же формула ещё раз), плюс коины на каждом BATTLE_PASS_COIN_MILESTONE_MOD-м
+    уровне цикла."""
+    pos = ((level - 1) % BATTLE_PASS_CYCLE_LEVELS) + 1
+    dust, tickets = _battle_pass_reward_at_position(pos)
+    coins = BATTLE_PASS_MILESTONE_COINS if pos % BATTLE_PASS_COIN_MILESTONE_MOD == 0 else 0
     return dust, tickets, coins
+
+
+# Дневной буст набора `BattlePass.progress` (подтверждено пользователем 2026-08-08): первые
+# BATTLE_PASS_BOOST_TIER_LEVELS[0] уровней прогресса за день дают ×BATTLE_PASS_BOOST_TIER_MULTIPLIERS[0]
+# к реальному начисленному UBP, следующие [1] уровней — ×[1], следующие [2] — ×[2], дальше —
+# без буста (×1). Считается в "уровнях прогресса", использованных СЕГОДНЯ (см.
+# services/battle_pass.add_progress) — НЕ влияет на User.ubp_season (лидерборд/войны кланов
+# остаются на настоящем UBP, см. CLAUDE.md).
+BATTLE_PASS_BOOST_TIER_LEVELS: tuple[int, ...] = (5, 10, 20)
+BATTLE_PASS_BOOST_TIER_MULTIPLIERS: tuple[int, ...] = (10, 5, 2)
+
+
+def battle_pass_boost_multiplier(levels_used_today: int) -> int:
+    """Множитель дневного буста по тому, сколько boosted-уровней прогресса уже использовано
+    сегодня — 1 (без буста), если дневная квота исчерпана."""
+    for threshold, multiplier in zip(BATTLE_PASS_BOOST_TIER_LEVELS, BATTLE_PASS_BOOST_TIER_MULTIPLIERS):
+        if levels_used_today < threshold:
+            return multiplier
+    return 1
 
 
 # --- Донат (ЮKassa через Telegram Bot Payments; см. CLAUDE.md, "Донат") ---

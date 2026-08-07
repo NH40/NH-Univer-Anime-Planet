@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
-from bot.config.game import BATTLE_PASS_MAX_LEVEL
 from bot.constant.battle_pass import (
     CB_BATTLE_PASS_CLAIM_FREE,
     CB_BATTLE_PASS_CLAIM_PREMIUM,
@@ -24,7 +23,6 @@ from bot.texts.battle_pass import (
     PASS_CLAIM_NONE,
     PASS_CLAIM_NOT_PREMIUM,
     PASS_CLAIM_PREMIUM_DONE,
-    PASS_MAX_LEVEL_LINE,
     PASS_NO_SEASON,
     PASS_PREMIUM_ACTIVE,
     PASS_PREMIUM_LOCKED,
@@ -43,14 +41,10 @@ router = Router(name="battle_pass")
 
 
 def _render(view: pass_service.PassView) -> tuple[str, InlineKeyboardMarkup]:
-    if view.ubp_next_level_ceiling is None:
-        percent = 100
-        progress = PASS_MAX_LEVEL_LINE
-    else:
-        have = view.ubp_season - view.ubp_level_floor
-        need = view.ubp_next_level_ceiling - view.ubp_level_floor
-        percent = round(100 * have / need) if need else 100
-        progress = PASS_PROGRESS_LINE.format(percent=percent, have=have, need=need)
+    have = view.progress - view.progress_level_floor
+    need = view.progress_next_level_ceiling - view.progress_level_floor
+    percent = round(100 * have / need) if need else 100
+    progress = PASS_PROGRESS_LINE.format(percent=percent, have=have, need=need)
 
     if view.pending_free_dust or view.pending_free_tickets:
         free_line = PASS_REWARD_PENDING.format(dust=view.pending_free_dust, tickets=view.pending_free_tickets)
@@ -68,10 +62,8 @@ def _render(view: pass_service.PassView) -> tuple[str, InlineKeyboardMarkup]:
 
     text = PASS_SCREEN.format(
         level=view.level,
-        max_level=BATTLE_PASS_MAX_LEVEL,
         bar=progress_bar(percent),
         progress=progress,
-        ubp_season=view.ubp_season,
         free_line=free_line,
         premium_emoji="💎" if view.is_premium else "🔒",
         premium_status=PASS_PREMIUM_ACTIVE if view.is_premium else PASS_PREMIUM_LOCKED,

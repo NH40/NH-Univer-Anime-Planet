@@ -23,6 +23,7 @@ from bot.db.repositories.card import list_by_universe
 from bot.db.repositories.inventory import add_card
 from bot.db.repositories.season import get_active as get_active_season
 from bot.db.repositories.user import add_coins, increment_total_rolls
+from bot.services import battle_pass as pass_service
 from bot.services import event as event_service
 from bot.services import ticket
 from bot.services.card import get_tier_map, pick_card
@@ -79,6 +80,7 @@ async def roll_one(session: AsyncSession, redis: Redis, *, user_id: int, univers
     owned_quantity = await add_card(session, user_id=user_id, card_id=card.id, stars=1, qty=1)
 
     new_season_ubp = await award_ubp(session, user_id=user_id, amount=card.base_ubp, reason=TRANSACTION_REASON_ROLL)
+    await pass_service.add_progress(session, user_id=user_id, season_id=season.id, real_ubp=card.base_ubp)
     new_total_rolls, referred_by_id = await increment_total_rolls(session, user_id=user_id, amount=1)
 
     # new_total_rolls == REFERRAL_ROLL_THRESHOLD означает, что именно ЭТА крутка довела

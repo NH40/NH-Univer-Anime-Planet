@@ -1,16 +1,29 @@
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer
+from datetime import date
+
+from sqlalchemy import BigInteger, Boolean, Date, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from bot.db.base import Base
 
 
 class BattlePass(Base):
-    """Прогресс сезонного пасса игрока. `level` намеренно НЕ хранится — он считается на
-    лету из `User.ubp_season` (см. `config/game: battle_pass_level_from_ubp`), тем же
-    паттерном "живая агрегация вместо денормализованной колонки", что и UBP клана (см.
-    CLAUDE.md, "Кланы") — не нужно ничего инкрементить при каждом начислении UBP игроку.
+    """Прогресс сезонного пасса игрока.
+
+    `progress` (переработано 2026-08-08, см. CLAUDE.md, "Сезонный пасс: 500 циклических
+    уровней") — накопительный счётчик, ОТДЕЛЬНЫЙ от `User.ubp_season`: раньше уровень
+    считался на лету прямо из `ubp_season` (та же "живая агрегация", что UBP клана), но
+    теперь на скорость набора `progress` влияет дневной буст (см. `boost_levels_used_today`
+    ниже), который НЕ должен искажать настоящий `ubp_season` (лидерборды/войны кланов) —
+    поэтому это персистентная колонка, растёт только через `services/battle_pass.add_progress`.
+    Уровень считается из неё через `config/game: battle_pass_level_from_progress`.
+
+    `boost_levels_used_today`/`boost_date` — дневная квота ускоренного набора `progress`
+    (первые 5 уровней сегодняшнего прогресса — ×10 к реальному UBP, следующие 5 — ×5,
+    следующие 10 — ×2, дальше — без буста). Ленивый дневной сброс: если `boost_date` не
+    сегодня, счётчик трактуется как 0 (тот же паттерн, что ежедневный бонус/тикеты) — нет
+    отдельного шедулера, обнуление происходит на первом же начислении UBP за новый день.
 
     `is_premium` — разовый флаг "премиум-ветка ЭТОГО сезона открыта навсегда, раз игрок
     купил Battle Pass" (подтверждено пользователем 2026-08-05/2026-08-06: разовая покупка
@@ -34,3 +47,6 @@ class BattlePass(Base):
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     claimed_free_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     claimed_premium_level: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    progress: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    boost_levels_used_today: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    boost_date: Mapped[date | None] = mapped_column(Date, nullable=True)

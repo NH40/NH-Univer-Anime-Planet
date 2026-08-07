@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.db import engine
-from api.routers import collection, profile, progress, universes
+from api.routers import battle_pass, collection, profile, progress, universes
 
 
 @asynccontextmanager
@@ -20,17 +20,20 @@ app = FastAPI(title="Universe Anime Planet API", lifespan=lifespan)
 # В проде Caddy проксирует и фронтенд, и /api под одним доменом (см. Caddyfile) —
 # same-origin, CORS не нужен вовсе. Разрешаем всё только для локальной разработки API
 # отдельно от Caddy (например, `vite dev` на другом порту).
+# POST — только ради /api/battle-pass/claim (см. CLAUDE.md, "Mini App": первый
+# write-эндпоинт, остальной API по-прежнему GET-only read-only).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
-    allow_headers=["X-Telegram-Init-Data"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["X-Telegram-Init-Data", "Content-Type"],
 )
 
 app.include_router(profile.router)
 app.include_router(universes.router)
 app.include_router(collection.router)
 app.include_router(progress.router)
+app.include_router(battle_pass.router)
 
 
 @app.get("/api/health")
