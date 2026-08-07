@@ -44,7 +44,7 @@ from bot.texts.deck import (
     UNIVERSE_NOT_READY,
 )
 from bot.utils.card_media import cache_card_photo, get_card_photo
-from bot.utils.formatting import esc
+from bot.utils.formatting import description_block, esc
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="deck")
@@ -60,7 +60,7 @@ def _card_caption(card: Card, stars: int, universe_title: str, quantity: int) ->
         quantity=quantity,
         tier_emoji=TIER_EMOJI.get(card.base_ubp, "🏳️"),
         tier_name=TIER_NAMES.get(card.base_ubp, card.base_ubp),
-        description=esc(card.description) if card.description else NO_DESCRIPTION,
+        description=description_block(card.description, fallback=NO_DESCRIPTION),
     )
 
 

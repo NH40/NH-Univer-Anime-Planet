@@ -12,8 +12,10 @@ STACK_CAPTION = (
     "Звёзды: {stars}\n"
     "UBP: <b>{ubp}</b>\n"
     "Копий: <b>{quantity}</b>\n\n"
+    "📖 <b>Описание:</b>\n{description}\n\n"
     "{position}/{total}"
 )
+NO_DESCRIPTION = "—"
 
 BTN_PREV_5 = "«« -5"
 BTN_PREV_1 = "« -1"

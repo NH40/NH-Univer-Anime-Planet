@@ -33,13 +33,14 @@ from bot.texts.collection import (
     MERGE_NOT_ENOUGH,
     MERGE_RESULT,
     NO_ACTIVE_SEASON,
+    NO_DESCRIPTION,
     STACK_CAPTION,
     TIER_PICKER_HEADER,
 )
 from bot.texts.common import NEED_START
 from bot.texts.deck import NO_UNIVERSE_SELECTED
 from bot.utils.card_media import cache_card_photo, get_card_photo
-from bot.utils.formatting import esc
+from bot.utils.formatting import description_block, esc
 from bot.utils.safe_edit import safe_edit_media, safe_edit_text
 
 router = Router(name="collection")
@@ -63,6 +64,7 @@ def _stack_caption(stack: OwnedStack, index: int, total: int) -> str:
         stars="🌟" * stack.stars,
         ubp=ubp_for_stars(stack.card.base_ubp, stack.stars),
         quantity=stack.quantity,
+        description=description_block(stack.card.description, fallback=NO_DESCRIPTION),
         position=index + 1,
         total=total,
     )

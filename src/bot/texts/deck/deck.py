@@ -24,7 +24,7 @@ CARD_CAPTION = (
     "🎴 <b>Персонаж:</b> {name}\n"
     "🌌 <b>Вселенная:</b> {universe}\n"
     "💠 <b>Очки:</b> {ubp}\n\n"
-    "📖 {description}\n\n"
+    "📖 <b>Описание:</b>\n{description}\n\n"
     "📦 <b>Количество:</b> {quantity}\n"
     "{tier_emoji} <b>Ранг:</b> {tier_name}\n"
     "🌟 <b>Звёзды:</b> {stars}"

@@ -18,6 +18,24 @@ def progress_bar(percent: int, *, width: int = 10) -> str:
     return "▓" * filled + "░" * (width - filled)
 
 
+_DESCRIPTION_MAX_LENGTH = 600
+
+
+def description_block(description: str | None, *, fallback: str) -> str:
+    """Описание карты — свёрнутая цитата Telegram (`<blockquote expandable>`), игрок сам
+    разворачивает, если хочет прочитать (тот же паттерн, что прогресс по вселенным в
+    профиле, см. handlers/profile) — длинное описание не растягивает подпись к фото на
+    весь экран по умолчанию. Пустое описание — просто fallback, разворачивать нечего.
+
+    Обрезается до `_DESCRIPTION_MAX_LENGTH` — подпись к фото у Telegram ограничена 1024
+    символами суммарно (id/имя/вселенная/тир и т.п. тоже туда входят), без обрезки очень
+    длинное описание могло бы уронить отправку карточки целиком."""
+    if not description:
+        return fallback
+    text = description if len(description) <= _DESCRIPTION_MAX_LENGTH else description[: _DESCRIPTION_MAX_LENGTH - 1].rstrip() + "…"
+    return f"<blockquote expandable>{esc(text)}</blockquote>"
+
+
 def format_countdown(total_seconds: int) -> str:
     """MM:SS, а часы добавляются спереди (H:MM:SS) только когда больше 59 минут — иначе
     таймер вроде "112:58" (тикеты) или "1439:59" (ежедневный бонус) читается плохо
