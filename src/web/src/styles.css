@@ -1,5 +1,9 @@
 :root {
   color-scheme: light dark;
+  --accent: var(--tg-theme-button-color, #2ea6ff);
+  --accent-text: var(--tg-theme-button-text-color, #ffffff);
+  --surface: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  --surface-strong: var(--tg-theme-secondary-bg-color, #eeeeee);
 }
 
 * {
@@ -14,6 +18,12 @@ body {
   color: var(--tg-theme-text-color, #111111);
 }
 
+button,
+input,
+select {
+  font-family: inherit;
+}
+
 .screen {
   min-height: 100vh;
   padding: 12px;
@@ -23,31 +33,129 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  min-height: 60vh;
 }
 
 .error {
   color: var(--tg-theme-destructive-text-color, #d33333);
 }
 
-.profile {
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+/* --- Плавный переход между вкладками --- */
+
+.page-transition {
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.page-transition-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Шапка профиля --- */
+
+.app-header {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--surface);
   margin-bottom: 12px;
 }
 
-.profile-name {
-  font-weight: 600;
+.app-header-name {
+  font-weight: 700;
   font-size: 18px;
 }
 
-.profile-stats {
+.app-header-stats {
   display: flex;
-  gap: 16px;
-  margin-top: 4px;
-  font-size: 14px;
-  opacity: 0.8;
+  gap: 8px;
+  margin-top: 8px;
 }
+
+.stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--tg-theme-bg-color, #ffffff);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+/* --- Нижняя/верхняя навигация по вкладкам --- */
+
+.view-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.view-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 6px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--tg-theme-text-color, #111111);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.65;
+  transition:
+    background-color 0.18s ease,
+    opacity 0.18s ease,
+    color 0.18s ease;
+}
+
+.view-tab.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  opacity: 1;
+}
+
+.view-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Вкладки вселенных --- */
 
 .universe-tabs {
   display: flex;
@@ -59,80 +167,23 @@ body {
 
 .tab {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 8px 14px;
   border-radius: 999px;
   border: none;
-  background: var(--tg-theme-secondary-bg-color, #eeeeee);
+  background: var(--surface-strong);
   color: var(--tg-theme-text-color, #111111);
   font-size: 14px;
 }
 
 .tab.active {
-  background: var(--tg-theme-button-color, #2ea6ff);
-  color: var(--tg-theme-button-text-color, #ffffff);
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 10px;
-}
-
-.card {
-  background: var(--tg-theme-secondary-bg-color, #f5f5f5);
-  border-radius: 10px;
-  padding: 6px;
-  text-align: center;
-}
-
-.card img {
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
-  border-radius: 6px;
-}
-
-.card-name {
-  font-size: 12px;
-  margin-top: 4px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.card-meta {
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-.empty {
-  text-align: center;
-  opacity: 0.7;
-  margin-top: 40px;
-}
-
-.view-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.view-tab {
-  flex: 1;
-  padding: 10px;
-  border-radius: 10px;
-  border: none;
-  background: var(--tg-theme-secondary-bg-color, #eeeeee);
-  color: var(--tg-theme-text-color, #111111);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.view-tab.active {
-  background: var(--tg-theme-button-color, #2ea6ff);
-  color: var(--tg-theme-button-text-color, #ffffff);
-}
+/* --- Фильтры коллекции --- */
 
 .filters {
   display: flex;
@@ -140,10 +191,24 @@ body {
   margin-bottom: 12px;
 }
 
-.search-input {
+.search-input-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
-  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+}
+
+.search-input-icon {
+  position: absolute;
+  left: 10px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 10px 8px 32px;
   border-radius: 8px;
   border: 1px solid var(--tg-theme-hint-color, #cccccc);
   background: var(--tg-theme-bg-color, #ffffff);
@@ -162,13 +227,84 @@ body {
   font-size: 13px;
 }
 
+/* --- Сетка карточек --- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+
 .card {
+  position: relative;
   display: block;
   width: 100%;
   border: none;
   cursor: pointer;
   font: inherit;
   text-align: center;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 6px;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.card:active {
+  transform: scale(0.96);
+}
+
+.card-tier-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--tg-theme-bg-color, #ffffff);
+}
+
+.card img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.card-name {
+  font-size: 12px;
+  margin-top: 6px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.card-meta-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  opacity: 0.7;
+  margin-top: 40px;
 }
 
 /* --- Профиль / прогресс --- */
@@ -180,7 +316,7 @@ body {
 }
 
 .progress-row {
-  background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  background: var(--surface);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -193,11 +329,15 @@ body {
 }
 
 .progress-row-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
 }
 
 .progress-row-count {
   opacity: 0.7;
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-bar-track {
@@ -210,7 +350,7 @@ body {
 .progress-bar-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--tg-theme-button-color, #2ea6ff);
+  background: var(--accent);
   transition: width 0.3s ease;
 }
 
@@ -219,13 +359,17 @@ body {
   font-size: 12px;
   text-align: right;
   opacity: 0.7;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- Карточка (детальная страница) --- */
 
 .back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: none;
-  background: var(--tg-theme-secondary-bg-color, #eeeeee);
+  background: var(--surface-strong);
   color: var(--tg-theme-text-color, #111111);
   padding: 8px 14px;
   border-radius: 8px;
@@ -238,7 +382,7 @@ body {
   max-height: 320px;
   object-fit: contain;
   border-radius: 12px;
-  background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+  background: var(--surface);
 }
 
 .card-page-body {
@@ -251,21 +395,41 @@ body {
 .card-page-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 14px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--tg-theme-secondary-bg-color, #eeeeee);
+  border-bottom: 1px solid var(--surface-strong);
 }
 
 .card-page-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   opacity: 0.8;
 }
 
 .card-page-description {
+  display: flex;
+  gap: 6px;
   font-size: 14px;
   opacity: 0.85;
   line-height: 1.4;
   margin: 4px 0;
+}
+
+.tier-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.star-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #f59e0b;
 }
 
 /* --- Battle Pass --- */
@@ -273,12 +437,28 @@ body {
 .battle-pass-page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .battle-pass-summary {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.battle-pass-summary-top {
+  display: flex;
+  justify-content: space-between;
   font-size: 14px;
-  opacity: 0.85;
+}
+
+.battle-pass-summary-need {
+  opacity: 0.7;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Горизонтальная лента: колонка на уровень (премиум-квадратик сверху, бесплатный снизу),
@@ -296,6 +476,14 @@ body {
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
+  padding: 4px;
+  border-radius: 14px;
+}
+
+/* Колонка текущего уровня — подсвечена, чтобы её было видно в ленте с первого взгляда. */
+.bp-column-current {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--accent) inset;
 }
 
 .bp-level-label {
@@ -304,22 +492,45 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.bp-column-current .bp-level-label {
+  opacity: 1;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .bp-tile {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
   border: none;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   line-height: 1.15;
+  transition: transform 0.12s ease;
+}
+
+.bp-tile-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bp-tile-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  opacity: 0.85;
 }
 
 .bp-tile-free {
-  background: var(--tg-theme-secondary-bg-color, #eeeeee);
+  background: var(--surface-strong);
   color: var(--tg-theme-text-color, #111111);
 }
 
@@ -331,15 +542,15 @@ body {
 }
 
 .bp-tile-locked {
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
 .bp-tile-claimed {
   opacity: 0.55;
 }
 
-.bp-tile-ready {
-  box-shadow: 0 0 0 2px var(--tg-theme-button-color, #2ea6ff);
+.bp-tile-ready:active {
+  transform: scale(0.92);
 }
 
 .bp-tile:disabled {
@@ -348,19 +559,30 @@ body {
 
 .battle-pass-nav {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
   justify-content: center;
 }
 
+.battle-pass-nav-page {
+  font-size: 13px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  text-align: center;
+}
+
 .battle-pass-nav button {
-  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
   border-radius: 10px;
   border: none;
-  background: var(--tg-theme-secondary-bg-color, #eeeeee);
+  background: var(--surface-strong);
   color: var(--tg-theme-text-color, #111111);
-  font-size: 14px;
 }
 
 .battle-pass-nav button:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
 }

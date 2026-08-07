@@ -42,6 +42,9 @@ async def get_battle_pass_page(
         total_pages=page_view.total_pages,
         current_level=page_view.current_level,
         is_premium=page_view.is_premium,
+        progress=page_view.progress,
+        level_floor=page_view.level_floor,
+        level_ceiling=page_view.level_ceiling,
     )
 
 

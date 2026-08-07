@@ -55,6 +55,9 @@ class BattlePassPageOut(BaseModel):
     total_pages: int
     current_level: int
     is_premium: bool
+    progress: int
+    level_floor: int
+    level_ceiling: int
 
 
 class BattlePassClaimIn(BaseModel):

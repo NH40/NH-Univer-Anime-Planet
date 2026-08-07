@@ -81,6 +81,9 @@ export interface BattlePassPage {
   total_pages: number;
   current_level: number;
   is_premium: boolean;
+  progress: number;
+  level_floor: number;
+  level_ceiling: number;
 }
 
 export interface BattlePassClaimResult {

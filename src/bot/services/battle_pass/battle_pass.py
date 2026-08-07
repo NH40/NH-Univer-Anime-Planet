@@ -267,6 +267,9 @@ class LevelsPage:
     total_pages: int
     current_level: int
     is_premium: bool
+    progress: int  # BattlePass.progress — сколько накоплено сейчас
+    level_floor: int  # сколько нужно было, чтобы достичь текущего уровня
+    level_ceiling: int  # сколько нужно для следующего уровня
 
 
 async def list_levels(session: AsyncSession, *, user_id: int, page: int) -> LevelsPage | None:
@@ -308,5 +311,12 @@ async def list_levels(session: AsyncSession, *, user_id: int, page: int) -> Leve
         )
 
     return LevelsPage(
-        entries=entries, page=page, total_pages=total_pages, current_level=current_level, is_premium=row.is_premium
+        entries=entries,
+        page=page,
+        total_pages=total_pages,
+        current_level=current_level,
+        is_premium=row.is_premium,
+        progress=row.progress,
+        level_floor=battle_pass_cumulative(current_level),
+        level_ceiling=battle_pass_cumulative(current_level + 1),
     )
