@@ -61,6 +61,7 @@ from bot.texts.shop import (
     BATTLE_PASS_STATUS_NONE,
     BUY_MAX_NOTHING,
     BUY_TICKETS_RESULT,
+    BUY_TICKETS_RESULT_ALERT,
     CANCELLED,
     COIN_SHOP_SCREEN,
     COIN_TICKETS_BOUGHT,
@@ -185,7 +186,7 @@ async def _buy_tickets_and_refresh(
             await callback.answer(NOT_ENOUGH_DUST.format(needed=exc.needed), show_alert=True)
             return
 
-        await callback.answer(BUY_TICKETS_RESULT.format(qty=quantity, cost=cost), show_alert=True)
+        await callback.answer(BUY_TICKETS_RESULT_ALERT.format(qty=quantity, cost=cost), show_alert=True)
 
         user = await get_by_id(session, user_id)
         if user is not None:

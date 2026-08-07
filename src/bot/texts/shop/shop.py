@@ -19,6 +19,10 @@ CUSTOM_QUANTITY_INVALID = "Нужно целое число от 1 до {max}. �
 CUSTOM_QUANTITY_CANCELLED = "Покупка отменена."
 
 BUY_TICKETS_RESULT = "✅ Куплено тикетов: <b>{qty}</b> за <b>{cost}</b> пыли."
+# Telegram НЕ поддерживает HTML/markdown в popup-алертах (callback.answer(show_alert=True))
+# — только в обычных сообщениях чата. Обычные <b> в BUY_TICKETS_RESULT там показались бы
+# как есть, буквально "<b>232</b>". Для попапа — версия без разметки.
+BUY_TICKETS_RESULT_ALERT = "✅ Куплено тикетов: {qty} за {cost} пыли."
 NOT_ENOUGH_DUST = "Не хватает пыли: нужно {needed}."
 NOT_ENOUGH_COINS = "Не хватает коинов: нужно {needed}."
 BUY_MAX_NOTHING = "Пыли не хватает даже на 1 тикет."

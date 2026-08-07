@@ -83,7 +83,11 @@ async def merge_all(
     каскада в следующую звезду — если после этого у (card_id, stars+1) тоже накопится 5+,
     слить их можно отдельным нажатием уже на ЕЁ стопке (та же граница, что у обычного
     "Слить 5→1", просто повторённая). Одна логическая операция на весь пакет — один
-    commit в конце и одно начисление UBP суммой, а не по одному на слияние (правило 10)."""
+    commit в конце (правило 10), но `award_ubp` вызывается ОТДЕЛЬНО на каждое слияние (не
+    один раз суммой) — иначе живая агрегация ежедневных заданий по count(transactions)
+    (см. CLAUDE.md, "Ежедневные задания") видела бы "Слить всё" как ОДНО слияние вместо
+    N, недосчитывая прогресс quest'а "Смержи карты N раз" (было исправлено 2026-08-06,
+    после того как игрок сообщил, что "выполненное" задание не давало забрать награду)."""
     card = await get_card_by_id(session, card_id)
     if card is None:
         raise CardNotFoundError(card_id)
@@ -95,11 +99,11 @@ async def merge_all(
     new_stars = stars + 1
     bonus = ubp_for_stars(card.base_ubp, stars)  # UBP одной исходной карты — см. CLAUDE.md
     results: list[MergeResult] = []
-    total_bonus = 0
+    new_season_ubp = None
 
     while await decrement_by(session, user_id=user_id, card_id=card_id, stars=stars, amount=MERGE_COPIES_REQUIRED):
         await add_card(session, user_id=user_id, card_id=card_id, stars=new_stars, qty=1)
-        total_bonus += bonus
+        new_season_ubp = await award_ubp(session, user_id=user_id, amount=bonus, reason=TRANSACTION_REASON_MERGE)
         results.append(
             MergeResult(card=card, new_stars=new_stars, new_ubp=ubp_for_stars(card.base_ubp, new_stars), bonus_ubp=bonus)
         )
@@ -107,7 +111,6 @@ async def merge_all(
     if not results:
         raise NotEnoughCopiesError(needed=MERGE_COPIES_REQUIRED)
 
-    new_season_ubp = await award_ubp(session, user_id=user_id, amount=total_bonus, reason=TRANSACTION_REASON_MERGE)
     await session.commit()
     await sync_score(redis, season.id, user_id, new_season_ubp)
     return results
