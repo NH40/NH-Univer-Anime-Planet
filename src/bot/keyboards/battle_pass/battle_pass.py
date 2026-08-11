@@ -26,6 +26,7 @@ from bot.texts.battle_pass import (
     PASS_LEVEL_REWARD_DUST,
     PASS_LEVEL_REWARD_TICKETS,
 )
+from bot.utils.mini_app import mini_app_url as build_mini_app_url
 
 
 def _reward_text(dust: int, tickets: int, coins: int = 0) -> str:
@@ -109,6 +110,12 @@ def levels_menu(page_view: LevelsPage, *, mini_app_url: str | None = None) -> In
     if mini_app_url:
         # ?view=battlepass — src/web/src/App.tsx читает это при загрузке и сразу открывает
         # вкладку Battle Pass вместо коллекции по умолчанию.
-        rows.append([InlineKeyboardButton(text=BTN_PASS_APP, web_app=WebAppInfo(url=f"{mini_app_url}?view=battlepass"))])
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=BTN_PASS_APP, web_app=WebAppInfo(url=build_mini_app_url(mini_app_url, view="battlepass"))
+                )
+            ]
+        )
 
     return InlineKeyboardMarkup(inline_keyboard=rows)

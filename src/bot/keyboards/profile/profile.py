@@ -11,6 +11,7 @@ from bot.constant.profile import (
 )
 from bot.texts.common import BTN_BACK, BTN_PROFILE_APP
 from bot.texts.profile import BTN_DAILY_BONUS, BTN_REFERRALS, BTN_RENAME
+from bot.utils.mini_app import mini_app_url as build_mini_app_url
 
 
 def profile_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
@@ -23,9 +24,15 @@ def profile_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
     ]
     if mini_app_url:
         # ?view=profile — src/web/src/App.tsx читает это при загрузке и открывает
-        # страницу профиля с прогрессом вместо коллекции по умолчанию.
+        # страницу профиля с прогрессом вместо коллекции по умолчанию. ?v=... (см.
+        # utils/mini_app) бампится вручную при деплое фронтенда, чтобы Telegram не отдавал
+        # клиенту старый закэшированный index.html под тем же url.
         rows.append(
-            [InlineKeyboardButton(text=BTN_PROFILE_APP, web_app=WebAppInfo(url=f"{mini_app_url}?view=profile"))]
+            [
+                InlineKeyboardButton(
+                    text=BTN_PROFILE_APP, web_app=WebAppInfo(url=build_mini_app_url(mini_app_url, view="profile"))
+                )
+            ]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

@@ -25,6 +25,7 @@ from bot.texts.deck import (
     TIER_EMOJI,
     TIER_NAMES,
 )
+from bot.utils.mini_app import mini_app_url as build_mini_app_url
 
 
 def deck_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
@@ -47,7 +48,7 @@ def deck_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
         # выбранная вселенная) — поэтому это отдельная кнопка, не замена. Живёт здесь, а не
         # в главном reply-меню (см. CLAUDE.md/TODO) — доступна в контексте экрана "Колода",
         # не занимает постоянное место в меню. Кнопка есть только когда настроен домен/HTTPS.
-        rows.append([InlineKeyboardButton(text=BTN_COLLECTION_APP, web_app=WebAppInfo(url=mini_app_url))])
+        rows.append([InlineKeyboardButton(text=BTN_COLLECTION_APP, web_app=WebAppInfo(url=build_mini_app_url(mini_app_url)))])
 
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
