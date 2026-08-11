@@ -113,7 +113,11 @@ async def cb_claim_all(callback: CallbackQuery, session: AsyncSession, redis: Re
         try:
             result = await quest_service.claim_all(session, user_id=user_id)
         except quest_service.NothingToClaimError:
+            # Экран мог устареть (набор заданий обновился с прошлого рендера сообщения,
+            # см. CLAUDE.md "Ежедневные задания: устаревшее сообщение") — перерисовываем,
+            # чтобы игрок сразу увидел АКТУАЛЬНОЕ состояние, а не гадал, почему клейм не прошёл.
             await callback.answer(QUEST_NOTHING_TO_CLAIM, show_alert=True)
+            await _show(callback.message, session, user_id, edit=True)
             return
 
         await callback.answer(
@@ -139,12 +143,21 @@ async def cb_claim_one(callback: CallbackQuery, session: AsyncSession, redis: Re
             result = await quest_service.claim(session, user_id=user_id, slot=slot)
         except quest_service.SlotNotFoundError:
             await callback.answer(QUEST_SLOT_NOT_FOUND, show_alert=True)
+            await _show(callback.message, session, user_id, edit=True)
             return
         except quest_service.QuestAlreadyClaimedError:
             await callback.answer(QUEST_ALREADY_CLAIMED, show_alert=True)
+            await _show(callback.message, session, user_id, edit=True)
             return
         except quest_service.QuestNotDoneError:
+            # См. комментарий в cb_claim_all — та же самокоррекция устаревшего сообщения:
+            # если задание в этом слоте успело смениться (набор обновился раз в 24ч) с
+            # момента, когда игрок открыл/увидел этот экран, старая кнопка "Забрать" ещё
+            # видна и кликабельна, но реально ссылается уже на ДРУГОЕ задание с нулевым
+            # прогрессом — отсюда "выполнено по экрану, но 'не выполнено' по факту".
+            # Перерисовка сразу показывает игроку правду вместо непонятной ошибки.
             await callback.answer(QUEST_NOT_DONE, show_alert=True)
+            await _show(callback.message, session, user_id, edit=True)
             return
 
         await callback.answer(
@@ -166,6 +179,7 @@ async def cb_reroll_all(callback: CallbackQuery, session: AsyncSession, redis: R
             await quest_service.reroll_all(session, user_id=user_id)
         except quest_service.RerollNotAvailableError:
             await callback.answer(QUEST_REROLL_NOT_AVAILABLE, show_alert=True)
+            await _show(callback.message, session, user_id, edit=True)
             return
 
         await callback.answer(QUEST_REROLL_ALL_DONE)
@@ -186,9 +200,11 @@ async def cb_reroll_one(callback: CallbackQuery, session: AsyncSession, redis: R
             await quest_service.reroll_one(session, user_id=user_id, slot=slot)
         except quest_service.SlotNotFoundError:
             await callback.answer(QUEST_SLOT_NOT_FOUND, show_alert=True)
+            await _show(callback.message, session, user_id, edit=True)
             return
         except quest_service.RerollNotAvailableError:
             await callback.answer(QUEST_REROLL_NOT_AVAILABLE, show_alert=True)
+            await _show(callback.message, session, user_id, edit=True)
             return
 
         await callback.answer(QUEST_REROLL_ONE_DONE)

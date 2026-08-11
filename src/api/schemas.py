@@ -58,13 +58,28 @@ class BattlePassPageOut(BaseModel):
     progress: int
     level_floor: int
     level_ceiling: int
+    claimed_free_level: int
+    claimed_premium_level: int
 
 
 class BattlePassClaimIn(BaseModel):
     track: str  # "free" | "premium"
+    level: int
 
 
 class BattlePassClaimOut(BaseModel):
     dust: int
     tickets: int
     coins: int
+
+
+class BattlePassClaimAllIn(BaseModel):
+    track: str  # "free" | "premium"
+
+
+class BattlePassClaimAllOut(BaseModel):
+    dust: int
+    tickets: int
+    coins: int
+    count: int
+    page: int  # страница, на которую фронтенд должен переключиться (см. api/routers/battle_pass.py)

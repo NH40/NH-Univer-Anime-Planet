@@ -50,19 +50,26 @@ async def grant_roll_reward(session: AsyncSession, *, user_id: int, roll_value: 
 
 async def charge_mass_roll(session: AsyncSession, *, user_id: int, quantity: int) -> int:
     """Атомарно списывает стоимость `quantity` круток разом. Возвращает списанную сумму.
-    Не коммитит — см. charge_roll."""
+    Не коммитит — см. charge_roll.
+
+    Пишет `quantity` отдельных строк в transactions (по одной на круг), а не одну строку
+    на всю сумму — та же причина, что у фикса `merge_all` (см. CLAUDE.md, "Слить всё"):
+    count-based метрика задания "Сыграй в казино N раз" считает количество СТРОК с этим
+    reason, и одна строка на весь пакет засчитала бы масс-крутку из 5 кругов как одну игру,
+    а не пять."""
     cost = quantity * CASINO_ROLL_COST_COINS
     ok = await spend_coins(session, user_id=user_id, amount=cost)
     if not ok:
         raise NotEnoughCoinsError(needed=cost)
-    session.add(
-        Transaction(
-            user_id=user_id,
-            currency=TransactionCurrency.coins,
-            amount=-cost,
-            reason=TRANSACTION_REASON_CASINO_MASS_ROLL,
+    for _ in range(quantity):
+        session.add(
+            Transaction(
+                user_id=user_id,
+                currency=TransactionCurrency.coins,
+                amount=-CASINO_ROLL_COST_COINS,
+                reason=TRANSACTION_REASON_CASINO_MASS_ROLL,
+            )
         )
-    )
     return cost
 
 

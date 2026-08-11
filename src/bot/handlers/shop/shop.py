@@ -118,8 +118,7 @@ async def _battle_pass_text(session: AsyncSession, user: User) -> tuple[str, boo
     """Возвращает (текст, is_premium) — статус читается из BattlePass.is_premium текущего
     сезона (services/battle_pass), а не из User.premium_pass_until: премиум-ветка
     открывается разово на весь сезон, не по дням (см. CLAUDE.md, "Сезонный пасс")."""
-    view = await pass_service.get_pass_view(session, user_id=user.id)
-    is_premium = view.is_premium if view is not None else False
+    is_premium = await pass_service.is_premium(session, user_id=user.id)
     status = BATTLE_PASS_STATUS_ACTIVE if is_premium else BATTLE_PASS_STATUS_NONE
     text = BATTLE_PASS_SCREEN.format(price=BATTLE_PASS_PRICE_COINS, status=status, coins=user.coins)
     return text, is_premium

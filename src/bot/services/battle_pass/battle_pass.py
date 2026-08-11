@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,13 +15,15 @@ from bot.config.game import (
     battle_pass_level_from_progress,
     battle_pass_premium_reward,
 )
-from bot.constant.battle_pass import TRANSACTION_REASON_PASS_FREE, TRANSACTION_REASON_PASS_PREMIUM
+from bot.constant.battle_pass import TRACK_FREE, TRACK_PREMIUM, TRANSACTION_REASON_PASS_FREE, TRANSACTION_REASON_PASS_PREMIUM
 from bot.db.models.enums import TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import battle_pass as pass_repo
 from bot.db.repositories import season as season_repo
 from bot.db.repositories.user import add_coins, add_dust
 from bot.services import ticket
+
+Track = Literal["free", "premium"]
 
 LEVELS_PER_PAGE = 10
 _DAILY_BOOST_CAP = BATTLE_PASS_BOOST_TIER_LEVELS[-1]
@@ -35,176 +38,141 @@ class NotPremiumError(Exception):
 
 
 class NothingToClaimError(Exception):
-    pass
+    """Для claim_all — во всём диапазоне claimed+1..текущий нечего забирать."""
 
 
-def _sum_free_reward(from_level_exclusive: int, to_level_inclusive: int) -> tuple[int, int]:
-    total_dust = total_tickets = 0
-    for lvl in range(from_level_exclusive + 1, to_level_inclusive + 1):
-        dust, tickets = battle_pass_free_reward(lvl)
-        total_dust += dust
-        total_tickets += tickets
-    return total_dust, total_tickets
+class LevelLockedError(Exception):
+    """Уровень ещё не разблокирован прогрессом (level > текущий уровень)."""
 
 
-def _sum_premium_reward(from_level_exclusive: int, to_level_inclusive: int) -> tuple[int, int, int]:
-    total_dust = total_tickets = total_coins = 0
-    for lvl in range(from_level_exclusive + 1, to_level_inclusive + 1):
-        dust, tickets, coins = battle_pass_premium_reward(lvl)
-        total_dust += dust
-        total_tickets += tickets
-        total_coins += coins
-    return total_dust, total_tickets, total_coins
+class LevelAlreadyClaimedError(Exception):
+    """Уровень уже забран — либо входит в сплошной high-water mark, либо был забран вне
+    очереди раньше (см. BattlePassClaim)."""
+
+
+def _reward(track: Track, level: int) -> tuple[int, int, int]:
+    """(пыль, тикеты, коины) за ОДИН конкретный уровень этой ветки — коины всегда 0 для
+    бесплатной. Награда циклится по позиции внутри круга и не растёт с уровнем (см.
+    CLAUDE.md, "Сезонный пасс") — обе формулы уже это учитывают."""
+    if track == TRACK_FREE:
+        dust, tickets = battle_pass_free_reward(level)
+        return dust, tickets, 0
+    return battle_pass_premium_reward(level)
+
+
+def _reason(track: Track) -> str:
+    return TRANSACTION_REASON_PASS_FREE if track == TRACK_FREE else TRANSACTION_REASON_PASS_PREMIUM
+
+
+def _claimed_level(row, track: Track) -> int:
+    return row.claimed_free_level if track == TRACK_FREE else row.claimed_premium_level
+
+
+async def _grant(session: AsyncSession, *, user_id: int, track: Track, dust: int, tickets: int, coins: int) -> None:
+    reason = _reason(track)
+    if dust:
+        await add_dust(session, user_id=user_id, amount=dust)
+        session.add(Transaction(user_id=user_id, currency=TransactionCurrency.dust, amount=dust, reason=reason))
+    if tickets:
+        await ticket.grant(session, user_id, tickets)
+        session.add(Transaction(user_id=user_id, currency=TransactionCurrency.tickets, amount=tickets, reason=reason))
+    if coins:
+        await add_coins(session, user_id=user_id, amount=coins)
+        session.add(Transaction(user_id=user_id, currency=TransactionCurrency.coins, amount=coins, reason=reason))
+
+
+async def claim_level(session: AsyncSession, *, user_id: int, track: Track, level: int) -> tuple[int, int, int]:
+    """Забирает награду ОДНОГО конкретного уровня одной ветки — тап по любой доступной
+    ячейке в любом порядке (подтверждено пользователем 2026-08-11, см. CLAUDE.md, "Сезонный
+    пасс: клейм произвольной ячейки"). Одна логическая операция — один commit. Возвращает
+    (пыль, тикеты, коины)."""
+    season = await season_repo.get_active(session)
+    if season is None:
+        raise NoSeasonActiveError
+
+    row = await pass_repo.get_or_create(session, user_id=user_id, season_id=season.id)
+    if track == TRACK_PREMIUM and not row.is_premium:
+        raise NotPremiumError
+
+    current_level = battle_pass_level_from_progress(row.progress)
+    if level < 1 or level > current_level:
+        raise LevelLockedError
+
+    claimed_level = _claimed_level(row, track)
+    if level <= claimed_level:
+        raise LevelAlreadyClaimedError
+    if await pass_repo.claim_exists(session, user_id=user_id, season_id=season.id, track=track, level=level):
+        raise LevelAlreadyClaimedError
+
+    dust, tickets, coins = _reward(track, level)
+    await _grant(session, user_id=user_id, track=track, dust=dust, tickets=tickets, coins=coins)
+
+    if level == claimed_level + 1:
+        # Продвигаем high-water mark и поглощаем подряд идущие внеочередные клеймы, уже
+        # лежащие в battle_pass_claims следом (иначе они остались бы там мёртвым весом).
+        pending = await pass_repo.list_claims(session, user_id=user_id, season_id=season.id, track=track)
+        new_level = level
+        absorbed: list[int] = []
+        while (new_level + 1) in pending:
+            new_level += 1
+            absorbed.append(new_level)
+        if absorbed:
+            await pass_repo.delete_claims(session, user_id=user_id, season_id=season.id, track=track, levels=absorbed)
+        await pass_repo.set_claimed_level(session, user_id=user_id, season_id=season.id, track=track, level=new_level)
+    else:
+        await pass_repo.add_claim(session, user_id=user_id, season_id=season.id, track=track, level=level)
+
+    await session.commit()
+    return dust, tickets, coins
 
 
 @dataclass
-class PassView:
-    level: int
-    progress: int  # BattlePass.progress — НЕ User.ubp_season, см. CLAUDE.md
-    progress_level_floor: int  # сколько progress нужно было, чтобы достичь текущего уровня
-    progress_next_level_ceiling: int  # сколько нужно для следующего — уровни не ограничены сверху
-    is_premium: bool
-    claimed_free_level: int
-    claimed_premium_level: int
-    free_claimable: bool
-    premium_claimable: bool
-    # Сумма НЕЗАБРАННЫХ наград от последнего забранного уровня до текущего — то же самое,
-    # что claim_free/claim_premium реально начислят по кнопке "Забрать" (см. CLAUDE.md,
-    # "Сезонный пасс" — "одной кнопкой сразу все уровни"). Показываем на экране заранее,
-    # чтобы игрок видел, что именно получит, до нажатия.
-    pending_free_dust: int
-    pending_free_tickets: int
-    pending_premium_dust: int
-    pending_premium_tickets: int
-    pending_premium_coins: int
+class ClaimAllResult:
+    dust: int
+    tickets: int
+    coins: int
+    count: int
+    current_level: int
 
 
-async def get_pass_view(session: AsyncSession, *, user_id: int) -> PassView | None:
-    season = await season_repo.get_active(session)
-    if season is None:
-        return None
-
-    row = await pass_repo.get_or_create(session, user_id=user_id, season_id=season.id)
-
-    level = battle_pass_level_from_progress(row.progress)
-    floor = battle_pass_cumulative(level)
-    ceiling = battle_pass_cumulative(level + 1)
-
-    pending_free_dust, pending_free_tickets = _sum_free_reward(row.claimed_free_level, level)
-    if row.is_premium:
-        pending_premium_dust, pending_premium_tickets, pending_premium_coins = _sum_premium_reward(
-            row.claimed_premium_level, level
-        )
-    else:
-        pending_premium_dust = pending_premium_tickets = pending_premium_coins = 0
-
-    return PassView(
-        level=level,
-        progress=row.progress,
-        progress_level_floor=floor,
-        progress_next_level_ceiling=ceiling,
-        is_premium=row.is_premium,
-        claimed_free_level=row.claimed_free_level,
-        claimed_premium_level=row.claimed_premium_level,
-        free_claimable=level > row.claimed_free_level,
-        premium_claimable=row.is_premium and level > row.claimed_premium_level,
-        pending_free_dust=pending_free_dust,
-        pending_free_tickets=pending_free_tickets,
-        pending_premium_dust=pending_premium_dust,
-        pending_premium_tickets=pending_premium_tickets,
-        pending_premium_coins=pending_premium_coins,
-    )
-
-
-async def claim_free(session: AsyncSession, *, user_id: int) -> tuple[int, int]:
-    """Начисляет ВСЕ неполученные награды бесплатной ветки разом (от последнего забранного
-    уровня до текущего). Возвращает (пыль, тикеты). Одна логическая операция — один commit."""
+async def claim_all(session: AsyncSession, *, user_id: int, track: Track) -> ClaimAllResult:
+    """Забирает разом ВСЕ незабранные уровни ветки от claimed+1 до текущего (старое
+    поведение клейма, сохранено как отдельная кнопка "Забрать всё" — см. CLAUDE.md). Одна
+    логическая операция — один commit."""
     season = await season_repo.get_active(session)
     if season is None:
         raise NoSeasonActiveError
 
     row = await pass_repo.get_or_create(session, user_id=user_id, season_id=season.id)
-
-    level = battle_pass_level_from_progress(row.progress)
-    if level <= row.claimed_free_level:
-        raise NothingToClaimError
-
-    total_dust, total_tickets = _sum_free_reward(row.claimed_free_level, level)
-
-    if total_dust:
-        await add_dust(session, user_id=user_id, amount=total_dust)
-        session.add(
-            Transaction(
-                user_id=user_id, currency=TransactionCurrency.dust, amount=total_dust, reason=TRANSACTION_REASON_PASS_FREE
-            )
-        )
-    if total_tickets:
-        await ticket.grant(session, user_id, total_tickets)
-        session.add(
-            Transaction(
-                user_id=user_id,
-                currency=TransactionCurrency.tickets,
-                amount=total_tickets,
-                reason=TRANSACTION_REASON_PASS_FREE,
-            )
-        )
-
-    await pass_repo.set_claimed_free_level(session, user_id=user_id, season_id=season.id, level=level)
-    await session.commit()
-    return total_dust, total_tickets
-
-
-async def claim_premium(session: AsyncSession, *, user_id: int) -> tuple[int, int, int]:
-    """Аналог claim_free для премиум-ветки — требует row.is_premium (см. docstring модели
-    BattlePass). Возвращает (пыль, тикеты, коины)."""
-    season = await season_repo.get_active(session)
-    if season is None:
-        raise NoSeasonActiveError
-
-    row = await pass_repo.get_or_create(session, user_id=user_id, season_id=season.id)
-    if not row.is_premium:
+    if track == TRACK_PREMIUM and not row.is_premium:
         raise NotPremiumError
 
-    level = battle_pass_level_from_progress(row.progress)
-    if level <= row.claimed_premium_level:
+    current_level = battle_pass_level_from_progress(row.progress)
+    claimed_level = _claimed_level(row, track)
+    if current_level <= claimed_level:
         raise NothingToClaimError
 
-    total_dust, total_tickets, total_coins = _sum_premium_reward(row.claimed_premium_level, level)
+    already_claimed = await pass_repo.list_claims(session, user_id=user_id, season_id=season.id, track=track)
 
-    if total_dust:
-        await add_dust(session, user_id=user_id, amount=total_dust)
-        session.add(
-            Transaction(
-                user_id=user_id,
-                currency=TransactionCurrency.dust,
-                amount=total_dust,
-                reason=TRANSACTION_REASON_PASS_PREMIUM,
-            )
-        )
-    if total_tickets:
-        await ticket.grant(session, user_id, total_tickets)
-        session.add(
-            Transaction(
-                user_id=user_id,
-                currency=TransactionCurrency.tickets,
-                amount=total_tickets,
-                reason=TRANSACTION_REASON_PASS_PREMIUM,
-            )
-        )
-    if total_coins:
-        await add_coins(session, user_id=user_id, amount=total_coins)
-        session.add(
-            Transaction(
-                user_id=user_id,
-                currency=TransactionCurrency.coins,
-                amount=total_coins,
-                reason=TRANSACTION_REASON_PASS_PREMIUM,
-            )
-        )
+    total_dust = total_tickets = total_coins = count = 0
+    for lvl in range(claimed_level + 1, current_level + 1):
+        if lvl in already_claimed:
+            continue  # уже забран вне очереди раньше — не начислять повторно
+        dust, tickets, coins = _reward(track, lvl)
+        total_dust += dust
+        total_tickets += tickets
+        total_coins += coins
+        count += 1
 
-    await pass_repo.set_claimed_premium_level(session, user_id=user_id, season_id=season.id, level=level)
+    if count == 0:
+        raise NothingToClaimError
+
+    await _grant(session, user_id=user_id, track=track, dust=total_dust, tickets=total_tickets, coins=total_coins)
+    await pass_repo.set_claimed_level(session, user_id=user_id, season_id=season.id, track=track, level=current_level)
+    await pass_repo.clear_claims(session, user_id=user_id, season_id=season.id, track=track)
+
     await session.commit()
-    return total_dust, total_tickets, total_coins
+    return ClaimAllResult(dust=total_dust, tickets=total_tickets, coins=total_coins, count=count, current_level=current_level)
 
 
 async def add_progress(session: AsyncSession, *, user_id: int, season_id: int, real_ubp: int) -> None:
@@ -270,23 +238,57 @@ class LevelsPage:
     progress: int  # BattlePass.progress — сколько накоплено сейчас
     level_floor: int  # сколько нужно было, чтобы достичь текущего уровня
     level_ceiling: int  # сколько нужно для следующего уровня
+    # high-water mark каждой ветки (не привязаны к текущей странице) — чтобы UI мог решить,
+    # показывать ли кнопку "Забрать всё", даже когда все незабранные уровни лежат на ДРУГОЙ
+    # странице, а не на той, что сейчас отрисована.
+    claimed_free_level: int
+    claimed_premium_level: int
 
 
-async def list_levels(session: AsyncSession, *, user_id: int, page: int) -> LevelsPage | None:
+def _circle_offset(current_level: int) -> int:
+    if current_level <= 0:
+        return 0
+    return ((current_level - 1) // BATTLE_PASS_CYCLE_LEVELS) * BATTLE_PASS_CYCLE_LEVELS
+
+
+def page_for_level(level: int, *, current_level: int) -> int:
+    """Номер страницы (в текущем круге игрока), на которой лежит `level` — используется
+    и для дефолтного открытия экрана (см. list_levels, page=None), и для редиректа после
+    "Забрать всё" (см. CLAUDE.md, "Сезонный пасс: клейм произвольной ячейки")."""
+    offset = _circle_offset(current_level)
+    pos = max(1, min(level - offset, BATTLE_PASS_CYCLE_LEVELS))
+    return -(-pos // LEVELS_PER_PAGE)
+
+
+async def list_levels(session: AsyncSession, *, user_id: int, page: int | None) -> LevelsPage | None:
     """Пагинированная лента уровней текущего 500-уровневого круга (не всей бесконечной
     истории) — общая формула для бота и Mini App, ничего не дублируется на два стека.
     Уровни якорятся на ТЕКУЩИЙ круг игрока: если игрок уже прошёл цикл 500 уровней целиком,
     страница 1 показывает уровни (500×circle + 1)..(500×circle + 10), а не 1..10 — иначе
-    статус "забрано"/"доступно" не совпадал бы с реальным `claimed_free_level`."""
+    статус "забрано"/"доступно" не совпадал бы с реальным `claimed_free_level`.
+
+    `page=None` — открыть на странице с ПЕРВЫМ незабранным уровнем (по любой из открытых
+    веток), а не всегда с первой страницы круга (см. CLAUDE.md — раньше дефолтная страница
+    не учитывала прогресс, и на дальних кругах приходилось пролистывать вручную)."""
     season = await season_repo.get_active(session)
     if season is None:
         return None
 
     row = await pass_repo.get_or_create(session, user_id=user_id, season_id=season.id)
     current_level = battle_pass_level_from_progress(row.progress)
-    circle_offset = ((current_level - 1) // BATTLE_PASS_CYCLE_LEVELS) * BATTLE_PASS_CYCLE_LEVELS if current_level > 0 else 0
+    circle_offset = _circle_offset(current_level)
+
+    free_claims = await pass_repo.list_claims(session, user_id=user_id, season_id=season.id, track=TRACK_FREE)
+    premium_claims = (
+        await pass_repo.list_claims(session, user_id=user_id, season_id=season.id, track=TRACK_PREMIUM)
+        if row.is_premium
+        else set()
+    )
 
     total_pages = -(-BATTLE_PASS_CYCLE_LEVELS // LEVELS_PER_PAGE)
+    if page is None:
+        anchor_level = min(row.claimed_free_level, row.claimed_premium_level if row.is_premium else row.claimed_free_level) + 1
+        page = page_for_level(anchor_level, current_level=current_level)
     page = max(1, min(page, total_pages))
     start_pos = (page - 1) * LEVELS_PER_PAGE + 1
     end_pos = min(start_pos + LEVELS_PER_PAGE - 1, BATTLE_PASS_CYCLE_LEVELS)
@@ -305,8 +307,8 @@ async def list_levels(session: AsyncSession, *, user_id: int, page: int) -> Leve
                 premium_tickets=premium_tickets,
                 premium_coins=premium_coins,
                 unlocked=current_level >= level,
-                free_claimed=row.claimed_free_level >= level,
-                premium_claimed=row.claimed_premium_level >= level,
+                free_claimed=(level <= row.claimed_free_level) or (level in free_claims),
+                premium_claimed=(level <= row.claimed_premium_level) or (level in premium_claims),
             )
         )
 
@@ -319,4 +321,16 @@ async def list_levels(session: AsyncSession, *, user_id: int, page: int) -> Leve
         progress=row.progress,
         level_floor=battle_pass_cumulative(current_level),
         level_ceiling=battle_pass_cumulative(current_level + 1),
+        claimed_free_level=row.claimed_free_level,
+        claimed_premium_level=row.claimed_premium_level,
     )
+
+
+async def is_premium(session: AsyncSession, *, user_id: int) -> bool:
+    """Только для экранов вне Battle Pass, которым нужен один булев статус (например,
+    магазин — см. handlers/shop._battle_pass_text) — не тянуть весь list_levels ради этого."""
+    season = await season_repo.get_active(session)
+    if season is None:
+        return False
+    row = await pass_repo.get_or_create(session, user_id=user_id, season_id=season.id)
+    return row.is_premium

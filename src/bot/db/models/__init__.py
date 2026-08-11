@@ -1,6 +1,7 @@
 """Импортировать все модели здесь, чтобы Base.metadata видел их (нужно для Alembic autogenerate)."""
 
 from bot.db.models.battle_pass import BattlePass
+from bot.db.models.battle_pass_claim import BattlePassClaim
 from bot.db.models.card import Card
 from bot.db.models.clan import Clan, ClanJoinRequest, ClanMember, ClanWar
 from bot.db.models.event import Event
@@ -16,6 +17,7 @@ from bot.db.models.user import User
 
 __all__ = [
     "BattlePass",
+    "BattlePassClaim",
     "Card",
     "Clan",
     "ClanJoinRequest",

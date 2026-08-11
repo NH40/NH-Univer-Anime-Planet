@@ -115,7 +115,8 @@ export function App() {
 								claiming={battlePass.claiming}
 								onPrev={battlePass.prevPage}
 								onNext={battlePass.nextPage}
-								onClaim={battlePass.claim}
+								onClaimLevel={battlePass.claimLevel}
+								onClaimAll={battlePass.claimAll}
 							/>
 						</Route>
 						<Route path={ROUTE_COLLECTION}>

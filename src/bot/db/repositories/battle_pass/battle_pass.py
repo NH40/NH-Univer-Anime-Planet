@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.constant.battle_pass import TRACK_FREE
 from bot.db.models.battle_pass import BattlePass
+from bot.db.models.battle_pass_claim import BattlePassClaim
 
 
 async def get(session: AsyncSession, *, user_id: int, season_id: int) -> BattlePass | None:
@@ -90,18 +92,67 @@ async def set_premium(session: AsyncSession, *, user_id: int, season_id: int) ->
     await session.execute(stmt)
 
 
-async def set_claimed_free_level(session: AsyncSession, *, user_id: int, season_id: int, level: int) -> None:
-    """Не коммитит — часть составной операции claim_free (см. services/battle_pass)."""
+async def set_claimed_level(session: AsyncSession, *, user_id: int, season_id: int, track: str, level: int) -> None:
+    """Двигает high-water mark нужной ветки. Не коммитит — часть составной операции
+    claim_level/claim_all (см. services/battle_pass)."""
+    column = "claimed_free_level" if track == TRACK_FREE else "claimed_premium_level"
     await session.execute(
         update(BattlePass)
         .where(BattlePass.user_id == user_id, BattlePass.season_id == season_id)
-        .values(claimed_free_level=level)
+        .values({column: level})
     )
 
 
-async def set_claimed_premium_level(session: AsyncSession, *, user_id: int, season_id: int, level: int) -> None:
+async def list_claims(session: AsyncSession, *, user_id: int, season_id: int, track: str) -> set[int]:
+    """Уровни, забранные ВНЕ ОЧЕРЕДИ (см. docstring BattlePassClaim) — обычно пустое
+    множество или несколько штук, не вся история клеймов."""
+    result = await session.execute(
+        select(BattlePassClaim.level).where(
+            BattlePassClaim.user_id == user_id,
+            BattlePassClaim.season_id == season_id,
+            BattlePassClaim.track == track,
+        )
+    )
+    return set(result.scalars().all())
+
+
+async def claim_exists(session: AsyncSession, *, user_id: int, season_id: int, track: str, level: int) -> bool:
+    return await session.get(BattlePassClaim, (user_id, season_id, track, level)) is not None
+
+
+async def add_claim(session: AsyncSession, *, user_id: int, season_id: int, track: str, level: int) -> None:
+    """Не коммитит — часть claim_level. ON CONFLICT DO NOTHING — защита от двойного клика
+    поверх Redis-лока (правило 2, CLAUDE.md), а не основная защита."""
+    stmt = (
+        pg_insert(BattlePassClaim)
+        .values(user_id=user_id, season_id=season_id, track=track, level=level)
+        .on_conflict_do_nothing(index_elements=[BattlePassClaim.user_id, BattlePassClaim.season_id, BattlePassClaim.track, BattlePassClaim.level])
+    )
+    await session.execute(stmt)
+
+
+async def delete_claims(session: AsyncSession, *, user_id: int, season_id: int, track: str, levels: list[int]) -> None:
+    """Не коммитит — используется при поглощении подряд идущих внеочередных клеймов в
+    high-water mark, и при clear_claims ниже."""
+    if not levels:
+        return
     await session.execute(
-        update(BattlePass)
-        .where(BattlePass.user_id == user_id, BattlePass.season_id == season_id)
-        .values(claimed_premium_level=level)
+        delete(BattlePassClaim).where(
+            BattlePassClaim.user_id == user_id,
+            BattlePassClaim.season_id == season_id,
+            BattlePassClaim.track == track,
+            BattlePassClaim.level.in_(levels),
+        )
+    )
+
+
+async def clear_claims(session: AsyncSession, *, user_id: int, season_id: int, track: str) -> None:
+    """Все внеочередные клеймы ветки становятся не нужны после claim_all (весь диапазон до
+    текущего уровня уже забран через high-water mark). Не коммитит."""
+    await session.execute(
+        delete(BattlePassClaim).where(
+            BattlePassClaim.user_id == user_id,
+            BattlePassClaim.season_id == season_id,
+            BattlePassClaim.track == track,
+        )
     )

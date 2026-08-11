@@ -84,12 +84,22 @@ export interface BattlePassPage {
 	progress: number
 	level_floor: number
 	level_ceiling: number
+	claimed_free_level: number
+	claimed_premium_level: number
 }
 
 export interface BattlePassClaimResult {
 	dust: number
 	tickets: number
 	coins: number
+}
+
+export interface BattlePassClaimAllResult {
+	dust: number
+	tickets: number
+	coins: number
+	count: number
+	page: number
 }
 
 export function fetchProfile(): Promise<Profile> {
@@ -112,10 +122,18 @@ export function fetchProgress(): Promise<UniverseProgress[]> {
 	return apiFetch<UniverseProgress[]>('/progress')
 }
 
-export function fetchBattlePassPage(page: number): Promise<BattlePassPage> {
-	return apiFetch<BattlePassPage>(`/battle-pass?page=${page}`)
+// page=undefined — сервер сам открывает страницу с первым незабранным уровнем (см.
+// api/routers/battle_pass.py).
+export function fetchBattlePassPage(page?: number): Promise<BattlePassPage> {
+	return apiFetch<BattlePassPage>(page === undefined ? '/battle-pass' : `/battle-pass?page=${page}`)
 }
 
-export function claimBattlePass(track: 'free' | 'premium'): Promise<BattlePassClaimResult> {
-	return apiPost<BattlePassClaimResult>('/battle-pass/claim', { track })
+// Тап по одной ячейке — забирает только её награду (см. CLAUDE.md, "Сезонный пасс: клейм
+// произвольной ячейки"), а не всё накопленное разом.
+export function claimBattlePassLevel(track: 'free' | 'premium', level: number): Promise<BattlePassClaimResult> {
+	return apiPost<BattlePassClaimResult>('/battle-pass/claim', { track, level })
+}
+
+export function claimBattlePassAll(track: 'free' | 'premium'): Promise<BattlePassClaimAllResult> {
+	return apiPost<BattlePassClaimAllResult>('/battle-pass/claim-all', { track })
 }

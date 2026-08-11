@@ -1,4 +1,4 @@
-import { CalendarOff, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { CalendarOff, ChevronLeft, ChevronRight, Gift, Loader2 } from 'lucide-react'
 import type { BattlePassPage as BattlePassPageData } from '../api'
 import { BattlePassTile } from '../components/ui/BattlePassTile'
 import { tileState } from '../service/battlePass'
@@ -9,14 +9,16 @@ export function BattlePassPage({
 	claiming,
 	onPrev,
 	onNext,
-	onClaim,
+	onClaimLevel,
+	onClaimAll,
 }: {
 	data: BattlePassPageData | null
 	loading: boolean
 	claiming: boolean
 	onPrev: () => void
 	onNext: () => void
-	onClaim: (track: 'free' | 'premium') => void
+	onClaimLevel: (track: 'free' | 'premium', level: number) => void
+	onClaimAll: (track: 'free' | 'premium') => void
 }) {
 	if (loading && !data) {
 		return (
@@ -36,6 +38,10 @@ export function BattlePassPage({
 	const have = data.progress - data.level_floor
 	const need = data.level_ceiling - data.level_floor
 	const percent = need > 0 ? Math.round((100 * have) / need) : 100
+	// "Забрать всё" зависит от high-water mark ветки целиком, не от того, что видно именно
+	// на этой странице — незабранные уровни могут лежать на другой странице.
+	const freeClaimAllAvailable = data.claimed_free_level < data.current_level
+	const premiumClaimAllAvailable = data.is_premium && data.claimed_premium_level < data.current_level
 
 	return (
 		<div class='battle-pass-page'>
@@ -55,10 +61,9 @@ export function BattlePassPage({
 
 			{/* Горизонтальная лента: колонка на уровень, в колонке — квадратик премиум-ветки
 			    сверху (золотой градиент — "покруче" бесплатной) и бесплатной снизу. Тап по
-			    доступному квадратику сразу забирает награду — claim_free/claim_premium и так
-			    забирают ВСЁ накопленное до текущего уровня разом, так что тап по любому
-			    доступному квадратику своей ветки эквивалентен. Колонка текущего уровня
-			    подсвечена (.bp-column-current). */}
+			    доступному квадратику забирает НАГРАДУ ИМЕННО ЭТОЙ ЯЧЕЙКИ — можно кликать в
+			    любом порядке (см. CLAUDE.md, "Сезонный пасс: клейм произвольной ячейки").
+			    Колонка текущего уровня подсвечена (.bp-column-current). */}
 			<div class='battle-pass-track'>
 				{data.entries.map((entry) => {
 					const freeState = tileState(entry.unlocked, entry.free_claimed)
@@ -75,7 +80,9 @@ export function BattlePassPage({
 								state={premiumState}
 								premium
 								onClick={
-									!claiming && premiumState === 'ready' ? () => onClaim('premium') : undefined
+									!claiming && premiumState === 'ready'
+										? () => onClaimLevel('premium', entry.level)
+										: undefined
 								}
 							/>
 							<BattlePassTile
@@ -84,7 +91,9 @@ export function BattlePassPage({
 								coins={0}
 								state={freeState}
 								premium={false}
-								onClick={!claiming && freeState === 'ready' ? () => onClaim('free') : undefined}
+								onClick={
+									!claiming && freeState === 'ready' ? () => onClaimLevel('free', entry.level) : undefined
+								}
 							/>
 							<div class='bp-level-label'>{entry.level}</div>
 						</div>
@@ -103,6 +112,21 @@ export function BattlePassPage({
 					<ChevronRight size={18} />
 				</button>
 			</div>
+
+			{(freeClaimAllAvailable || premiumClaimAllAvailable) && (
+				<div class='battle-pass-claim-all'>
+					{freeClaimAllAvailable && (
+						<button type='button' disabled={claiming} onClick={() => onClaimAll('free')}>
+							<Gift size={16} /> Забрать всё (бесплатная)
+						</button>
+					)}
+					{premiumClaimAllAvailable && (
+						<button type='button' disabled={claiming} onClick={() => onClaimAll('premium')}>
+							<Gift size={16} /> Забрать всё (премиум)
+						</button>
+					)}
+				</div>
+			)}
 		</div>
 	)
 }

@@ -587,3 +587,27 @@ select {
 .battle-pass-nav button:disabled {
   opacity: 0.35;
 }
+
+.battle-pass-claim-all {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.battle-pass-claim-all button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: var(--surface-strong);
+  color: var(--tg-theme-text-color, #111111);
+  font-weight: 600;
+}
+
+.battle-pass-claim-all button:disabled {
+  opacity: 0.5;
+}
