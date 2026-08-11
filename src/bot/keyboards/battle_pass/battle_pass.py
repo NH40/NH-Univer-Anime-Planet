@@ -60,18 +60,25 @@ def levels_menu(page_view: LevelsPage, *, mini_app_url: str | None = None) -> In
     CLAUDE.md, "Сезонный пасс: клейм произвольной ячейки". Кнопки заблокированных/уже
     забранных/недоступной премиум-ветки остаются кликабельными (Telegram не даёт по-другому
     "выключить" inline-кнопку) — тап по ним просто вернёт понятный alert от хендлера."""
-    rows: list[list[InlineKeyboardButton]] = []
-
-    for entry in page_view.entries:
-        free_btn = InlineKeyboardButton(
-            text=_free_label(entry),
-            callback_data=f"{CB_BATTLE_PASS_LEVELS_CLAIM_FREE_PREFIX}{page_view.page}:{entry.level}",
-        )
-        premium_btn = InlineKeyboardButton(
+    # 2 горизонтальные строки — премиум сверху, бесплатная снизу (тот же принцип, что в
+    # Mini App: "премиум-ветка сверху, бесплатная снизу" на колонку, здесь колонки просто
+    # заменены на строку кнопок целиком, см. CLAUDE.md). Подтверждено пользователем
+    # 2026-08-11 вместо исходных 10 вертикальных пар.
+    premium_row = [
+        InlineKeyboardButton(
             text=_premium_label(entry, is_premium=page_view.is_premium),
             callback_data=f"{CB_BATTLE_PASS_LEVELS_CLAIM_PREMIUM_PREFIX}{page_view.page}:{entry.level}",
         )
-        rows.append([free_btn, premium_btn])
+        for entry in page_view.entries
+    ]
+    free_row = [
+        InlineKeyboardButton(
+            text=_free_label(entry),
+            callback_data=f"{CB_BATTLE_PASS_LEVELS_CLAIM_FREE_PREFIX}{page_view.page}:{entry.level}",
+        )
+        for entry in page_view.entries
+    ]
+    rows: list[list[InlineKeyboardButton]] = [premium_row, free_row]
 
     # "Забрать всё" зависит от high-water mark ветки целиком, а не от того, что видно на
     # ЭТОЙ странице (незабранные уровни могут лежать на другой странице) — см. docstring

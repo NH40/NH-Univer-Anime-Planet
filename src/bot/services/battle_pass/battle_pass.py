@@ -251,21 +251,29 @@ def _circle_offset(current_level: int) -> int:
     return ((current_level - 1) // BATTLE_PASS_CYCLE_LEVELS) * BATTLE_PASS_CYCLE_LEVELS
 
 
-def page_for_level(level: int, *, current_level: int) -> int:
+def page_for_level(level: int, *, current_level: int, per_page: int = LEVELS_PER_PAGE) -> int:
     """Номер страницы (в текущем круге игрока), на которой лежит `level` — используется
     и для дефолтного открытия экрана (см. list_levels, page=None), и для редиректа после
-    "Забрать всё" (см. CLAUDE.md, "Сезонный пасс: клейм произвольной ячейки")."""
+    "Забрать всё" (см. CLAUDE.md, "Сезонный пасс: клейм произвольной ячейки"). `per_page`
+    параметризован — бот и Mini App показывают разное число уровней на странице (см.
+    list_levels), у каждого свой смысл у номера страницы."""
     offset = _circle_offset(current_level)
     pos = max(1, min(level - offset, BATTLE_PASS_CYCLE_LEVELS))
-    return -(-pos // LEVELS_PER_PAGE)
+    return -(-pos // per_page)
 
 
-async def list_levels(session: AsyncSession, *, user_id: int, page: int | None) -> LevelsPage | None:
+async def list_levels(
+    session: AsyncSession, *, user_id: int, page: int | None, per_page: int = LEVELS_PER_PAGE
+) -> LevelsPage | None:
     """Пагинированная лента уровней текущего 500-уровневого круга (не всей бесконечной
     истории) — общая формула для бота и Mini App, ничего не дублируется на два стека.
     Уровни якорятся на ТЕКУЩИЙ круг игрока: если игрок уже прошёл цикл 500 уровней целиком,
-    страница 1 показывает уровни (500×circle + 1)..(500×circle + 10), а не 1..10 — иначе
-    статус "забрано"/"доступно" не совпадал бы с реальным `claimed_free_level`.
+    страница 1 показывает уровни (500×circle + 1).. , а не 1.. — иначе статус
+    "забрано"/"доступно" не совпадал бы с реальным `claimed_free_level`.
+
+    `per_page` — Mini App использует дефолт (горизонтальная лента, скроллится), бот просит
+    меньше (см. `handlers/battle_pass/levels.py` — 2 горизонтальные строки кнопок вместо
+    вертикального списка, подтверждено пользователем 2026-08-11).
 
     `page=None` — открыть на странице с ПЕРВЫМ незабранным уровнем (по любой из открытых
     веток), а не всегда с первой страницы круга (см. CLAUDE.md — раньше дефолтная страница
@@ -285,13 +293,13 @@ async def list_levels(session: AsyncSession, *, user_id: int, page: int | None) 
         else set()
     )
 
-    total_pages = -(-BATTLE_PASS_CYCLE_LEVELS // LEVELS_PER_PAGE)
+    total_pages = -(-BATTLE_PASS_CYCLE_LEVELS // per_page)
     if page is None:
         anchor_level = min(row.claimed_free_level, row.claimed_premium_level if row.is_premium else row.claimed_free_level) + 1
-        page = page_for_level(anchor_level, current_level=current_level)
+        page = page_for_level(anchor_level, current_level=current_level, per_page=per_page)
     page = max(1, min(page, total_pages))
-    start_pos = (page - 1) * LEVELS_PER_PAGE + 1
-    end_pos = min(start_pos + LEVELS_PER_PAGE - 1, BATTLE_PASS_CYCLE_LEVELS)
+    start_pos = (page - 1) * per_page + 1
+    end_pos = min(start_pos + per_page - 1, BATTLE_PASS_CYCLE_LEVELS)
 
     entries = []
     for pos in range(start_pos, end_pos + 1):

@@ -42,6 +42,12 @@ from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="battle_pass_levels")
 
+# 2 горизонтальные строки кнопок (премиум сверху, бесплатная снизу) вместо 10 вертикальных
+# пар — подтверждено пользователем 2026-08-11 (см. CLAUDE.md, "клейм произвольной ячейки").
+# Меньше, чем LEVELS_PER_PAGE у Mini App (та — горизонтально скроллящаяся лента, ей 10
+# норм), потому что у бота ширина строки инлайн-кнопок Telegram ограничена практически.
+_PAGE_SIZE = 5
+
 
 def _reward_text(dust: int, tickets: int, coins: int = 0) -> str:
     if dust and tickets:
@@ -74,7 +80,7 @@ def _render(page_view: pass_service.LevelsPage, *, mini_app_url: str | None) -> 
 
 async def show_page(target: Message, session: AsyncSession, user_id: int, *, page: int | None, edit: bool) -> None:
     settings = get_settings()
-    page_view = await pass_service.list_levels(session, user_id=user_id, page=page)
+    page_view = await pass_service.list_levels(session, user_id=user_id, page=page, per_page=_PAGE_SIZE)
     if page_view is None:
         if edit:
             await safe_edit_text(target, PASS_NO_SEASON)
@@ -201,7 +207,7 @@ async def _claim_all(
     # После "Забрать всё" — редирект на страницу с ТЕКУЩИМ уровнем (весь диапазон до него
     # только что забран целиком), а не оставаться на исходной странице (подтверждено
     # пользователем 2026-08-11, см. CLAUDE.md).
-    target_page = pass_service.page_for_level(result.current_level, current_level=result.current_level)
+    target_page = pass_service.page_for_level(result.current_level, current_level=result.current_level, per_page=_PAGE_SIZE)
     await show_page(callback.message, session, user_id, page=target_page, edit=True)
 
 

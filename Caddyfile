@@ -11,6 +11,10 @@
 	handle /cards/* {
 		uri strip_prefix /cards
 		root * /srv/cards
+		# Картинки карточек не меняются после заливки (см. seed_cards.py — upsert по пути,
+		# не по содержимому) — долгий Cache-Control убирает повторную загрузку при возврате
+		# на экран коллекции/пролистывании страниц, это НЕ чинит первую загрузку (см. CLAUDE.md).
+		header Cache-Control "public, max-age=2592000, immutable"
 		file_server
 	}
 
