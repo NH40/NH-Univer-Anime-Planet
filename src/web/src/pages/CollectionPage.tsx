@@ -1,8 +1,15 @@
 import { PartyPopper, Search, Star } from 'lucide-react'
-import { useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import type { CardStack, Universe } from '../api'
 import { TIER_INFO } from '../config'
 import { EVENTS_TAB_CODE } from '../constants'
+
+// Рендерим карточки порциями по BATCH_SIZE вместо всей коллекции разом — по жалобе
+// пользователя 2026-08-11 на медленную загрузку картинок/переключение вселенных. Сама
+// коллекция по-прежнему приходит с API целиком (нужна для поиска/фильтра по ВСЕЙ
+// коллекции, не только по загруженной части) — порционим только КОЛИЧЕСТВО отрисованных
+// <img>, подгружая следующую порцию через IntersectionObserver на сентинеле внизу сетки.
+const BATCH_SIZE = 30
 
 export function CollectionPage({
 	universes,
@@ -19,6 +26,8 @@ export function CollectionPage({
 }) {
 	const [search, setSearch] = useState('')
 	const [tierFilter, setTierFilter] = useState<number | 'all'>('all')
+	const [visibleCount, setVisibleCount] = useState(BATCH_SIZE)
+	const sentinelRef = useRef<HTMLDivElement | null>(null)
 
 	const visibleCards = useMemo(() => {
 		const query = search.trim().toLowerCase()
@@ -28,6 +37,30 @@ export function CollectionPage({
 			return true
 		})
 	}, [cards, search, tierFilter])
+
+	// Новая вселенная/поиск/фильтр — начинаем показ заново с первой порции.
+	useEffect(() => {
+		setVisibleCount(BATCH_SIZE)
+	}, [cards, search, tierFilter])
+
+	const renderedCards = visibleCards.slice(0, visibleCount)
+	const hasMore = visibleCount < visibleCards.length
+
+	useEffect(() => {
+		if (!hasMore) return
+		const sentinel = sentinelRef.current
+		if (!sentinel) return
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting) {
+					setVisibleCount((count) => count + BATCH_SIZE)
+				}
+			},
+			{ rootMargin: '400px' },
+		)
+		observer.observe(sentinel)
+		return () => observer.disconnect()
+	}, [hasMore])
 
 	return (
 		<>
@@ -88,30 +121,33 @@ export function CollectionPage({
 					{visibleCards.length === 0 ? (
 						<div class='empty'>Ничего не найдено.</div>
 					) : (
-						<div class='grid'>
-							{visibleCards.map((card) => {
-								const tier = TIER_INFO[card.base_ubp]
-								return (
-									<button
-										type='button'
-										class='card'
-										key={`${card.card_id}-${card.stars}`}
-										onClick={() => onOpenCard(card)}
-									>
-										{tier && <span class='card-tier-dot' style={{ background: tier.color }} />}
-										<img src={card.image_url} alt={card.name} loading='lazy' />
-										<div class='card-name'>{card.name}</div>
-										<div class='card-meta'>
-											<span class='card-meta-stars'>
-												<Star size={11} fill='currentColor' /> {card.stars}
-											</span>
-											<span>{card.base_ubp} UBP</span>
-											<span>×{card.quantity}</span>
-										</div>
-									</button>
-								)
-							})}
-						</div>
+						<>
+							<div class='grid'>
+								{renderedCards.map((card) => {
+									const tier = TIER_INFO[card.base_ubp]
+									return (
+										<button
+											type='button'
+											class='card'
+											key={`${card.card_id}-${card.stars}`}
+											onClick={() => onOpenCard(card)}
+										>
+											{tier && <span class='card-tier-dot' style={{ background: tier.color }} />}
+											<img src={card.image_url} alt={card.name} loading='lazy' />
+											<div class='card-name'>{card.name}</div>
+											<div class='card-meta'>
+												<span class='card-meta-stars'>
+													<Star size={11} fill='currentColor' /> {card.stars}
+												</span>
+												<span>{card.base_ubp} UBP</span>
+												<span>×{card.quantity}</span>
+											</div>
+										</button>
+									)
+								})}
+							</div>
+							{hasMore && <div ref={sentinelRef} class='grid-sentinel' />}
+						</>
 					)}
 				</>
 			)}

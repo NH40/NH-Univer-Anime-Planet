@@ -203,6 +203,11 @@ select {
 .search-input-icon {
   position: absolute;
   left: 10px;
+  /* absolute вынимает элемент из flex-потока — align-items: center у .search-input-wrap
+     на него не действует, без явного вертикального центрирования иконка съезжала к
+     верхнему краю поля (жалоба пользователя 2026-08-11). */
+  top: 50%;
+  transform: translateY(-50%);
   opacity: 0.5;
   pointer-events: none;
 }
@@ -234,6 +239,10 @@ select {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 10px;
+}
+
+.grid-sentinel {
+  height: 1px;
 }
 
 .card {

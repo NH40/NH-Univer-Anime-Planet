@@ -20,6 +20,15 @@
 
 	handle {
 		root * /srv/web
+		# index.html (и SPA-фоллбэк try_files) — всегда без кэша: иначе после редеплоя
+		# Telegram WebView/браузер продолжает открывать старую HTML-страницу со ссылкой на
+		# старый хэшированный JS-бандл, и новый код фронтенда не подхватывается без ручного
+		# сброса кэша клиента (наступили на это 2026-08-11). Файлы в /assets/* от Vite
+		# хэшируются по содержимому — им, наоборот, можно кэшироваться агрессивно и долго,
+		# смена контента = новое имя файла, никогда не отдаст устаревшее.
+		header Cache-Control "no-cache"
+		@hashed_assets path /assets/*
+		header @hashed_assets Cache-Control "public, max-age=31536000, immutable"
 		try_files {path} /index.html
 		file_server
 	}
