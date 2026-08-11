@@ -3,9 +3,11 @@ from bot.services.promo.promo import (
     PromoExpiredError,
     PromoNotAllowedError,
     PromoNotFoundError,
+    PromoStatus,
     PromoTakenError,
     PromoUsesExhaustedError,
     create_promo,
+    list_status,
     redeem,
 )
 
@@ -14,8 +16,10 @@ __all__ = [
     "PromoExpiredError",
     "PromoNotAllowedError",
     "PromoNotFoundError",
+    "PromoStatus",
     "PromoTakenError",
     "PromoUsesExhaustedError",
     "create_promo",
+    "list_status",
     "redeem",
 ]

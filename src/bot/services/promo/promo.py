@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +35,43 @@ class PromoUsesExhaustedError(Exception):
 
 class PromoAlreadyRedeemedError(Exception):
     pass
+
+
+@dataclass
+class PromoStatus:
+    code: str
+    is_active: bool
+    dust: int
+    coins: int
+    tickets: int
+    max_uses: int | None
+    used_count: int
+
+
+async def list_status(session: AsyncSession, *, limit: int = 20) -> list[PromoStatus]:
+    """Последние выпущенные промокоды со статусом (активен/нет) — экран /admin -> Промокоды
+    (см. CLAUDE.md, "Промокоды: список существующих"). Активен = не истёк по времени И
+    (лимита активаций нет, либо он ещё не исчерпан) — та же логика, что проверяет redeem()
+    при активации, просто без похода в БД за инкрементом."""
+    codes = await promo_repo.list_recent(session, limit=limit)
+    now = datetime.now(timezone.utc)
+    statuses = []
+    for promo in codes:
+        expired = promo.expires_at is not None and promo.expires_at <= now
+        exhausted = promo.max_uses is not None and promo.used_count >= promo.max_uses
+        reward = promo.reward or {}
+        statuses.append(
+            PromoStatus(
+                code=promo.code,
+                is_active=not expired and not exhausted,
+                dust=int(reward.get("dust", 0)),
+                coins=int(reward.get("coins", 0)),
+                tickets=int(reward.get("tickets", 0)),
+                max_uses=promo.max_uses,
+                used_count=promo.used_count,
+            )
+        )
+    return statuses
 
 
 async def create_promo(

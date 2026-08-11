@@ -20,3 +20,11 @@ async def list_active(session: AsyncSession) -> list[Universe]:
 
 async def get_by_code(session: AsyncSession, code: str) -> Universe | None:
     return await session.get(Universe, code)
+
+
+async def list_all(session: AsyncSession) -> list[Universe]:
+    """ВСЕ вселенные — активные и нет, ивентовые и обычные (в отличие от `list_active`).
+    Для /admin (выдача карточки, см. handlers/admin/admin.py): админ должен уметь выдать
+    карту из ЛЮБОЙ вселенной, включая выключенную для крутки или ивентовую."""
+    result = await session.execute(select(Universe).order_by(Universe.title))
+    return list(result.scalars().all())

@@ -1,4 +1,4 @@
-import { PartyPopper, Search, Star } from 'lucide-react'
+import { PartyPopper, Star } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import type { CardStack, Universe } from '../api'
 import { TIER_INFO } from '../config'
@@ -90,7 +90,6 @@ export function CollectionPage({
 				<>
 					<div class='filters'>
 						<div class='search-input-wrap'>
-							<Search size={15} class='search-input-icon' />
 							<input
 								class='search-input'
 								type='search'

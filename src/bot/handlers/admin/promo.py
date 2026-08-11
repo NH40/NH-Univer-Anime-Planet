@@ -20,7 +20,12 @@ from bot.texts.admin import (
     PROMO_CREATE_INVALID,
     PROMO_CREATE_PROMPT,
     PROMO_CREATE_TAKEN,
+    PROMO_LINE,
+    PROMO_LINE_ACTIVE,
+    PROMO_LINE_INACTIVE,
+    PROMO_LINE_USES,
     PROMO_SCREEN,
+    PROMO_SCREEN_EMPTY,
 )
 from bot.utils.safe_edit import safe_edit_text
 
@@ -30,13 +35,35 @@ _CODE_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
 _TYPES = {"uses": PromoCodeType.uses, "time": PromoCodeType.time, "users": PromoCodeType.user_list}
 
 
+def _reward_line(status: promo_service.PromoStatus) -> str:
+    parts = []
+    if status.dust:
+        parts.append(f"{status.dust}✨")
+    if status.coins:
+        parts.append(f"{status.coins}💎")
+    if status.tickets:
+        parts.append(f"{status.tickets}🎫")
+    reward = ", ".join(parts) if parts else "—"
+    uses = PROMO_LINE_USES.format(used=status.used_count, max_uses=status.max_uses) if status.max_uses is not None else ""
+    return PROMO_LINE.format(
+        icon=PROMO_LINE_ACTIVE if status.is_active else PROMO_LINE_INACTIVE, code=status.code, reward=reward, uses=uses
+    )
+
+
+async def _render_promo_screen(session: AsyncSession) -> str:
+    statuses = await promo_service.list_status(session)
+    lines = "".join(_reward_line(s) for s in statuses) if statuses else PROMO_SCREEN_EMPTY
+    return PROMO_SCREEN.format(count=len(statuses), lines=lines)
+
+
 @router.callback_query(F.data == CB_ADMIN_PROMO)
-async def cb_promo(callback: CallbackQuery, state: FSMContext) -> None:
+async def cb_promo(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     # На случай прихода сюда как "Назад" из waiting_promo_create — иначе FSM-состояние
     # осталось бы висеть, и следующий текст игрока ошибочно попал бы в apply_promo_create.
     await state.clear()
     await callback.answer()
-    await safe_edit_text(callback.message, PROMO_SCREEN, reply_markup=promo_menu())
+    text = await _render_promo_screen(session)
+    await safe_edit_text(callback.message, text, reply_markup=promo_menu())
 
 
 @router.callback_query(F.data == CB_ADMIN_PROMO_CREATE)
@@ -109,3 +136,5 @@ async def apply_promo_create(message: Message, state: FSMContext, session: Async
         return
 
     await message.answer(PROMO_CREATE_DONE.format(code=code))
+    text = await _render_promo_screen(session)
+    await message.answer(text, reply_markup=promo_menu())

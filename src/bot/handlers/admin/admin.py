@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -10,11 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.config.settings import get_settings
 from bot.constant.admin import (
     CB_ADMIN_FIND_PLAYER_START,
+    CB_ADMIN_GIVE_CARD_CARD_PREFIX,
+    CB_ADMIN_GIVE_CARD_PAGE_PREFIX,
+    CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX,
     CB_ADMIN_OPEN,
     CB_ADMIN_PLAYER_BAN_TOGGLE_PREFIX,
     CB_ADMIN_PLAYER_GIVE_CARD_PREFIX,
     CB_ADMIN_PLAYER_GIVE_COINS_PREFIX,
     CB_ADMIN_PLAYER_GIVE_DUST_PREFIX,
+    CB_ADMIN_PLAYER_VIEW_PREFIX,
     CB_ADMIN_STATS,
     CB_ADMIN_TECH_MODE_TOGGLE,
     TRANSACTION_REASON_ADMIN_GRANT_COINS,
@@ -25,9 +31,16 @@ from bot.db.models.transaction import Transaction
 from bot.db.models.user import User
 from bot.db.repositories import card as card_repo
 from bot.db.repositories import clan as clan_repo
-from bot.db.repositories.inventory import add_card
+from bot.db.repositories import universe as universe_repo
+from bot.db.repositories.inventory import add_card, decrement_by
 from bot.db.repositories.user import add_coins, add_dust, get_by_id, get_by_username, set_is_banned
-from bot.keyboards.admin import admin_menu, back_to_admin_menu, player_card_menu
+from bot.keyboards.admin import (
+    admin_menu,
+    back_to_admin_menu,
+    give_card_card_menu,
+    give_card_universe_menu,
+    player_card_menu,
+)
 from bot.services import admin as admin_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
@@ -39,8 +52,12 @@ from bot.texts.admin import (
     GIVE_AMOUNT_INVALID,
     GIVE_CARD_DONE,
     GIVE_CARD_INVALID,
+    GIVE_CARD_NOT_ENOUGH,
     GIVE_CARD_NOT_FOUND,
+    GIVE_CARD_PICK_CARD,
+    GIVE_CARD_PICK_UNIVERSE,
     GIVE_CARD_PROMPT,
+    GIVE_CARD_REVOKED,
     GIVE_COINS_DONE,
     GIVE_COINS_PROMPT,
     GIVE_DUST_DONE,
@@ -276,16 +293,102 @@ async def apply_give_coins(message: Message, state: FSMContext, session: AsyncSe
     await message.answer(text, reply_markup=keyboard)
 
 
-# --- Выдать карточку ---
+# --- Выдать карточку (вселенная -> карта кнопками, звёзды/количество текстом, см.
+# CLAUDE.md "Управление карточками: выбор кнопками" — раньше всё вводилось одной строкой
+# сырых чисел, включая id карты, который админ физически не мог помнить наизусть) ---
+
+_GIVE_CARD_PAGE_SIZE = 10
+_SIGNED_INT_RE = re.compile(r"-?\d+")
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PLAYER_VIEW_PREFIX))
+async def cb_player_view(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    """Возврат к карточке игрока с любого шага выдачи карточки ("Назад")."""
+    target_id = int(callback.data[len(CB_ADMIN_PLAYER_VIEW_PREFIX) :])
+    await state.clear()
+    await callback.answer()
+    target = await get_by_id(session, target_id)
+    if target is None:
+        await safe_edit_text(callback.message, FIND_PLAYER_NOT_FOUND, reply_markup=back_to_admin_menu())
+        return
+    text, keyboard = await _render_player_card(session, target)
+    await safe_edit_text(callback.message, text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith(CB_ADMIN_PLAYER_GIVE_CARD_PREFIX))
-async def cb_give_card_start(callback: CallbackQuery, state: FSMContext) -> None:
+async def cb_give_card_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     target_id = int(callback.data[len(CB_ADMIN_PLAYER_GIVE_CARD_PREFIX) :])
-    await state.set_state(AdminStates.waiting_give_card)
     await state.update_data(target_user_id=target_id)
     await callback.answer()
-    await safe_edit_text(callback.message, GIVE_CARD_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    universes = await universe_repo.list_all(session)
+    await safe_edit_text(
+        callback.message, GIVE_CARD_PICK_UNIVERSE, reply_markup=give_card_universe_menu(universes, user_id=target_id)
+    )
+
+
+async def _show_card_page(callback: CallbackQuery, state: FSMContext, session: AsyncSession, *, page: int) -> None:
+    data = await state.get_data()
+    target_id = data.get("target_user_id")
+    universe_code = data.get("give_card_universe")
+    if target_id is None or universe_code is None:
+        # Экран устарел (например, состояние потерялось) — откатываемся к карточке игрока,
+        # если известен id, иначе в главное admin-меню.
+        if target_id is not None:
+            target = await get_by_id(session, target_id)
+            if target is not None:
+                text, keyboard = await _render_player_card(session, target)
+                await safe_edit_text(callback.message, text, reply_markup=keyboard)
+                return
+        await safe_edit_text(callback.message, ADMIN_MENU, reply_markup=back_to_admin_menu())
+        return
+
+    universe = await universe_repo.get_by_code(session, universe_code)
+    all_cards = await card_repo.list_by_universe(session, universe_code)
+    total_pages = max(1, -(-len(all_cards) // _GIVE_CARD_PAGE_SIZE))
+    page = max(1, min(page, total_pages))
+    await state.update_data(give_card_page=page)
+    start = (page - 1) * _GIVE_CARD_PAGE_SIZE
+    page_cards = all_cards[start : start + _GIVE_CARD_PAGE_SIZE]
+
+    text = GIVE_CARD_PICK_CARD.format(
+        universe=universe.title if universe is not None else universe_code, page=page, total_pages=total_pages
+    )
+    await safe_edit_text(
+        callback.message, text, reply_markup=give_card_card_menu(page_cards, page=page, total_pages=total_pages, user_id=target_id)
+    )
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX))
+async def cb_give_card_pick_universe(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    universe_code = callback.data[len(CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX) :]
+    await state.update_data(give_card_universe=universe_code)
+    await callback.answer()
+    await _show_card_page(callback, state, session, page=1)
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_GIVE_CARD_PAGE_PREFIX))
+async def cb_give_card_page(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    page = int(callback.data[len(CB_ADMIN_GIVE_CARD_PAGE_PREFIX) :])
+    await callback.answer()
+    await _show_card_page(callback, state, session, page=page)
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_GIVE_CARD_CARD_PREFIX))
+async def cb_give_card_pick_card(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    card_id = int(callback.data[len(CB_ADMIN_GIVE_CARD_CARD_PREFIX) :])
+    card = await card_repo.get_by_id(session, card_id)
+    await callback.answer()
+    if card is None:
+        await safe_edit_text(callback.message, GIVE_CARD_NOT_FOUND, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+        return
+
+    await state.update_data(give_card_id=card_id)
+    await state.set_state(AdminStates.waiting_give_card)
+    await safe_edit_text(
+        callback.message,
+        GIVE_CARD_PROMPT.format(card_name=card.name),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
+    )
 
 
 @router.message(StateFilter(AdminStates.waiting_give_card), Command("cancel"))
@@ -297,34 +400,52 @@ async def cancel_give_card(message: Message, state: FSMContext) -> None:
 @router.message(StateFilter(AdminStates.waiting_give_card))
 async def apply_give_card(message: Message, state: FSMContext, session: AsyncSession) -> None:
     parts = (message.text or "").strip().split()
-    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+    if len(parts) != 2 or not parts[0].isdigit() or not _SIGNED_INT_RE.fullmatch(parts[1]):
         await message.answer(GIVE_CARD_INVALID)
         return
 
-    card_id, stars, qty = (int(p) for p in parts)
-    if stars <= 0 or qty <= 0:
+    stars, qty = int(parts[0]), int(parts[1])
+    if stars <= 0 or qty == 0:
         await message.answer(GIVE_CARD_INVALID)
-        return
-
-    card = await card_repo.get_by_id(session, card_id)
-    if card is None:
-        await message.answer(GIVE_CARD_NOT_FOUND)
         return
 
     data = await state.get_data()
     target_id = data.get("target_user_id")
-    await state.clear()
+    card_id = data.get("give_card_id")
+    if target_id is None or card_id is None:
+        await state.clear()
+        await message.answer(GIVE_CARD_NOT_FOUND)
+        return
 
-    target = await get_by_id(session, target_id) if target_id is not None else None
+    card = await card_repo.get_by_id(session, card_id)
+    if card is None:
+        await state.clear()
+        await message.answer(GIVE_CARD_NOT_FOUND)
+        return
+
+    target = await get_by_id(session, target_id)
     if target is None:
+        await state.clear()
         await message.answer(FIND_PLAYER_NOT_FOUND)
         return
 
-    await add_card(session, user_id=target_id, card_id=card_id, stars=stars, qty=qty)
-    await session.commit()
-
+    await state.clear()
     name = target.display_name or str(target.id)
-    await message.answer(GIVE_CARD_DONE.format(card_name=card.name, stars=stars, qty=qty, name=name))
+
+    if qty > 0:
+        await add_card(session, user_id=target_id, card_id=card_id, stars=stars, qty=qty)
+        await session.commit()
+        await message.answer(GIVE_CARD_DONE.format(card_name=card.name, stars=stars, qty=qty, name=name))
+    else:
+        ok = await decrement_by(session, user_id=target_id, card_id=card_id, stars=stars, amount=-qty)
+        if not ok:
+            await message.answer(GIVE_CARD_NOT_ENOUGH)
+            return
+        await session.commit()
+        await message.answer(GIVE_CARD_REVOKED.format(card_name=card.name, stars=stars, qty=-qty, name=name))
+
+    text, keyboard = await _render_player_card(session, target)
+    await message.answer(text, reply_markup=keyboard)
 
     text, keyboard = await _render_player_card(session, target)
     await message.answer(text, reply_markup=keyboard)

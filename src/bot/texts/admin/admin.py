@@ -50,20 +50,30 @@ BTN_GIVE_CARD = "🃏 Выдать карточку"
 BTN_BAN = "⛔️ Забанить"
 BTN_UNBAN = "✅ Разбанить"
 BTN_FIND_ANOTHER = "🔍 Другой игрок"
+BTN_ADMIN_PAGE_PREV = "◀️"
+BTN_ADMIN_PAGE_NEXT = "▶️"
 
 GIVE_DUST_PROMPT = "Сколько пыли выдать? /cancel — отменить."
 GIVE_COINS_PROMPT = "Сколько коинов выдать? /cancel — отменить."
+
+# Выдача карточки — вселенная и карта выбираются кнопками (см. handlers/admin/admin.py),
+# текстом вводятся только звёзды и количество на последнем шаге.
+GIVE_CARD_PICK_UNIVERSE = "🃏 Выберите вселенную:"
+GIVE_CARD_PICK_CARD = "🃏 {universe} — выберите карту (стр. {page}/{total_pages}):"
 GIVE_CARD_PROMPT = (
-    "Введите id карты, звёзды и количество через пробел, например: <code>5 1 3</code>. "
-    "/cancel — отменить."
+    "🃏 «{card_name}»\n\n"
+    "Введите звёзды и количество через пробел, например: <code>1 3</code>.\n"
+    "Отрицательное количество — забрать. /cancel — отменить."
 )
 GIVE_AMOUNT_INVALID = "Нужно целое число больше 0."
-GIVE_CARD_INVALID = "Формат: id_карты звёзды количество, все — целые числа больше 0."
+GIVE_CARD_INVALID = "Формат: звёзды количество — оба целые числа, звёзды > 0, количество ≠ 0."
 GIVE_CARD_NOT_FOUND = "Карта с таким id не найдена."
+GIVE_CARD_NOT_ENOUGH = "У игрока нет столько копий этой карты на этой звезде — нечего забирать."
 
 GIVE_DUST_DONE = "✅ Выдано {amount} пыли игроку {name}."
 GIVE_COINS_DONE = "✅ Выдано {amount} коинов игроку {name}."
 GIVE_CARD_DONE = "✅ Выдана карта «{card_name}» {stars}★ x{qty} игроку {name}."
+GIVE_CARD_REVOKED = "✅ Забрана карта «{card_name}» {stars}★ x{qty} у игрока {name}."
 BAN_DONE = "⛔️ {name} забанен."
 UNBAN_DONE = "✅ {name} разбанен."
 
@@ -88,7 +98,12 @@ SEASON_NEW_DONE = "✅ Новый сезон «{version}» начат. Нагр�
 SEASON_BUMP_DONE = "✅ Версия обновлена: {version}."
 
 # --- Промокоды ---
-PROMO_SCREEN = "🎟 <b>Промокоды</b>"
+PROMO_SCREEN = "🎟 <b>Промокоды</b> — всего: {count}\n\n{lines}"
+PROMO_SCREEN_EMPTY = "Пока ни одного не создано."
+PROMO_LINE_ACTIVE = "✅"
+PROMO_LINE_INACTIVE = "❌"
+PROMO_LINE = "{icon} <code>{code}</code> | {reward}{uses}\n"
+PROMO_LINE_USES = " ({used}/{max_uses})"
 BTN_PROMO_CREATE = "➕ Создать промокод"
 PROMO_CREATE_PROMPT = (
     "Введите промокод 4 строками:\n"
@@ -203,3 +218,4 @@ BTN_EVENT_ACTIVATE_PREFIX = "▶️ Включить: "
 BTN_EVENT_DEACTIVATE_PREFIX = "⏹ Выключить: "
 EVENT_TOGGLED_ON = "✅ Ивент «{title}» включён."
 EVENT_TOGGLED_OFF = "❌ Ивент «{title}» выключен."
+EVENT_START_BROADCAST = "🎉 Стартовал ивент «{title}»! Крутите — у каждой крутки есть шанс получить редкую ивент-карту."

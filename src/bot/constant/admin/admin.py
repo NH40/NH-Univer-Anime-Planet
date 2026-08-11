@@ -14,6 +14,15 @@ CB_ADMIN_PLAYER_GIVE_DUST_PREFIX = "admin:give_dust:"
 CB_ADMIN_PLAYER_GIVE_COINS_PREFIX = "admin:give_coins:"
 CB_ADMIN_PLAYER_GIVE_CARD_PREFIX = "admin:give_card:"
 CB_ADMIN_PLAYER_BAN_TOGGLE_PREFIX = "admin:ban_toggle:"
+CB_ADMIN_PLAYER_VIEW_PREFIX = "admin:player_view:"
+
+# Выдача карточки — выбор вселенной/карты кнопками вместо ввода id карты вручную
+# (подтверждено пользователем 2026-08-11: сырой числовой id было неудобно помнить/вводить).
+# target_id/universe_code копятся в FSM-данных состояния (см. handlers/admin/admin.py) —
+# в callback_data кодируется только то, что специфично для конкретного шага.
+CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX = "admin:give_card_uni:"
+CB_ADMIN_GIVE_CARD_PAGE_PREFIX = "admin:give_card_page:"
+CB_ADMIN_GIVE_CARD_CARD_PREFIX = "admin:give_card_card:"
 
 CB_ADMIN_SEASON = "admin:season"
 CB_ADMIN_SEASON_NEW = "admin:season_new"

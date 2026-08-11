@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import or_, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,14 @@ from bot.db.models.promocode import PromoCode, PromoRedemption
 
 async def get_by_code(session: AsyncSession, code: str) -> PromoCode | None:
     return await session.get(PromoCode, code)
+
+
+async def list_recent(session: AsyncSession, *, limit: int = 20) -> list[PromoCode]:
+    """Последние `limit` промокодов, новые сверху — для экрана /admin -> Промокоды (см.
+    CLAUDE.md, "Промокоды: список существующих"). Раньше экран показывал только кнопку
+    создания без единого способа посмотреть, что уже выпущено и ещё ли оно активно."""
+    result = await session.execute(select(PromoCode).order_by(PromoCode.created_at.desc()).limit(limit))
+    return list(result.scalars().all())
 
 
 async def create(

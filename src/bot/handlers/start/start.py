@@ -3,11 +3,13 @@ from __future__ import annotations
 from aiogram import Router
 from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import Message
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config.game import TICKET_STARTING_COUNT
 from bot.constant.referral import REFERRAL_DEEPLINK_PREFIX
 from bot.db.repositories.user import get_by_id, set_referred_by, upsert_from_telegram
+from bot.handlers.profile.profile import show_profile
 from bot.keyboards.common import main_menu
 from bot.services import referral as referral_service
 from bot.texts.common import WELCOME
@@ -18,9 +20,13 @@ _REFERRAL_PAYLOAD_PREFIX = "ref_"
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, command: CommandObject, session: AsyncSession) -> None:
+async def cmd_start(message: Message, command: CommandObject, session: AsyncSession, redis: Redis) -> None:
     user_id = message.from_user.id
     display_name = message.from_user.full_name[:32]
+    # Не первый /start (игрок уже был зарегистрирован) — открываем профиль вместо
+    # приветственного сообщения (запрос пользователя 2026-08-11): реф-ссылки/deep-link'и
+    # всё равно нужно обработать один раз, а не только новым игрокам.
+    is_returning = await get_by_id(session, user_id) is not None
     await upsert_from_telegram(
         session,
         user_id=user_id,
@@ -46,4 +52,7 @@ async def cmd_start(message: Message, command: CommandObject, session: AsyncSess
             if referrer_id != user_id and await get_by_id(session, referrer_id) is not None:
                 await set_referred_by(session, user_id=user_id, referrer_id=referrer_id)
 
+    if is_returning:
+        await show_profile(message, session, redis)
+        return
     await message.answer(WELCOME, reply_markup=main_menu())

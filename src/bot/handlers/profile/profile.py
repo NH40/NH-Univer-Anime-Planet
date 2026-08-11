@@ -108,6 +108,8 @@ async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> 
         ubp_total=user.ubp_total,
         tickets_line=_tickets_line(ticket_status),
         total_rolls=user.total_rolls,
+        dust=user.dust,
+        coins=user.coins,
         progress=_progress_block(progress),
     )
 

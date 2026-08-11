@@ -7,7 +7,9 @@ from bot.db.models.card import Card
 
 
 async def list_by_universe(session: AsyncSession, universe_code: str) -> list[Card]:
-    result = await session.execute(select(Card).where(Card.universe_code == universe_code))
+    result = await session.execute(
+        select(Card).where(Card.universe_code == universe_code).order_by(Card.base_ubp.desc(), Card.external_id)
+    )
     return list(result.scalars().all())
 
 

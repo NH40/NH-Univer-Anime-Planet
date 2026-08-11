@@ -17,6 +17,9 @@ PROFILE_CARD = (
     "{tickets_line}\n"
     "🎴 <b>Круток за всё время:</b> {total_rolls}\n\n"
     "{divider}\n\n"
+    "✨ <b>Пыль:</b> {dust}\n"
+    "💎 <b>Коины:</b> {coins}\n\n"
+    "{divider}\n\n"
     "{progress}"
 )
 NO_USERNAME = "—"

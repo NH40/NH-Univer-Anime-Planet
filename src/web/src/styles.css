@@ -200,21 +200,9 @@ select {
   align-items: center;
 }
 
-.search-input-icon {
-  position: absolute;
-  left: 10px;
-  /* absolute вынимает элемент из flex-потока — align-items: center у .search-input-wrap
-     на него не действует, без явного вертикального центрирования иконка съезжала к
-     верхнему краю поля (жалоба пользователя 2026-08-11). */
-  top: 50%;
-  transform: translateY(-50%);
-  opacity: 0.5;
-  pointer-events: none;
-}
-
 .search-input {
   width: 100%;
-  padding: 8px 10px 8px 32px;
+  padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--tg-theme-hint-color, #cccccc);
   background: var(--tg-theme-bg-color, #ffffff);

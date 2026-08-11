@@ -10,6 +10,9 @@ from bot.constant.admin import (
     CB_ADMIN_EVENT_TOGGLE_PREFIX,
     CB_ADMIN_EVENTS,
     CB_ADMIN_FIND_PLAYER_START,
+    CB_ADMIN_GIVE_CARD_CARD_PREFIX,
+    CB_ADMIN_GIVE_CARD_PAGE_PREFIX,
+    CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX,
     CB_ADMIN_MANAGE_ADMINS,
     CB_ADMIN_MANAGE_FIND_PLAYER,
     CB_ADMIN_MASS_GRANT,
@@ -22,6 +25,7 @@ from bot.constant.admin import (
     CB_ADMIN_PLAYER_GIVE_CARD_PREFIX,
     CB_ADMIN_PLAYER_GIVE_COINS_PREFIX,
     CB_ADMIN_PLAYER_GIVE_DUST_PREFIX,
+    CB_ADMIN_PLAYER_VIEW_PREFIX,
     CB_ADMIN_PROMO,
     CB_ADMIN_PROMO_CREATE,
     CB_ADMIN_REFERRAL,
@@ -44,6 +48,8 @@ from bot.texts.admin import (
     BTN_ADMIN_FIND_PLAYER,
     BTN_ADMIN_MANAGE_ADMINS,
     BTN_ADMIN_MASS_GRANT,
+    BTN_ADMIN_PAGE_NEXT,
+    BTN_ADMIN_PAGE_PREV,
     BTN_ADMIN_PROMO,
     BTN_ADMIN_REFERRAL,
     BTN_ADMIN_SEASON,
@@ -151,6 +157,49 @@ def player_card_menu(*, user_id: int, is_banned: bool) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)],
         ]
     )
+
+
+def give_card_universe_menu(universes: list, *, user_id: int) -> InlineKeyboardMarkup:
+    """Шаг 1 выдачи карточки — выбор вселенной (см. CLAUDE.md, "Управление карточками:
+    выбор кнопками"). `universes` — list[Universe], тип не аннотирован явно, чтобы не тащить
+    модель в keyboards-слой лишним импортом (тот же принцип, что у events_menu)."""
+    rows = [
+        [InlineKeyboardButton(text=u.title, callback_data=f"{CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX}{u.code}")]
+        for u in universes
+    ]
+    rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=f"{CB_ADMIN_PLAYER_VIEW_PREFIX}{user_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def give_card_card_menu(cards: list, *, page: int, total_pages: int, user_id: int) -> InlineKeyboardMarkup:
+    """Шаг 2 — выбор конкретной карты по имени (уже отфильтрованной по вселенной и
+    постранично нарезанной вызывающим кодом, см. handlers/admin/admin.py). `cards` —
+    list[Card], аннотация та же причина, что у give_card_universe_menu выше."""
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=f"{card.name} ({card.base_ubp} UBP)", callback_data=f"{CB_ADMIN_GIVE_CARD_CARD_PREFIX}{card.id}"
+            )
+        ]
+        for card in cards
+    ]
+
+    nav_row = []
+    if page > 1:
+        nav_row.append(
+            InlineKeyboardButton(text=BTN_ADMIN_PAGE_PREV, callback_data=f"{CB_ADMIN_GIVE_CARD_PAGE_PREFIX}{page - 1}")
+        )
+    if page < total_pages:
+        nav_row.append(
+            InlineKeyboardButton(text=BTN_ADMIN_PAGE_NEXT, callback_data=f"{CB_ADMIN_GIVE_CARD_PAGE_PREFIX}{page + 1}")
+        )
+    if nav_row:
+        rows.append(nav_row)
+
+    # Назад — к списку вселенных (тот же экран, что открывает "🃏 Выдать карточку" в первый
+    # раз, переиспользуем без отдельной константы).
+    rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=f"{CB_ADMIN_PLAYER_GIVE_CARD_PREFIX}{user_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def season_menu() -> InlineKeyboardMarkup:
