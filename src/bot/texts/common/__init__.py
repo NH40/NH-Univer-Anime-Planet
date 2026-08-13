@@ -15,6 +15,7 @@ from bot.texts.common.common import (
     UNKNOWN_CALLBACK,
     UNKNOWN_MESSAGE,
     WELCOME,
+    WELCOME_BACK,
 )
 
 __all__ = [
@@ -34,4 +35,5 @@ __all__ = [
     "UNKNOWN_CALLBACK",
     "UNKNOWN_MESSAGE",
     "WELCOME",
+    "WELCOME_BACK",
 ]

@@ -12,7 +12,7 @@ from bot.db.repositories.user import get_by_id, set_referred_by, upsert_from_tel
 from bot.handlers.profile.profile import show_profile
 from bot.keyboards.common import main_menu
 from bot.services import referral as referral_service
-from bot.texts.common import WELCOME
+from bot.texts.common import WELCOME, WELCOME_BACK
 
 router = Router(name="start")
 
@@ -53,6 +53,11 @@ async def cmd_start(message: Message, command: CommandObject, session: AsyncSess
                 await set_referred_by(session, user_id=user_id, referrer_id=referrer_id)
 
     if is_returning:
+        # Отдельное сообщение с reply-клавиатурой ПЕРЕД карточкой профиля — на одном
+        # сообщении Telegram не даёт совместить inline (profile_menu, у самой карточки) и
+        # reply (main_menu) разметку, а /start обязан гарантированно вернуть игроку нижнюю
+        # клавиатуру, даже если клиент её потерял (см. CLAUDE.md).
+        await message.answer(WELCOME_BACK, reply_markup=main_menu())
         await show_profile(message, session, redis)
         return
     await message.answer(WELCOME, reply_markup=main_menu())
