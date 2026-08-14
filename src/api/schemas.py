@@ -29,6 +29,16 @@ class CardStackOut(BaseModel):
     image_url: str
 
 
+class CardStackPageOut(BaseModel):
+    """Постраничная выдача коллекции (см. CLAUDE.md, "Долгая загрузка карт в Mini App") —
+    `items` — одна страница стопок, `has_more` говорит фронтенду, есть ли смысл запрашивать
+    следующую (`offset` растёт на len(items) каждый раз, без отдельного COUNT-запроса —
+    см. db.repositories.inventory: страница читается limit+1 строкой, лишняя обрезается)."""
+
+    items: list[CardStackOut]
+    has_more: bool
+
+
 class UniverseProgressOut(BaseModel):
     code: str
     title: str

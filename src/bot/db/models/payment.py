@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from bot.db.base import Base
-from bot.db.models.enums import PaymentStatus
+from bot.db.models.enums import PaymentItemKind, PaymentStatus
 
 
 class Payment(Base):
@@ -20,7 +20,15 @@ class Payment(Base):
     telegram_payment_charge_id: Mapped[str] = mapped_column(String(64), unique=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
     amount_rub: Mapped[int] = mapped_column(Integer)
-    coins_amount: Mapped[int] = mapped_column(Integer)
+    # Nullable — заполняется только для item_kind=donate_coins (см. CLAUDE.md, "Магазин:
+    # слот капа тикетов"); покупки, не конвертируемые в коины, оставляют это поле пустым, а
+    # не 0 (0 неотличим от "начислили ноль коинов" по ошибке).
+    coins_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    item_kind: Mapped[PaymentItemKind] = mapped_column(
+        Enum(PaymentItemKind, name="payment_item_kind"),
+        default=PaymentItemKind.donate_coins,
+        server_default=PaymentItemKind.donate_coins.value,
+    )
     status: Mapped[PaymentStatus] = mapped_column(
         Enum(PaymentStatus, name="payment_status"), default=PaymentStatus.pending
     )

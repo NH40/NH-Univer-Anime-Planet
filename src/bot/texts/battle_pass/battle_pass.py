@@ -7,11 +7,17 @@ PASS_NO_SEASON = "Сейчас нет активного сезона."
 PASS_HEADER = (
     "🎫 <b>Сезонный пасс</b> — уровень <b>{level}</b>\n"
     "{bar} {percent}% ({have}/{need} до след. уровня)\n"
-    "{premium_status}\n\n"
+    "{premium_status}\n"
+    "{boost_line}\n\n"
     "Стр. {page}/{total_pages}. Жми на ячейку — заберёшь именно её награду.\n"
 )
 PASS_PREMIUM_ACTIVE = "💎 Премиум-ветка открыта"
 PASS_PREMIUM_LOCKED = "🔒 Премиум-ветка закрыта — купите Battle Pass"
+
+# Дневной буст прогресса (см. CLAUDE.md, "Сезонный пасс: 500 циклических уровней") — не
+# влияет на UBP сезона, только на скорость заполнения самого пасса. ×1 = квота на сегодня
+# исчерпана, показываем без "сброс через" интригующим множителем — просто когда обновится.
+PASS_BOOST_LINE = "🚀 Буст: ×{multiplier} ({used}/{cap} ур. сегодня, сброс через {countdown})"
 
 PASS_LEVEL_ICON_LOCKED = "🔒"
 PASS_LEVEL_ICON_CLAIMED = "✅"

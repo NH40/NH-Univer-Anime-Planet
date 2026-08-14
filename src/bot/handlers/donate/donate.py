@@ -3,7 +3,7 @@ from __future__ import annotations
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery
+from aiogram.types import CallbackQuery, LabeledPrice, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config.game import DONATE_MAX_RUB, DONATE_MIN_RUB
@@ -11,7 +11,6 @@ from bot.config.settings import get_settings
 from bot.constant.donate import CB_DONATE_CUSTOM, CB_DONATE_PRESET_PREFIX
 from bot.db.repositories.user import get_by_id
 from bot.keyboards.donate import donate_menu
-from bot.services import donate as donate_service
 from bot.states.donate import DonateStates
 from bot.texts.common import BTN_DONATE, NEED_START
 from bot.texts.donate import (
@@ -23,7 +22,6 @@ from bot.texts.donate import (
     DONATE_INVOICE_TITLE,
     DONATE_NOT_CONFIGURED,
     DONATE_SCREEN,
-    DONATE_SUCCESS,
 )
 
 router = Router(name="donate")
@@ -89,28 +87,3 @@ async def apply_custom_amount(message: Message, state: FSMContext, bot: Bot) -> 
 
     await state.clear()
     await _send_invoice(bot, message.chat.id, int(raw))
-
-
-@router.pre_checkout_query()
-async def handle_pre_checkout(pre_checkout_query: PreCheckoutQuery) -> None:
-    # Инвойс создаём только сами (см. _send_invoice) — сумма/валюта в нём уже валидны на
-    # момент создания, отдельная проверка "товар ещё в наличии" здесь не нужна (коины —
-    # не ограниченный ресурс). Отвечаем сразу, без похода в БД — важен SLA 10 секунд.
-    await pre_checkout_query.answer(ok=True)
-
-
-@router.message(F.successful_payment)
-async def handle_successful_payment(message: Message, session: AsyncSession) -> None:
-    payment = message.successful_payment
-    amount_rub = payment.total_amount // _KOPECKS_PER_RUB
-
-    coins = await donate_service.credit_payment(
-        session,
-        telegram_payment_charge_id=payment.telegram_payment_charge_id,
-        user_id=message.from_user.id,
-        amount_rub=amount_rub,
-    )
-    if coins is None:
-        # Повторная доставка апдейта от Telegram — уже начислено раньше, не начисляем второй раз.
-        return
-    await message.answer(DONATE_SUCCESS.format(coins=coins))

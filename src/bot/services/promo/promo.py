@@ -9,7 +9,7 @@ from bot.constant.admin import TRANSACTION_REASON_PROMO
 from bot.db.models.enums import PromoCodeType, TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import promocode as promo_repo
-from bot.db.repositories.user import add_coins, add_dust
+from bot.db.repositories.user import apply_coins_delta, apply_dust_delta
 from bot.services import ticket
 
 
@@ -82,11 +82,12 @@ async def create_promo(
     max_uses: int | None,
     expires_at: datetime | None,
     allowed_usernames: list[str] | None,
-    dust: int,
-    coins: int,
-    tickets: int,
+    reward: dict[str, int],
 ) -> None:
-    reward = {"dust": dust, "coins": coins, "tickets": tickets}
+    """`reward` — {"tickets"|"coins"|"dust": количество}, только заданные ключи (не всегда
+    все три, см. handlers/admin/promo.py — одна строка вида "coins:1000 tickets:5" вместо
+    прежних фиксированных 3 чисел). Количество может быть отрицательным — промокод-штраф
+    (см. CLAUDE.md, "Промокоды"), клампится к 0 при активации, не здесь."""
     ok = await promo_repo.create(
         session,
         code=code,
@@ -134,11 +135,13 @@ async def redeem(session: AsyncSession, *, code: str, user_id: int, username: st
     coins = int(reward.get("coins", 0))
     tickets = int(reward.get("tickets", 0))
 
+    # apply_*_delta/ticket.grant — оба знака (штрафной промокод даёт отрицательное
+    # количество, см. CLAUDE.md, "Промокоды"), баланс клампится к 0, не уходит в минус.
     if dust:
-        await add_dust(session, user_id=user_id, amount=dust)
+        await apply_dust_delta(session, user_id=user_id, delta=dust)
         session.add(Transaction(user_id=user_id, currency=TransactionCurrency.dust, amount=dust, reason=TRANSACTION_REASON_PROMO))
     if coins:
-        await add_coins(session, user_id=user_id, amount=coins)
+        await apply_coins_delta(session, user_id=user_id, delta=coins)
         session.add(Transaction(user_id=user_id, currency=TransactionCurrency.coins, amount=coins, reason=TRANSACTION_REASON_PROMO))
     if tickets:
         await ticket.grant(session, user_id, tickets)

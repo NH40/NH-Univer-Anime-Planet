@@ -105,7 +105,14 @@ NOT_AUTHORIZED = "Недостаточно прав."
 BTN_EXCHANGE_DUST = "✨ Пыль"
 BTN_EXCHANGE_TICKETS = "🎫 Тикеты"
 BTN_EXCHANGE_COINS = "💎 Коины"
-EXCHANGE_CHOOSE_CURRENCY = "🔄 <b>Обменник</b>\n\nЧто передать?"
+
+# Флоу переработан (2026-08-14): было "выбор валюты -> ввести @username и число текстом",
+# теперь "выбор игрока из списка -> выбор ресурса -> ввести только число" — не нужно помнить
+# username вручную, и на каждом шаге есть кнопка "Назад" (подтверждено пользователем).
+EXCHANGE_CHOOSE_MEMBER = "🔄 <b>Обменник</b>\n\nКому передать ресурс?"
+EXCHANGE_NO_MEMBERS = "В клане больше никого нет — обмениваться не с кем."
+EXCHANGE_CHOOSE_CURRENCY = "🔄 <b>Обменник</b> — {name}\n\nЧто передать?"
+EXCHANGE_TARGET_GONE = "Этот игрок уже не в вашем клане — выберите другого."
 
 # Родительный падеж множественного числа — одинаково подходит и для "количество {currency}",
 # и для "Передано {amount} {currency}" (см. CLAUDE.md, "Кланы" — обменник обобщён с пыли
@@ -113,10 +120,10 @@ EXCHANGE_CHOOSE_CURRENCY = "🔄 <b>Обменник</b>\n\nЧто переда�
 CURRENCY_NAMES_GENITIVE = {"dust": "пыли", "tickets": "тикетов", "coins": "коинов"}
 
 EXCHANGE_PROMPT = (
-    "Введите @username участника клана и количество {currency} через пробел.\n"
-    "Например: <code>@ivan 50</code>\n/cancel — отменить."
+    "Сколько {currency} передать игроку {name}?\n"
+    "Например: <code>50</code>\n/cancel — отменить."
 )
-EXCHANGE_INVALID = "Формат: @username количество (целое число больше 0)."
+EXCHANGE_INVALID = "Нужно целое число больше 0. Попробуйте ещё раз."
 EXCHANGE_NOT_IN_CLAN = "Этот игрок не в вашем клане."
 EXCHANGE_NOT_ENOUGH = "Не хватает {currency}: нужно {needed}."
 EXCHANGE_DONE = "✅ Передано {amount} {currency} игроку @{username}."

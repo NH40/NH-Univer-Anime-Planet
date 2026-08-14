@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.config.game import DONATE_COINS_PER_RUB, REFERRAL_DONATE_CUT_PERCENT
 from bot.constant.donate import TRANSACTION_REASON_DONATE
 from bot.constant.referral import TRANSACTION_REASON_REFERRAL_DONATE_CUT
-from bot.db.models.enums import TransactionCurrency
+from bot.db.models.enums import PaymentItemKind, TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import payment as payment_repo
 from bot.db.repositories.user import add_coins, get_by_id
@@ -32,6 +32,7 @@ async def credit_payment(
         telegram_payment_charge_id=telegram_payment_charge_id,
         user_id=user_id,
         amount_rub=amount_rub,
+        item_kind=PaymentItemKind.donate_coins,
         coins_amount=coins,
     )
     if not ok:

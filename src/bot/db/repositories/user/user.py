@@ -100,6 +100,25 @@ async def add_coins(session: AsyncSession, *, user_id: int, amount: int) -> None
     await session.execute(update(User).where(User.id == user_id).values(coins=User.coins + amount))
 
 
+async def apply_dust_delta(session: AsyncSession, *, user_id: int, delta: int) -> int:
+    """Начисляет ИЛИ списывает пыль — `delta` может быть отрицательным (промокод-штраф, см.
+    CLAUDE.md, "Промокоды"), не уходя ниже 0. В отличие от `add_dust` (всегда прибавляет) и
+    `spend_dust` (требует, чтобы хватало, иначе не списывает вовсе) — здесь недостачи не
+    бывает, баланс просто клампится к нулю. Не коммитит. Возвращает новый баланс."""
+    result = await session.execute(
+        update(User).where(User.id == user_id).values(dust=func.greatest(User.dust + delta, 0)).returning(User.dust)
+    )
+    return result.scalar_one()
+
+
+async def apply_coins_delta(session: AsyncSession, *, user_id: int, delta: int) -> int:
+    """Как apply_dust_delta, но для коинов. Не коммитит."""
+    result = await session.execute(
+        update(User).where(User.id == user_id).values(coins=func.greatest(User.coins + delta, 0)).returning(User.coins)
+    )
+    return result.scalar_one()
+
+
 _EXTEND_SUBSCRIPTION_SQL = text(
     """
     UPDATE users
@@ -119,6 +138,45 @@ async def extend_subscription(session: AsyncSession, *, user_id: int, days: int)
     если он ещё NULL (первая подписка вообще), чтобы продление уже активной подписки не
     сбрасывало таймер суточного начисления тикетов (см. CLAUDE.md, "Подписка"). Не коммитит."""
     result = await session.execute(_EXTEND_SUBSCRIPTION_SQL, {"user_id": user_id, "days": days})
+    return result.scalar_one()
+
+
+async def grant_ticket_cap_permanent_bonus(session: AsyncSession, *, user_id: int, amount: int) -> int:
+    """+amount к перманентному слоту капа тикетов (см. CLAUDE.md, "Магазин: слот капа
+    тикетов") — простой стакающийся счётчик, действует навсегда. Не коммитит. Возвращает
+    новое значение."""
+    result = await session.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(ticket_cap_permanent_bonus=User.ticket_cap_permanent_bonus + amount)
+        .returning(User.ticket_cap_permanent_bonus)
+    )
+    return result.scalar_one()
+
+
+_GRANT_TICKET_CAP_SEASONAL_SQL = text(
+    """
+    UPDATE users
+    SET ticket_cap_seasonal_bonus = CASE
+            WHEN ticket_cap_seasonal_season_id = :season_id THEN ticket_cap_seasonal_bonus + :amount
+            ELSE :amount
+        END,
+        ticket_cap_seasonal_season_id = :season_id
+    WHERE id = :user_id
+    RETURNING ticket_cap_seasonal_bonus
+    """
+)
+
+
+async def grant_ticket_cap_seasonal_bonus(session: AsyncSession, *, user_id: int, season_id: int, amount: int) -> int:
+    """+amount к сезонному слоту капа тикетов ТЕКУЩЕГО сезона. Если у игрока уже был
+    сезонный бонус в ЭТОМ ЖЕ сезоне — складывается; если бонус остался от ПРОШЛОГО сезона
+    (`ticket_cap_seasonal_season_id` не совпадает) — начинается заново с `amount`, а не
+    складывается со старым значением (то всё равно уже не учитывалось в капе, см.
+    services/ticket — сравнение season_id там же). Не коммитит. Возвращает новое значение."""
+    result = await session.execute(
+        _GRANT_TICKET_CAP_SEASONAL_SQL, {"user_id": user_id, "season_id": season_id, "amount": amount}
+    )
     return result.scalar_one()
 
 

@@ -1,66 +1,42 @@
-import { PartyPopper, Star } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { Loader2, PartyPopper, Star } from 'lucide-react'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import type { CardStack, Universe } from '../api'
 import { TIER_INFO } from '../config'
 import { EVENTS_TAB_CODE } from '../constants'
-
-// Рендерим карточки порциями по BATCH_SIZE вместо всей коллекции разом — по жалобе
-// пользователя 2026-08-11 на медленную загрузку картинок/переключение вселенных. Сама
-// коллекция по-прежнему приходит с API целиком (нужна для поиска/фильтра по ВСЕЙ
-// коллекции, не только по загруженной части) — порционим только КОЛИЧЕСТВО отрисованных
-// <img>, подгружая следующую порцию через IntersectionObserver на сентинеле внизу сетки.
-const BATCH_SIZE = 30
+import { useCollection } from '../hooks/useCollection'
 
 export function CollectionPage({
 	universes,
 	selectedUniverse,
 	onSelectUniverse,
-	cards,
 	onOpenCard,
 }: {
 	universes: Universe[]
 	selectedUniverse: string | null
 	onSelectUniverse: (code: string) => void
-	cards: CardStack[]
 	onOpenCard: (card: CardStack) => void
 }) {
 	const [search, setSearch] = useState('')
 	const [tierFilter, setTierFilter] = useState<number | 'all'>('all')
-	const [visibleCount, setVisibleCount] = useState(BATCH_SIZE)
+	const { cards, hasMore, loading, loadMore } = useCollection(selectedUniverse, search, tierFilter)
 	const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-	const visibleCards = useMemo(() => {
-		const query = search.trim().toLowerCase()
-		return cards.filter((card) => {
-			if (tierFilter !== 'all' && card.base_ubp !== tierFilter) return false
-			if (query && !card.name.toLowerCase().includes(query)) return false
-			return true
-		})
-	}, [cards, search, tierFilter])
-
-	// Новая вселенная/поиск/фильтр — начинаем показ заново с первой порции.
-	useEffect(() => {
-		setVisibleCount(BATCH_SIZE)
-	}, [cards, search, tierFilter])
-
-	const renderedCards = visibleCards.slice(0, visibleCount)
-	const hasMore = visibleCount < visibleCards.length
-
+	// Пагинация по скроллу — сентинел внизу сетки подгружает следующую порцию карт с
+	// сервера (см. hooks/useCollection), а не рендерит уже загруженное быстрее.
 	useEffect(() => {
 		if (!hasMore) return
 		const sentinel = sentinelRef.current
 		if (!sentinel) return
 		const observer = new IntersectionObserver(
 			(entries) => {
-				if (entries[0]?.isIntersecting) {
-					setVisibleCount((count) => count + BATCH_SIZE)
-				}
+				if (entries[0]?.isIntersecting) loadMore()
 			},
 			{ rootMargin: '400px' },
 		)
 		observer.observe(sentinel)
 		return () => observer.disconnect()
-	}, [hasMore])
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [hasMore, selectedUniverse, search, tierFilter])
 
 	return (
 		<>
@@ -117,12 +93,12 @@ export function CollectionPage({
 						</select>
 					</div>
 
-					{visibleCards.length === 0 ? (
+					{cards.length === 0 && !loading ? (
 						<div class='empty'>Ничего не найдено.</div>
 					) : (
 						<>
 							<div class='grid'>
-								{renderedCards.map((card) => {
+								{cards.map((card) => {
 									const tier = TIER_INFO[card.base_ubp]
 									return (
 										<button
@@ -145,6 +121,11 @@ export function CollectionPage({
 									)
 								})}
 							</div>
+							{loading && (
+								<div class='grid-loading'>
+									<Loader2 size={18} class='spin' />
+								</div>
+							)}
 							{hasMore && <div ref={sentinelRef} class='grid-sentinel' />}
 						</>
 					)}

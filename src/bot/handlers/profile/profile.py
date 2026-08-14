@@ -15,7 +15,6 @@ from bot.config.game import (
     REFERRAL_ROLL_REWARD_COINS,
     REFERRAL_ROLL_REWARD_TICKETS,
     REFERRAL_ROLL_THRESHOLD,
-    TICKET_NATURAL_CAP,
 )
 from bot.config.settings import get_settings
 from bot.constant.profile import (
@@ -58,7 +57,7 @@ from bot.texts.profile import (
     TOP_HEADER,
     TOP_LINE,
 )
-from bot.utils.formatting import esc, format_countdown, progress_bar
+from bot.utils.formatting import esc, format_countdown, format_number, progress_bar
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="profile")
@@ -67,11 +66,12 @@ PLAYERS_PAGE_SIZE = 20
 
 
 def _tickets_line(status: ticket.TicketStatus) -> str:
+    # status.cap — эффективный потолок ЭТОГО игрока (TICKET_NATURAL_CAP + купленные слоты
+    # капа, см. CLAUDE.md, "Магазин: слот капа тикетов"), не глобальная константа.
+    count, cap = format_number(status.count), format_number(status.cap)
     if status.seconds_until_next is None:
-        return TICKETS_LINE_READY.format(count=status.count, cap=TICKET_NATURAL_CAP)
-    return TICKETS_LINE_COUNTDOWN.format(
-        count=status.count, cap=TICKET_NATURAL_CAP, time=format_countdown(status.seconds_until_next)
-    )
+        return TICKETS_LINE_READY.format(count=count, cap=cap)
+    return TICKETS_LINE_COUNTDOWN.format(count=count, cap=cap, time=format_countdown(status.seconds_until_next))
 
 
 def _progress_block(progress: list[UniverseProgress]) -> str:
@@ -79,7 +79,11 @@ def _progress_block(progress: list[UniverseProgress]) -> str:
         return PROGRESS_EMPTY
     lines = "".join(
         PROGRESS_LINE.format(
-            universe=esc(p.title), bar=progress_bar(p.percent), percent=p.percent, owned=p.owned, total=p.total
+            universe=esc(p.title),
+            bar=progress_bar(p.percent),
+            percent=p.percent,
+            owned=format_number(p.owned),
+            total=format_number(p.total),
         )
         for p in progress
     )
@@ -103,13 +107,13 @@ async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> 
         username=f"@{esc(user.username)}" if user.username else NO_USERNAME,
         clan=esc(clan_name) if clan_name else NO_CLAN,
         divider=DIVIDER,
-        ubp_season=user.ubp_season,
-        rank=rank if rank else NO_RANK,
-        ubp_total=user.ubp_total,
+        ubp_season=format_number(user.ubp_season),
+        rank=format_number(rank) if rank else NO_RANK,
+        ubp_total=format_number(user.ubp_total),
         tickets_line=_tickets_line(ticket_status),
-        total_rolls=user.total_rolls,
-        dust=user.dust,
-        coins=user.coins,
+        total_rolls=format_number(user.total_rolls),
+        dust=format_number(user.dust),
+        coins=format_number(user.coins),
         progress=_progress_block(progress),
     )
 
@@ -162,16 +166,16 @@ async def cb_referrals(callback: CallbackQuery, session: AsyncSession, bot: Bot)
         callback.message,
         REFERRALS_SCREEN.format(
             link=link,
-            invited=stats.invited,
-            playing=stats.playing,
-            donors=stats.donors,
-            subscribers=stats.subscribers,
-            battle_pass_owners=stats.battle_pass_owners,
-            coins_earned=stats.coins_earned,
-            tickets_earned=stats.tickets_earned,
-            reward_coins=REFERRAL_ROLL_REWARD_COINS,
-            reward_tickets=REFERRAL_ROLL_REWARD_TICKETS,
-            threshold=REFERRAL_ROLL_THRESHOLD,
+            invited=format_number(stats.invited),
+            playing=format_number(stats.playing),
+            donors=format_number(stats.donors),
+            subscribers=format_number(stats.subscribers),
+            battle_pass_owners=format_number(stats.battle_pass_owners),
+            coins_earned=format_number(stats.coins_earned),
+            tickets_earned=format_number(stats.tickets_earned),
+            reward_coins=format_number(REFERRAL_ROLL_REWARD_COINS),
+            reward_tickets=format_number(REFERRAL_ROLL_REWARD_TICKETS),
+            threshold=format_number(REFERRAL_ROLL_THRESHOLD),
             cut_percent=REFERRAL_DONATE_CUT_PERCENT,
         ),
         reply_markup=back_to_profile(),
@@ -210,7 +214,7 @@ async def cmd_top(message: Message, session: AsyncSession, redis: Redis) -> None
 
     users = await get_many_by_ids(session, [uid for uid, _ in top])
     lines = "".join(
-        TOP_LINE.format(place=i + 1, name=esc(users[uid].display_name or "—"), ubp=ubp)
+        TOP_LINE.format(place=i + 1, name=esc(users[uid].display_name or "—"), ubp=format_number(ubp))
         for i, (uid, ubp) in enumerate(top)
         if uid in users
     )
@@ -238,7 +242,7 @@ async def _render_players_page(session: AsyncSession, redis: Redis, page: int) -
             place=start + i + 1,
             name=esc(users[uid].display_name or "—"),
             username=esc(users[uid].username) if users[uid].username else "—",
-            ubp=ubp,
+            ubp=format_number(ubp),
         )
         for i, (uid, ubp) in enumerate(rows)
         if uid in users

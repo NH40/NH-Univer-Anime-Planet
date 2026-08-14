@@ -36,6 +36,13 @@ def description_block(description: str | None, *, fallback: str) -> str:
     return f"<blockquote expandable>{esc(text)}</blockquote>"
 
 
+def format_number(value: int) -> str:
+    """Разделяет разряды запятыми (2000000 -> "2,000,000") — большие числа (UBP, топы,
+    коины клана и т.п.) иначе сливаются в нечитаемую цепочку цифр (см. запрос
+    пользователя 2026-08-14: профиль/топы/клан)."""
+    return f"{value:,}"
+
+
 def format_countdown(total_seconds: int) -> str:
     """MM:SS, а часы добавляются спереди (H:MM:SS) только когда больше 59 минут — иначе
     таймер вроде "112:58" (тикеты) или "1439:59" (ежедневный бонус) читается плохо

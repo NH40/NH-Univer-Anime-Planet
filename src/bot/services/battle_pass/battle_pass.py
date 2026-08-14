@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from bot.config.game import (
     battle_pass_premium_reward,
 )
 from bot.constant.battle_pass import TRACK_FREE, TRACK_PREMIUM, TRANSACTION_REASON_PASS_FREE, TRANSACTION_REASON_PASS_PREMIUM
+from bot.db.models.battle_pass import BattlePass
 from bot.db.models.enums import TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import battle_pass as pass_repo
@@ -216,6 +217,39 @@ async def add_progress(session: AsyncSession, *, user_id: int, season_id: int, r
 
 
 @dataclass
+class BoostStatus:
+    """Только для отображения (см. CLAUDE.md, "Mini App: редизайн"/дневной буст) — сама
+    логика расчёта и продвижения буста живёт в add_progress(), эта функция её не
+    повторяет, только читает уже посчитанные boost_levels_used_today/boost_date той же
+    лениво-сбрасываемой логикой (используется ЛЕНИВОЕ обнуление "used_today", если
+    boost_date не сегодня — точная копия того, что уже делает add_progress)."""
+
+    multiplier: int
+    used_today: int
+    cap: int
+    seconds_until_reset: int
+
+
+def _boost_status_from_row(row: BattlePass) -> BoostStatus:
+    today = datetime.now(timezone.utc).date()
+    used_today = row.boost_levels_used_today if row.boost_date == today else 0
+    multiplier = battle_pass_boost_multiplier(used_today)
+    tomorrow = datetime.combine(today + timedelta(days=1), time.min, tzinfo=timezone.utc)
+    seconds_until_reset = int((tomorrow - datetime.now(timezone.utc)).total_seconds())
+    return BoostStatus(
+        multiplier=multiplier, used_today=used_today, cap=_DAILY_BOOST_CAP, seconds_until_reset=max(0, seconds_until_reset)
+    )
+
+
+async def get_boost_status(session: AsyncSession, *, user_id: int, season_id: int) -> BoostStatus:
+    """Read-only статус дневного буста — для экранов, которым не нужна вся `list_levels()`
+    целиком (сейчас используется только там же, но вынесено отдельно на случай других
+    точек входа, см. CLAUDE.md)."""
+    row = await pass_repo.get_or_create(session, user_id=user_id, season_id=season_id)
+    return _boost_status_from_row(row)
+
+
+@dataclass
 class LevelEntry:
     level: int  # абсолютный номер уровня (растёт бесконечно, награда циклится по позиции)
     free_dust: int
@@ -243,6 +277,7 @@ class LevelsPage:
     # странице, а не на той, что сейчас отрисована.
     claimed_free_level: int
     claimed_premium_level: int
+    boost: BoostStatus
 
 
 def _circle_offset(current_level: int) -> int:
@@ -331,6 +366,7 @@ async def list_levels(
         level_ceiling=battle_pass_cumulative(current_level + 1),
         claimed_free_level=row.claimed_free_level,
         claimed_premium_level=row.claimed_premium_level,
+        boost=_boost_status_from_row(row),
     )
 
 

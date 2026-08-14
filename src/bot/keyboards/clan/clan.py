@@ -14,6 +14,7 @@ from bot.constant.clan import (
     CB_CLAN_EDIT_IMAGE,
     CB_CLAN_EDIT_NAME,
     CB_CLAN_EXCHANGE_CURRENCY_PREFIX,
+    CB_CLAN_EXCHANGE_MEMBER_PREFIX,
     CB_CLAN_EXCHANGE_START,
     CB_CLAN_FIND,
     CB_CLAN_FIND_PAGE_PREFIX,
@@ -89,16 +90,51 @@ def no_clan_menu(*, invite_count: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def exchange_currency_menu() -> InlineKeyboardMarkup:
-    """Шаг выбора валюты перед вводом @username/суммы (см. CLAUDE.md, "Кланы" — обменник
-    обобщён с пыли на пыль/тикеты/коины). Суффикс callback'а — значение TransactionCurrency
-    (см. handlers/clan/exchange.py: cb_exchange_currency)."""
+def exchange_member_menu(members: list[tuple[int, str]]) -> InlineKeyboardMarkup:
+    """Шаг 1 обменника — выбор игрока из списка участников клана, а не ввод @username
+    текстом (см. CLAUDE.md, "Кланы" — редизайн обменника 2026-08-14). members — (user_id,
+    display_name), без самого отправителя."""
+    rows = [
+        [InlineKeyboardButton(text=name, callback_data=f"{CB_CLAN_EXCHANGE_MEMBER_PREFIX}{uid}")]
+        for uid, name in members
+    ]
+    rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_OPEN)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def exchange_currency_menu(target_user_id: int) -> InlineKeyboardMarkup:
+    """Шаг 2 обменника — выбор ресурса для уже выбранного игрока. Суффикс callback'а —
+    "{target_user_id}:{currency}" (см. handlers/clan/exchange.py: cb_exchange_currency).
+    "Назад" возвращает на шаг 1 (список игроков)."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=BTN_EXCHANGE_DUST, callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}dust")],
-            [InlineKeyboardButton(text=BTN_EXCHANGE_TICKETS, callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}tickets")],
-            [InlineKeyboardButton(text=BTN_EXCHANGE_COINS, callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}coins")],
-            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_OPEN)],
+            [
+                InlineKeyboardButton(
+                    text=BTN_EXCHANGE_DUST, callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}{target_user_id}:dust"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=BTN_EXCHANGE_TICKETS,
+                    callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}{target_user_id}:tickets",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=BTN_EXCHANGE_COINS, callback_data=f"{CB_CLAN_EXCHANGE_CURRENCY_PREFIX}{target_user_id}:coins"
+                )
+            ],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_EXCHANGE_START)],
+        ]
+    )
+
+
+def exchange_amount_menu(target_user_id: int) -> InlineKeyboardMarkup:
+    """Шаг 3 (ожидание числа текстом) — единственная кнопка "Назад", на шаг 2 (выбор
+    ресурса) для того же игрока."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=f"{CB_CLAN_EXCHANGE_MEMBER_PREFIX}{target_user_id}")]
         ]
     )
 

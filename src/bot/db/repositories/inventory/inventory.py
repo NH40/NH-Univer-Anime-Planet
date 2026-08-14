@@ -110,6 +110,71 @@ async def list_owned_stacks_in_event_universes(session: AsyncSession, user_id: i
     return [OwnedStack(card=card, stars=stars, quantity=qty) for card, stars, qty in result.all()]
 
 
+async def list_owned_stacks_in_universe_page(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    universe_code: str,
+    offset: int,
+    limit: int,
+    search: str | None = None,
+    tier: int | None = None,
+) -> tuple[list[OwnedStack], bool]:
+    """Постраничная версия list_owned_stacks_in_universe — для Mini App (см. CLAUDE.md,
+    "Долгая загрузка карт"): игрок листает вниз, каждая порция — отдельный запрос, а не вся
+    коллекция сразу. `LIMIT limit+1` вместо отдельного COUNT-запроса — если пришло на одну
+    строку больше запрошенного, значит есть ещё, лишняя строка обрезается и превращается в
+    has_more=True (правило 3 — минимум запросов). search/tier — тот же фильтр, что раньше
+    делал фронтенд на уже загруженном массиве, теперь на стороне SQL, иначе поиск видел бы
+    только то, что успело подгрузиться."""
+    stmt = (
+        select(Card, UserCard.stars, UserCard.quantity)
+        .join(UserCard, UserCard.card_id == Card.id)
+        .where(Card.universe_code == universe_code, UserCard.user_id == user_id, UserCard.quantity > 0)
+    )
+    if search:
+        stmt = stmt.where(Card.name.ilike(f"%{search}%"))
+    if tier is not None:
+        stmt = stmt.where(Card.base_ubp == tier)
+    stmt = stmt.order_by(Card.base_ubp.desc(), Card.external_id, UserCard.stars).offset(offset).limit(limit + 1)
+
+    result = await session.execute(stmt)
+    rows = result.all()
+    has_more = len(rows) > limit
+    return [OwnedStack(card=card, stars=stars, quantity=qty) for card, stars, qty in rows[:limit]], has_more
+
+
+async def list_owned_stacks_in_event_universes_page(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    offset: int,
+    limit: int,
+    search: str | None = None,
+    tier: int | None = None,
+) -> tuple[list[OwnedStack], bool]:
+    """Постраничная версия list_owned_stacks_in_event_universes — см.
+    list_owned_stacks_in_universe_page, тот же LIMIT limit+1 приём."""
+    from bot.db.models.universe import Universe
+
+    stmt = (
+        select(Card, UserCard.stars, UserCard.quantity)
+        .join(UserCard, UserCard.card_id == Card.id)
+        .join(Universe, Universe.code == Card.universe_code)
+        .where(Universe.is_event.is_(True), UserCard.user_id == user_id, UserCard.quantity > 0)
+    )
+    if search:
+        stmt = stmt.where(Card.name.ilike(f"%{search}%"))
+    if tier is not None:
+        stmt = stmt.where(Card.base_ubp == tier)
+    stmt = stmt.order_by(Card.external_id, UserCard.stars).offset(offset).limit(limit + 1)
+
+    result = await session.execute(stmt)
+    rows = result.all()
+    has_more = len(rows) > limit
+    return [OwnedStack(card=card, stars=stars, quantity=qty) for card, stars, qty in rows[:limit]], has_more
+
+
 @dataclass
 class UniverseProgress:
     code: str
@@ -194,3 +259,40 @@ async def decrement_to(
         {"user_id": user_id, "card_id": card_id, "stars": stars, "target": target},
     )
     return result.scalar_one_or_none()
+
+
+_DISTILL_ALL_OWNED_SQL = text(
+    """
+    WITH locked AS (
+        SELECT user_id, card_id, stars, quantity FROM user_cards
+        WHERE user_id = :user_id AND quantity > :target
+        FOR UPDATE
+    ), updated AS (
+        UPDATE user_cards uc
+        SET quantity = :target
+        FROM locked l
+        WHERE uc.user_id = l.user_id AND uc.card_id = l.card_id AND uc.stars = l.stars
+        RETURNING uc.card_id, uc.stars, (l.quantity - :target) AS dusted_qty
+    )
+    SELECT COALESCE(
+        SUM(updated.dusted_qty * (c.base_ubp / :divisor) * POWER(:copies, updated.stars - 1))::bigint,
+        0
+    )
+    FROM updated
+    JOIN cards c ON c.id = updated.card_id
+    """
+)
+
+
+async def distill_all_owned(session: AsyncSession, *, user_id: int, target: int, divisor: int, copies: int) -> int:
+    """Балк-распыление ВСЕЙ коллекции игрока (все вселенные + ивент-карты) одним атомарным
+    запросом — без Python-цикла по стопкам (правило 3, см. CLAUDE.md). `target` — 1
+    (оставить дубликаты по 1 копии) или 0 (распылить под ноль). `divisor`/`copies` —
+    DUST_DIVISOR/MERGE_COPIES_REQUIRED из config.game, переданные вызывающим сервисом
+    (репозиторий формулу пыли не знает, как и остальные repositories/*). Не коммитит.
+    Возвращает суммарную начисленную пыль (0, если распылять было нечего — не ошибка)."""
+    result = await session.execute(
+        _DISTILL_ALL_OWNED_SQL,
+        {"user_id": user_id, "target": target, "divisor": divisor, "copies": copies},
+    )
+    return result.scalar_one()

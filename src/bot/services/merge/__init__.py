@@ -1,17 +1,19 @@
 from bot.services.merge.merge import (
     CardNotFoundError,
-    MergeResult,
+    InvalidTargetError,
+    MergeSummary,
     NoActiveSeasonError,
     NotEnoughCopiesError,
-    merge_all,
-    merge_stack,
+    merge_all_to_max_in_universe,
+    merge_to_target,
 )
 
 __all__ = [
     "CardNotFoundError",
-    "MergeResult",
+    "InvalidTargetError",
+    "MergeSummary",
     "NoActiveSeasonError",
     "NotEnoughCopiesError",
-    "merge_all",
-    "merge_stack",
+    "merge_all_to_max_in_universe",
+    "merge_to_target",
 ]

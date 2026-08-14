@@ -11,6 +11,8 @@ from bot.constant.deck import (
     CB_DECK_OPEN,
     CB_DECK_ROLL1,
 )
+from bot.constant.dust import CB_DUST_OPEN
+from bot.constant.merge import CB_MERGE_OPEN
 from bot.db.models.card import Card
 from bot.texts.common import BTN_BACK, BTN_COLLECTION_APP
 from bot.texts.deck import (
@@ -36,10 +38,10 @@ def deck_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=BTN_CHANCES, callback_data=CB_DECK_CHANCES),
         ],
         [
-            # Распыление и слияние живут внутри "Коллекции" (выбор конкретной стопки
-            # карт), а не отдельными плоскими флоу — см. handlers/collection.
-            InlineKeyboardButton(text=BTN_DISENCHANT, callback_data=CB_DECK_COLLECTION),
-            InlineKeyboardButton(text=BTN_MERGE, callback_data=CB_DECK_COLLECTION),
+            # Слияние и распыление — отдельные флоу от "Коллекции" (та осталась чисто
+            # просмотровой), см. CLAUDE.md и handlers/merge, handlers/dust.
+            InlineKeyboardButton(text=BTN_DISENCHANT, callback_data=CB_DUST_OPEN),
+            InlineKeyboardButton(text=BTN_MERGE, callback_data=CB_MERGE_OPEN),
         ],
     ]
     if mini_app_url:

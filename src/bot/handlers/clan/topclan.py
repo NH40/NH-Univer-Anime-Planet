@@ -10,6 +10,7 @@ from bot.handlers.clan.clan import CLAN_PAGE_SIZE
 from bot.keyboards.clan import topclan_menu
 from bot.services import clan as clan_service
 from bot.texts.clan import FIND_CLANS_EMPTY, FIND_CLANS_LINE, TOPCLAN_HEADER, TOPCLAN_MODE_SEASON, TOPCLAN_MODE_TOTAL
+from bot.utils.formatting import format_number
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="topclan")
@@ -25,7 +26,7 @@ async def _render_topclan(session: AsyncSession, page: int, by_total: bool) -> t
 
     offset = page * CLAN_PAGE_SIZE
     lines = "".join(
-        FIND_CLANS_LINE.format(place=offset + i + 1, name=clan.name, ubp=ubp, members=cnt)
+        FIND_CLANS_LINE.format(place=offset + i + 1, name=clan.name, ubp=format_number(ubp), members=cnt)
         for i, (clan, ubp, cnt) in enumerate(rows)
     )
     text = TOPCLAN_HEADER.format(mode=mode, page=page + 1, total_pages=total_pages) + lines

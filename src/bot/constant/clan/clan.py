@@ -38,6 +38,7 @@ CB_CLAN_EDIT_DESCRIPTION = "clan:edit_description"
 CB_CLAN_EDIT_IMAGE = "clan:edit_image"
 
 CB_CLAN_EXCHANGE_START = "clan:exchange_start"
+CB_CLAN_EXCHANGE_MEMBER_PREFIX = "clan:exchange_member:"
 CB_CLAN_EXCHANGE_CURRENCY_PREFIX = "clan:exchange_currency:"
 
 CB_CLAN_WAR = "clan:war"

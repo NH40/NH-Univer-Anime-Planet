@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
-from bot.config.game import TICKET_NATURAL_CAP, TIER_CHANCE_PERCENT
+from bot.config.game import TIER_CHANCE_PERCENT
 from bot.config.settings import get_settings
 from bot.constant.deck import (
     CB_DECK_CHANCES,
@@ -72,11 +72,11 @@ async def _render_deck(session: AsyncSession, user_id: int) -> tuple[str, object
         return NO_UNIVERSE_SELECTED, None
 
     universe = await get_universe(session, user.universe_selected)
-    tickets = await ticket.get_balance(session, user_id)
-    await session.commit()  # get_balance могла применить лениво накопленный реген
+    ticket_status = await ticket.get_status(session, user_id)
+    await session.commit()  # get_status могла применить лениво накопленный реген
 
     text = DECK_SCREEN.format(
-        universe=esc(universe.title), tickets=tickets, cap=TICKET_NATURAL_CAP, dust=user.dust
+        universe=esc(universe.title), tickets=ticket_status.count, cap=ticket_status.cap, dust=user.dust
     )
     settings = get_settings()
     return text, deck_menu(mini_app_url=settings.mini_app_url or None)
@@ -138,7 +138,11 @@ async def cb_roll1(callback: CallbackQuery, session: AsyncSession, redis: Redis)
             )
             return
         except NotEnoughTicketsError as exc:
-            await callback.message.answer(NOT_ENOUGH_TICKETS.format(needed=exc.needed, cap=TICKET_NATURAL_CAP))
+            # Не хватило тикетов — ticket.spend() ничего не изменила (0 затронутых строк),
+            # безопасно сразу перечитать статус тем же session для актуального капа игрока.
+            status = await ticket.get_status(session, user_id)
+            await session.commit()
+            await callback.message.answer(NOT_ENOUGH_TICKETS.format(needed=exc.needed, cap=status.cap))
             return
 
         universe = await get_universe(session, user.universe_selected)

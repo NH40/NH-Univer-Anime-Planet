@@ -19,16 +19,8 @@ export function App() {
 	const [selectedCard, setSelectedCard] = useState<CardStack | null>(null)
 	const [appError, setAppError] = useState<string | null>(null)
 
-	const {
-		profile,
-		universes,
-		progress,
-		selectedUniverse,
-		setSelectedUniverse,
-		cards,
-		loading,
-		error,
-	} = useAppData()
+	const { profile, universes, progress, selectedUniverse, setSelectedUniverse, loading, error } =
+		useAppData()
 	const battlePass = useBattlePass(location === ROUTE_BATTLE_PASS, setAppError)
 
 	useEffect(() => {
@@ -39,8 +31,9 @@ export function App() {
 	}, [])
 
 	// Карточка — оверлей поверх текущего маршрута, а не отдельный роут (нет отдельного
-	// API "карточка по id", она берётся из уже загруженного cards). Смена маршрута
-	// (клик по NavTabs) закрывает её сама собой, открытие карточки маршрут не меняет.
+	// API "карточка по id" — объект передаётся напрямую из уже отрисованной карточки в
+	// CollectionPage). Смена маршрута (клик по NavTabs) закрывает её сама собой, открытие
+	// карточки маршрут не меняет.
 	useEffect(() => {
 		setSelectedCard(null)
 	}, [location])
@@ -124,7 +117,6 @@ export function App() {
 								universes={universes}
 								selectedUniverse={selectedUniverse}
 								onSelectUniverse={setSelectedUniverse}
-								cards={cards}
 								onOpenCard={setSelectedCard}
 							/>
 						</Route>

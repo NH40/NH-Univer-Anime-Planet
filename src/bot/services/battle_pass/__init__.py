@@ -1,4 +1,5 @@
 from bot.services.battle_pass.battle_pass import (
+    BoostStatus,
     ClaimAllResult,
     LevelAlreadyClaimedError,
     LevelEntry,
@@ -12,6 +13,7 @@ from bot.services.battle_pass.battle_pass import (
     add_progress,
     claim_all,
     claim_level,
+    get_boost_status,
     is_premium,
     list_levels,
     page_for_level,
@@ -19,6 +21,7 @@ from bot.services.battle_pass.battle_pass import (
 
 __all__ = [
     "LEVELS_PER_PAGE",
+    "BoostStatus",
     "ClaimAllResult",
     "LevelAlreadyClaimedError",
     "LevelEntry",
@@ -31,6 +34,7 @@ __all__ = [
     "add_progress",
     "claim_all",
     "claim_level",
+    "get_boost_status",
     "is_premium",
     "list_levels",
     "page_for_level",

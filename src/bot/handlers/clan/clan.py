@@ -64,6 +64,7 @@ from bot.texts.clan import (
     RANK_NAME,
 )
 from bot.texts.common import BTN_CLAN, NEED_START
+from bot.utils.formatting import format_number
 from bot.utils.notify import notify
 from bot.utils.safe_edit import safe_edit_text
 
@@ -79,8 +80,8 @@ def _clan_card_text(view: clan_service.ClanView, owner) -> str:
         description=(view.clan.description + "\n") if view.clan.description else NO_DESCRIPTION,
         member_count=view.member_count,
         max_members=MAX_CLAN_MEMBERS,
-        ubp_season=view.ubp_season,
-        ubp_total=view.ubp_total,
+        ubp_season=format_number(view.ubp_season),
+        ubp_total=format_number(view.ubp_total),
         owner_name=owner.display_name if owner else "—",
     )
 
@@ -164,7 +165,7 @@ async def _render_find_page(session: AsyncSession, page: int) -> tuple[str, Inli
 
     offset = page * CLAN_PAGE_SIZE
     lines = "".join(
-        FIND_CLANS_LINE.format(place=offset + i + 1, name=clan.name, ubp=ubp, members=cnt)
+        FIND_CLANS_LINE.format(place=offset + i + 1, name=clan.name, ubp=format_number(ubp), members=cnt)
         for i, (clan, ubp, cnt) in enumerate(rows)
     )
     text = FIND_CLANS_HEADER.format(page=page + 1, total_pages=total_pages) + lines

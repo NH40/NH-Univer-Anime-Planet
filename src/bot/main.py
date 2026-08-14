@@ -15,6 +15,7 @@ from bot.db.session import make_engine, make_session_factory
 from bot.handlers import get_routers
 from bot.logging_setup import setup_logging
 from bot.middlewares.ban_check import BanCheckMiddleware
+from bot.middlewares.command_state_reset import CommandStateResetMiddleware
 from bot.middlewares.db_session import DbSessionMiddleware
 from bot.middlewares.tech_mode import TechModeMiddleware
 from bot.middlewares.throttling import ThrottlingMiddleware
@@ -59,6 +60,7 @@ async def main() -> None:
     db_mw = DbSessionMiddleware(session_factory)
     tech_mw = TechModeMiddleware(redis, settings.admin_ids)
     ban_mw = BanCheckMiddleware()
+    command_state_reset_mw = CommandStateResetMiddleware()
 
     # Порядок важен: throttle_mw — самый внешний, отсекает спам ДО открытия сессии БД
     # (незачем тратить соединение на апдейт, который всё равно будет отброшен). db_mw —
@@ -70,6 +72,10 @@ async def main() -> None:
         observer.outer_middleware(db_mw)
         observer.outer_middleware(tech_mw)
         observer.outer_middleware(ban_mw)
+    # Только Message — у callback_query команд не бывает. Сбрасывает "зависшее" FSM-
+    # состояние на любую /команду, чтобы она не проглатывалась хендлером чужого
+    # "ожидания ввода" (см. CLAUDE.md, баг "/promo триггерит обменник клана").
+    dp.message.outer_middleware(command_state_reset_mw)
 
     dp.include_routers(*get_routers())
 

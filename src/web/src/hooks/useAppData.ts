@@ -1,26 +1,21 @@
 import { useEffect, useState } from 'preact/hooks'
 import {
-	type CardStack,
 	type Profile,
 	type Universe,
 	type UniverseProgress,
-	fetchCollection,
-	fetchEventCollection,
 	fetchProfile,
 	fetchProgress,
 	fetchUniverses,
 } from '../api'
-import { EVENTS_TAB_CODE } from '../constants'
 
-// Собирает данные, нужные для первого экрана (профиль/список вселенных/прогресс
-// коллекции) плюс карточки текущей выбранной вселенной — общее состояние для
-// Header/CollectionPage/ProgressPage, поэтому живёт одним хуком, а не размазано по App.
+// Собирает данные, нужные для первого экрана (профиль/список вселенных/прогресс) —
+// карточки коллекции сюда больше не входят, у них своя пагинация (см. hooks/useCollection),
+// владеет ей CollectionPage напрямую (см. CLAUDE.md, "Долгая загрузка карт в Mini App").
 export function useAppData() {
 	const [profile, setProfile] = useState<Profile | null>(null)
 	const [universes, setUniverses] = useState<Universe[]>([])
 	const [progress, setProgress] = useState<UniverseProgress[]>([])
 	const [selectedUniverse, setSelectedUniverse] = useState<string | null>(null)
-	const [cards, setCards] = useState<CardStack[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
@@ -38,22 +33,12 @@ export function useAppData() {
 			.finally(() => setLoading(false))
 	}, [])
 
-	useEffect(() => {
-		if (!selectedUniverse) return
-		const fetcher =
-			selectedUniverse === EVENTS_TAB_CODE
-				? fetchEventCollection()
-				: fetchCollection(selectedUniverse)
-		fetcher.then(setCards).catch((err: unknown) => setError(String(err)))
-	}, [selectedUniverse])
-
 	return {
 		profile,
 		universes,
 		progress,
 		selectedUniverse,
 		setSelectedUniverse,
-		cards,
 		loading,
 		error,
 	}

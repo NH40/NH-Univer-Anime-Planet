@@ -13,6 +13,7 @@ from bot.config.game import (
     TICKET_NATURAL_CAP,
     TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED,
 )
+from bot.services.ticket import CAP_SQL_EXPR
 from bot.texts.notify import DAILY_BONUS_READY, QUESTS_REFRESHED, ROLL_REMINDER, TICKETS_FULL_REMINDER
 from bot.utils.notify import notify
 
@@ -47,13 +48,17 @@ _GRANT_SUBSCRIPTION_TICKETS_SQL = text(
     """
 )
 
+# tickets_count >= CAP_SQL_EXPR — эффективный кап ЭТОГО игрока (TICKET_NATURAL_CAP +
+# купленные слоты, см. services/ticket), не плоская константа — иначе подписчик с купленным
+# слотом получил бы "тикеты заполнены" уже на натуральном капе, хотя реген у него ещё
+# продолжается до его личного потолка (см. CLAUDE.md, "Магазин: слот капа тикетов").
 _FIND_TICKETS_FULL_SQL = text(
-    """
+    f"""
     UPDATE users
     SET tickets_updated_at = now()
     WHERE notify_tickets_full = true
       AND subscription_until > now()
-      AND tickets_count >= :cap
+      AND tickets_count >= {CAP_SQL_EXPR}
       AND tickets_updated_at <= now() - (:interval * INTERVAL '1 second')
     RETURNING id
     """
@@ -116,7 +121,7 @@ async def find_and_notify_tickets_full(session: AsyncSession) -> list[int]:
     проход шедулера напомнил бы повторно раньше чем через час. Коммитит сама."""
     result = await session.execute(
         _FIND_TICKETS_FULL_SQL,
-        {"cap": TICKET_NATURAL_CAP, "interval": TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED},
+        {"cap_base": TICKET_NATURAL_CAP, "interval": TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED},
     )
     ids = [row[0] for row in result.all()]
     await session.commit()

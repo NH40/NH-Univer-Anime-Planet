@@ -38,10 +38,16 @@ TIER_CHANCE_PERCENT: dict[int, float] = {
 
 # --- Распыление: пыль за карту 1★ = base_ubp // DUST_DIVISOR (6000 UBP -> 6 пыли, 1000 -> 1) ---
 DUST_DIVISOR = 1000
+# Пресеты точного количества на экране "Распыление -> Выбор -> карта" (см. CLAUDE.md) —
+# "своё число" не ограничено этим списком, максимум там — фактическое количество копий.
+DUST_AMOUNT_PRESETS = (1, 5, 10)
 
 # --- Слияние ---
 MERGE_COPIES_REQUIRED = 5
 MERGE_MULTIPLIER = 5 * 1.2  # новый UBP = старый UBP * 5 * 1.2 (собрали 5 карт + 20% бонус)
+# Жёсткий потолок звёзд (подтверждено пользователем 2026-08-14) — выше 5★ слияние
+# недоступно вообще, ни через "1 карту", ни через "все карты"/"до Макс".
+MAX_STARS = 5
 
 # --- Магазин пыли ---
 SHOP_TICKET_PRICE_DUST = 20  # 20 пыли = 1 тикет
@@ -65,6 +71,14 @@ BATTLE_PASS_PRICE_COINS = 500
 
 SHOP_COIN_TICKET_PRICE = 5  # 5 коинов = 1 тикет
 SHOP_COIN_TICKET_MAX_QUANTITY = 1000
+
+# --- Магазин: слоты капа тикетов (за рубли через YooKassa/Telegram Bot Payments,
+# подтверждено пользователем 2026-08-14) --- Каждый слот добавляет TICKET_CAP_SLOT_BONUS
+# к TICKET_NATURAL_CAP. Сезонный слот действует, пока это ЕЩЁ ID активного сезона (см.
+# User.ticket_cap_seasonal_season_id) — не календарный таймер, сезон переключается админом.
+TICKET_CAP_SLOT_BONUS = 1
+TICKET_CAP_SLOT_PRICE_SEASONAL_RUB = 50
+TICKET_CAP_SLOT_PRICE_PERMANENT_RUB = 250
 
 # --- Казино (подтверждено пользователем 2026-08-05: одно правило на все 4 игры) ---
 CASINO_ROLL_COST_COINS = 15

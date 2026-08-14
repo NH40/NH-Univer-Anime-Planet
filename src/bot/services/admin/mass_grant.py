@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config.game import TICKET_NATURAL_CAP
 from bot.constant.admin import TRANSACTION_REASON_ADMIN_MASS_GRANT
+from bot.services.ticket import CAP_SQL_EXPR
 
 # Массовая выдача — это UPDATE + INSERT...SELECT ОДНИМ запросом на ВСЕХ игроков разом
 # (writable CTE), не Python-цикл по 30k строк (см. CLAUDE.md, правило 3). Аудит-лог
@@ -29,13 +30,18 @@ _MASS_GRANT_COINS_SQL = text(
     """
 )
 
+# Тот же анти-эксплойт freeze-паттерн, что в services/ticket._GRANT_SQL, только батчем на
+# всех игроков разом — CAP_SQL_EXPR сравнивает с эффективным капом КАЖДОГО игрока (натур.
+# кап + его купленные слоты, см. CLAUDE.md, "Магазин: слот капа тикетов"), не с плоской
+# константой, иначе игрокам с бонусом реген некорректно "заморозился" бы раньше их
+# личного потолка.
 _MASS_GRANT_TICKETS_SQL = text(
-    """
+    f"""
     WITH updated AS (
         UPDATE users
         SET tickets_count = tickets_count + :amount,
             tickets_updated_at = CASE
-                WHEN tickets_count + :amount >= :cap THEN now()
+                WHEN tickets_count + :amount >= {CAP_SQL_EXPR} THEN now()
                 ELSE tickets_updated_at
             END
         RETURNING id
@@ -67,7 +73,7 @@ async def mass_grant_tickets(session: AsyncSession, *, amount: int, admin_id: in
         _MASS_GRANT_TICKETS_SQL,
         {
             "amount": amount,
-            "cap": TICKET_NATURAL_CAP,
+            "cap_base": TICKET_NATURAL_CAP,
             "reason": TRANSACTION_REASON_ADMIN_MASS_GRANT,
             "admin_id": admin_id,
         },

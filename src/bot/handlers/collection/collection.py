@@ -5,38 +5,14 @@ from aiogram.types import CallbackQuery, InputMediaPhoto
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.cache.keys import action_lock
-from bot.cache.lock import try_acquire
-from bot.config.game import EVENT_CARD_UBP, MERGE_COPIES_REQUIRED, ubp_for_stars
-from bot.constant.collection import (
-    CB_COLL_DUST1_PREFIX,
-    CB_COLL_DUSTALL_PREFIX,
-    CB_COLL_EVENTS,
-    CB_COLL_MERGE_ALL_PREFIX,
-    CB_COLL_MERGE_PREFIX,
-    CB_COLL_NAV_PREFIX,
-    CB_COLL_TIER_PREFIX,
-    LOCK_ACTION_DUST,
-    LOCK_ACTION_MERGE,
-)
+from bot.config.game import EVENT_CARD_UBP, ubp_for_stars
+from bot.constant.collection import CB_COLL_EVENTS, CB_COLL_NAV_PREFIX, CB_COLL_TIER_PREFIX
 from bot.constant.deck import CB_DECK_COLLECTION
 from bot.db.repositories.inventory import OwnedStack, list_owned_stacks_in_event_universes, list_owned_stacks_in_tier
 from bot.db.repositories.universe import get_by_code as get_universe
 from bot.db.repositories.user import get_by_id
 from bot.keyboards.collection import stack_view, tier_picker
-from bot.services import dust, merge
-from bot.texts.collection import (
-    DUST_NOTHING,
-    DUST_RESULT,
-    EMPTY_TIER,
-    MERGE_ALL_RESULT,
-    MERGE_NOT_ENOUGH,
-    MERGE_RESULT,
-    NO_ACTIVE_SEASON,
-    NO_DESCRIPTION,
-    STACK_CAPTION,
-    TIER_PICKER_HEADER,
-)
+from bot.texts.collection import EMPTY_TIER, NO_DESCRIPTION, STACK_CAPTION, TIER_PICKER_HEADER
 from bot.texts.common import NEED_START
 from bot.texts.deck import NO_UNIVERSE_SELECTED
 from bot.utils.card_media import cache_card_photo, get_card_photo
@@ -51,7 +27,7 @@ async def _stacks(session: AsyncSession, user_id: int, universe_code: str | None
     вселенных разом, `universe_code` в этом случае не используется (см. CLAUDE.md,
     "Ивенты") — 7000 UBP не входит в TIER_CHANCE_PERCENT, так что коллизий с обычными
     тирами нет, и это значение безопасно "протекает" через тот же tier-based callback_data
-    (nav/dust/merge), что и обычные тиры, без отдельной ветки в каждом хендлере ниже."""
+    (nav), что и обычные тиры, без отдельной ветки в каждом хендлере ниже."""
     if tier == EVENT_CARD_UBP:
         return await list_owned_stacks_in_event_universes(session, user_id)
     return await list_owned_stacks_in_tier(session, user_id=user_id, universe_code=universe_code, base_ubp=tier)
@@ -114,7 +90,7 @@ async def cb_open_events(callback: CallbackQuery, session: AsyncSession, redis: 
     sent = await callback.message.answer_photo(
         photo,
         caption=_stack_caption(stacks[0], 0, len(stacks)),
-        reply_markup=stack_view(tier=EVENT_CARD_UBP, index=0, total=len(stacks), quantity=stacks[0].quantity),
+        reply_markup=stack_view(tier=EVENT_CARD_UBP, index=0, total=len(stacks)),
     )
     await cache_card_photo(redis, stacks[0].card.id, sent)
 
@@ -140,7 +116,7 @@ async def cb_open_tier(callback: CallbackQuery, session: AsyncSession, redis: Re
     sent = await callback.message.answer_photo(
         photo,
         caption=_stack_caption(stacks[0], 0, len(stacks)),
-        reply_markup=stack_view(tier=tier, index=0, total=len(stacks), quantity=stacks[0].quantity),
+        reply_markup=stack_view(tier=tier, index=0, total=len(stacks)),
     )
     await cache_card_photo(redis, stacks[0].card.id, sent)
 
@@ -165,144 +141,7 @@ async def cb_navigate(callback: CallbackQuery, session: AsyncSession, redis: Red
     edited = await safe_edit_media(
         callback.message,
         InputMediaPhoto(media=photo, caption=_stack_caption(stack, index, len(stacks))),
-        reply_markup=stack_view(tier=tier, index=index, total=len(stacks), quantity=stack.quantity),
+        reply_markup=stack_view(tier=tier, index=index, total=len(stacks)),
     )
     if edited is not None:
         await cache_card_photo(redis, stack.card.id, edited)
-
-
-async def _refresh_after_action(
-    callback: CallbackQuery, session: AsyncSession, redis: Redis, universe_code: str | None, tier: int
-) -> None:
-    """После распыления/слияния состав стопок в тире мог измениться — просто
-    показываем тир заново с начала, а не пытаемся угадать, куда делась старая позиция."""
-    stacks = await _stacks(session, callback.from_user.id, universe_code, tier)
-    if not stacks:
-        await callback.message.answer(EMPTY_TIER, reply_markup=tier_picker())
-        return
-    photo = await get_card_photo(redis, stacks[0].card)
-    edited = await safe_edit_media(
-        callback.message,
-        InputMediaPhoto(media=photo, caption=_stack_caption(stacks[0], 0, len(stacks))),
-        reply_markup=stack_view(tier=tier, index=0, total=len(stacks), quantity=stacks[0].quantity),
-    )
-    if edited is not None:
-        await cache_card_photo(redis, stacks[0].card.id, edited)
-
-
-@router.callback_query(F.data.startswith(CB_COLL_DUST1_PREFIX) | F.data.startswith(CB_COLL_DUSTALL_PREFIX))
-async def cb_dust(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
-    keep_one = callback.data.startswith(CB_COLL_DUST1_PREFIX)
-    prefix = CB_COLL_DUST1_PREFIX if keep_one else CB_COLL_DUSTALL_PREFIX
-    tier, index = _parse_tier_index(callback.data, prefix)
-    user_id = callback.from_user.id
-
-    async with try_acquire(redis, action_lock(user_id, LOCK_ACTION_DUST)) as acquired:
-        if not acquired:
-            await callback.answer()
-            return
-
-        user = await get_by_id(session, user_id)
-        if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
-            await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
-            return
-
-        stacks = await _stacks(session, user_id, user.universe_selected, tier)
-        if index >= len(stacks):
-            await callback.answer(DUST_NOTHING, show_alert=True)
-            return
-        stack = stacks[index]
-
-        try:
-            reward = await dust.distill(
-                session, user_id=user_id, card_id=stack.card.id, stars=stack.stars, keep_one=keep_one
-            )
-        except dust.NothingToDistillError:
-            await callback.answer(DUST_NOTHING, show_alert=True)
-            return
-
-        dusted_count = stack.quantity - (1 if keep_one else 0)
-        await callback.answer(DUST_RESULT.format(count=dusted_count, reward=reward), show_alert=True)
-        await _refresh_after_action(callback, session, redis, user.universe_selected, tier)
-
-
-@router.callback_query(F.data.startswith(CB_COLL_MERGE_PREFIX))
-async def cb_merge(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
-    tier, index = _parse_tier_index(callback.data, CB_COLL_MERGE_PREFIX)
-    user_id = callback.from_user.id
-
-    async with try_acquire(redis, action_lock(user_id, LOCK_ACTION_MERGE)) as acquired:
-        if not acquired:
-            await callback.answer()
-            return
-
-        user = await get_by_id(session, user_id)
-        if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
-            await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
-            return
-
-        stacks = await _stacks(session, user_id, user.universe_selected, tier)
-        if index >= len(stacks):
-            await callback.answer(MERGE_NOT_ENOUGH.format(needed=MERGE_COPIES_REQUIRED), show_alert=True)
-            return
-        stack = stacks[index]
-
-        try:
-            result = await merge.merge_stack(
-                session, redis, user_id=user_id, card_id=stack.card.id, stars=stack.stars
-            )
-        except merge.NotEnoughCopiesError as exc:
-            await callback.answer(MERGE_NOT_ENOUGH.format(needed=exc.needed), show_alert=True)
-            return
-        except merge.NoActiveSeasonError:
-            await callback.answer(NO_ACTIVE_SEASON, show_alert=True)
-            return
-
-        await callback.answer(
-            MERGE_RESULT.format(
-                name=result.card.name, stars="🌟" * result.new_stars, ubp=result.new_ubp, bonus=result.bonus_ubp
-            ),
-            show_alert=True,
-        )
-        await _refresh_after_action(callback, session, redis, user.universe_selected, tier)
-
-
-@router.callback_query(F.data.startswith(CB_COLL_MERGE_ALL_PREFIX))
-async def cb_merge_all(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
-    tier, index = _parse_tier_index(callback.data, CB_COLL_MERGE_ALL_PREFIX)
-    user_id = callback.from_user.id
-
-    async with try_acquire(redis, action_lock(user_id, LOCK_ACTION_MERGE)) as acquired:
-        if not acquired:
-            await callback.answer()
-            return
-
-        user = await get_by_id(session, user_id)
-        if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
-            await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
-            return
-
-        stacks = await _stacks(session, user_id, user.universe_selected, tier)
-        if index >= len(stacks):
-            await callback.answer(MERGE_NOT_ENOUGH.format(needed=MERGE_COPIES_REQUIRED), show_alert=True)
-            return
-        stack = stacks[index]
-
-        try:
-            results = await merge.merge_all(session, redis, user_id=user_id, card_id=stack.card.id, stars=stack.stars)
-        except merge.NotEnoughCopiesError as exc:
-            await callback.answer(MERGE_NOT_ENOUGH.format(needed=exc.needed), show_alert=True)
-            return
-        except merge.NoActiveSeasonError:
-            await callback.answer(NO_ACTIVE_SEASON, show_alert=True)
-            return
-
-        last = results[-1]
-        total_bonus = sum(r.bonus_ubp for r in results)
-        await callback.answer(
-            MERGE_ALL_RESULT.format(
-                count=len(results), name=last.card.name, stars="🌟" * last.new_stars, bonus=total_bonus
-            ),
-            show_alert=True,
-        )
-        await _refresh_after_action(callback, session, redis, user.universe_selected, tier)

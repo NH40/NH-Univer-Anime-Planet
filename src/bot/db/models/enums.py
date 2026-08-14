@@ -33,3 +33,13 @@ class PaymentStatus(str, enum.Enum):
     pending = "pending"
     succeeded = "succeeded"
     canceled = "canceled"
+
+
+class PaymentItemKind(str, enum.Enum):
+    """Что именно куплено этим рублёвым платежом (см. CLAUDE.md, "Магазин: слот капа
+    тикетов") — успешный платёж диспетчеризуется по этому полю в handlers/payment,
+    вместо того чтобы всегда безусловно кредитовать коины, как было изначально."""
+
+    donate_coins = "donate_coins"
+    ticket_cap_seasonal = "ticket_cap_seasonal"
+    ticket_cap_permanent = "ticket_cap_permanent"

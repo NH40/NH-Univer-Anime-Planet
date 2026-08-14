@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot.config.game import SHOP_TICKET_PRESETS
+from bot.config.game import SHOP_TICKET_PRESETS, TICKET_CAP_SLOT_PRICE_PERMANENT_RUB, TICKET_CAP_SLOT_PRICE_SEASONAL_RUB
 from bot.constant.casino import CB_CASINO_OPEN
 from bot.constant.shop import (
     CB_COINSHOP_BATTLE_PASS,
@@ -10,6 +10,9 @@ from bot.constant.shop import (
     CB_COINSHOP_CANCEL,
     CB_COINSHOP_SUBSCRIPTION,
     CB_COINSHOP_SUBSCRIPTION_CONFIRM,
+    CB_COINSHOP_TICKET_CAP,
+    CB_COINSHOP_TICKET_CAP_PERMANENT,
+    CB_COINSHOP_TICKET_CAP_SEASONAL,
     CB_COINSHOP_TICKETS,
     CB_COINSHOP_TICKETS_CONFIRM,
     CB_SHOP_BUY_TICKETS_CUSTOM,
@@ -33,6 +36,9 @@ from bot.texts.shop import (
     BTN_SHOP_COINS,
     BTN_SHOP_DUST,
     BTN_SUBSCRIPTION,
+    BTN_TICKET_CAP,
+    BTN_TICKET_CAP_PERMANENT,
+    BTN_TICKET_CAP_SEASONAL,
     BTN_TICKET_PRESET,
 )
 
@@ -72,6 +78,7 @@ def coin_shop_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=BTN_BATTLE_PASS, callback_data=CB_COINSHOP_BATTLE_PASS)],
             [InlineKeyboardButton(text=BTN_COIN_TICKETS, callback_data=CB_COINSHOP_TICKETS)],
             [InlineKeyboardButton(text=BTN_CASINO, callback_data=CB_CASINO_OPEN)],
+            [InlineKeyboardButton(text=BTN_TICKET_CAP, callback_data=CB_COINSHOP_TICKET_CAP)],
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_OPEN)],
         ]
     )
@@ -121,3 +128,23 @@ def confirm_cancel_menu(confirm_callback: str) -> InlineKeyboardMarkup:
 
 def coin_tickets_confirm_menu() -> InlineKeyboardMarkup:
     return confirm_cancel_menu(CB_COINSHOP_TICKETS_CONFIRM)
+
+
+def ticket_cap_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=BTN_TICKET_CAP_SEASONAL.format(price=TICKET_CAP_SLOT_PRICE_SEASONAL_RUB),
+                    callback_data=CB_COINSHOP_TICKET_CAP_SEASONAL,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=BTN_TICKET_CAP_PERMANENT.format(price=TICKET_CAP_SLOT_PRICE_PERMANENT_RUB),
+                    callback_data=CB_COINSHOP_TICKET_CAP_PERMANENT,
+                )
+            ],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_COINS)],
+        ]
+    )

@@ -22,6 +22,7 @@ from bot.constant.battle_pass import (
 from bot.keyboards.battle_pass import levels_menu
 from bot.services import battle_pass as pass_service
 from bot.texts.battle_pass import (
+    PASS_BOOST_LINE,
     PASS_CLAIM_ALL_DONE,
     PASS_CLAIMED_DONE,
     PASS_HEADER,
@@ -37,7 +38,7 @@ from bot.texts.battle_pass import (
     PASS_REWARD_DUST_TICKETS,
     PASS_REWARD_TICKETS_ONLY,
 )
-from bot.utils.formatting import progress_bar
+from bot.utils.formatting import format_countdown, progress_bar
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="battle_pass_levels")
@@ -65,6 +66,12 @@ def _render(page_view: pass_service.LevelsPage, *, mini_app_url: str | None) -> 
     have = page_view.progress - page_view.level_floor
     need = page_view.level_ceiling - page_view.level_floor
     percent = round(100 * have / need) if need else 100
+    boost_line = PASS_BOOST_LINE.format(
+        multiplier=page_view.boost.multiplier,
+        used=page_view.boost.used_today,
+        cap=page_view.boost.cap,
+        countdown=format_countdown(page_view.boost.seconds_until_reset),
+    )
     text = PASS_HEADER.format(
         level=page_view.current_level,
         bar=progress_bar(percent),
@@ -72,6 +79,7 @@ def _render(page_view: pass_service.LevelsPage, *, mini_app_url: str | None) -> 
         have=have,
         need=need,
         premium_status=PASS_PREMIUM_ACTIVE if page_view.is_premium else PASS_PREMIUM_LOCKED,
+        boost_line=boost_line,
         page=page_view.page,
         total_pages=page_view.total_pages,
     )

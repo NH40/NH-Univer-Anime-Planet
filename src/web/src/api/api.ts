@@ -55,6 +55,18 @@ export interface CardStack {
 	image_url: string
 }
 
+export interface CardStackPage {
+	items: CardStack[]
+	has_more: boolean
+}
+
+export interface CollectionQuery {
+	offset?: number
+	limit?: number
+	search?: string
+	tier?: number
+}
+
 export interface UniverseProgress {
 	code: string
 	title: string
@@ -110,12 +122,30 @@ export function fetchUniverses(): Promise<Universe[]> {
 	return apiFetch<Universe[]>('/universes')
 }
 
-export function fetchCollection(universeCode: string): Promise<CardStack[]> {
-	return apiFetch<CardStack[]>(`/collection/${encodeURIComponent(universeCode)}`)
+// Пагинация вместо загрузки всей коллекции разом (см. CLAUDE.md, "Долгая загрузка карт в
+// Mini App") — offset/limit/search/tier уходят на сервер, а не фильтруют уже загруженный
+// массив на клиенте, иначе поиск не находил бы карты, которые ещё не подгрузились.
+function collectionQueryString(query: CollectionQuery): string {
+	const params = new URLSearchParams()
+	if (query.offset) params.set('offset', String(query.offset))
+	if (query.limit) params.set('limit', String(query.limit))
+	if (query.search) params.set('search', query.search)
+	if (query.tier !== undefined) params.set('tier', String(query.tier))
+	const qs = params.toString()
+	return qs ? `?${qs}` : ''
 }
 
-export function fetchEventCollection(): Promise<CardStack[]> {
-	return apiFetch<CardStack[]>('/collection/events')
+export function fetchCollection(
+	universeCode: string,
+	query: CollectionQuery = {},
+): Promise<CardStackPage> {
+	return apiFetch<CardStackPage>(
+		`/collection/${encodeURIComponent(universeCode)}${collectionQueryString(query)}`,
+	)
+}
+
+export function fetchEventCollection(query: CollectionQuery = {}): Promise<CardStackPage> {
+	return apiFetch<CardStackPage>(`/collection/events${collectionQueryString(query)}`)
 }
 
 export function fetchProgress(): Promise<UniverseProgress[]> {
@@ -130,7 +160,10 @@ export function fetchBattlePassPage(page?: number): Promise<BattlePassPage> {
 
 // Тап по одной ячейке — забирает только её награду (см. CLAUDE.md, "Сезонный пасс: клейм
 // произвольной ячейки"), а не всё накопленное разом.
-export function claimBattlePassLevel(track: 'free' | 'premium', level: number): Promise<BattlePassClaimResult> {
+export function claimBattlePassLevel(
+	track: 'free' | 'premium',
+	level: number,
+): Promise<BattlePassClaimResult> {
 	return apiPost<BattlePassClaimResult>('/battle-pass/claim', { track, level })
 }
 

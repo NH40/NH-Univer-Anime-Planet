@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, LabeledPrice, Message
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,13 +19,21 @@ from bot.config.game import (
     SHOP_TICKET_PRICE_DUST,
     SUBSCRIPTION_DURATION_DAYS,
     SUBSCRIPTION_PRICE_COINS,
+    TICKET_CAP_SLOT_BONUS,
+    TICKET_CAP_SLOT_PRICE_PERMANENT_RUB,
+    TICKET_CAP_SLOT_PRICE_SEASONAL_RUB,
+    TICKET_NATURAL_CAP,
 )
+from bot.config.settings import get_settings
 from bot.constant.shop import (
     CB_COINSHOP_BATTLE_PASS,
     CB_COINSHOP_BATTLE_PASS_CONFIRM,
     CB_COINSHOP_CANCEL,
     CB_COINSHOP_SUBSCRIPTION,
     CB_COINSHOP_SUBSCRIPTION_CONFIRM,
+    CB_COINSHOP_TICKET_CAP,
+    CB_COINSHOP_TICKET_CAP_PERMANENT,
+    CB_COINSHOP_TICKET_CAP_SEASONAL,
     CB_COINSHOP_TICKETS,
     CB_COINSHOP_TICKETS_CONFIRM,
     CB_SHOP_BUY_TICKETS_CUSTOM,
@@ -39,6 +47,7 @@ from bot.constant.shop import (
     LOCK_ACTION_BUY_TICKETS,
 )
 from bot.db.models.user import User
+from bot.db.repositories import season as season_repo
 from bot.db.repositories.user import get_by_id
 from bot.keyboards.shop import (
     battle_pass_menu,
@@ -47,6 +56,7 @@ from bot.keyboards.shop import (
     dust_shop_menu,
     shop_menu,
     subscription_menu,
+    ticket_cap_menu,
 )
 from bot.services import battle_pass as pass_service
 from bot.services import shop
@@ -79,8 +89,17 @@ from bot.texts.shop import (
     SUBSCRIPTION_SCREEN,
     SUBSCRIPTION_STATUS_ACTIVE,
     SUBSCRIPTION_STATUS_NONE,
+    TICKET_CAP_INVOICE_DESCRIPTION,
+    TICKET_CAP_INVOICE_LABEL,
+    TICKET_CAP_INVOICE_TITLE_PERMANENT,
+    TICKET_CAP_INVOICE_TITLE_SEASONAL,
+    TICKET_CAP_NO_SEASON,
+    TICKET_CAP_NOT_CONFIGURED,
+    TICKET_CAP_SCREEN,
 )
 from bot.utils.safe_edit import safe_edit_text
+
+_KOPECKS_PER_RUB = 100
 
 router = Router(name="shop")
 
@@ -393,3 +412,71 @@ async def cb_cancel_pending_purchase(callback: CallbackQuery, state: FSMContext)
     await state.clear()
     await callback.answer()
     await callback.message.answer(CANCELLED)
+
+
+# --- Слот капа тикетов (за рубли, см. CLAUDE.md, "Магазин: слот капа тикетов") ---
+
+
+def _ticket_cap_text(user: User) -> str:
+    total_cap = TICKET_NATURAL_CAP + user.ticket_cap_permanent_bonus + user.ticket_cap_seasonal_bonus
+    return TICKET_CAP_SCREEN.format(
+        bonus=TICKET_CAP_SLOT_BONUS,
+        natural_cap=TICKET_NATURAL_CAP,
+        permanent=user.ticket_cap_permanent_bonus,
+        seasonal=user.ticket_cap_seasonal_bonus,
+        total_cap=total_cap,
+    )
+
+
+@router.callback_query(F.data == CB_COINSHOP_TICKET_CAP)
+async def cb_open_ticket_cap(callback: CallbackQuery, session: AsyncSession) -> None:
+    user = await get_by_id(session, callback.from_user.id)
+    await callback.answer()
+    if user is None:
+        await callback.message.answer(NEED_START)
+        return
+    await safe_edit_text(callback.message, _ticket_cap_text(user), reply_markup=ticket_cap_menu())
+
+
+@router.callback_query(F.data == CB_COINSHOP_TICKET_CAP_SEASONAL)
+async def cb_buy_ticket_cap_seasonal(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
+    if not get_settings().yookassa_provider_token:
+        await callback.answer(TICKET_CAP_NOT_CONFIGURED, show_alert=True)
+        return
+    # Сезонный слот без активного сезона покупать не за что (см. CLAUDE.md) — гейтим ДО
+    # инвойса, деньги ещё не списаны, в отличие от проверки внутри successful_payment.
+    season = await season_repo.get_active(session)
+    if season is None:
+        await callback.answer(TICKET_CAP_NO_SEASON, show_alert=True)
+        return
+
+    await callback.answer()
+    price = TICKET_CAP_SLOT_PRICE_SEASONAL_RUB
+    await bot.send_invoice(
+        chat_id=callback.message.chat.id,
+        title=TICKET_CAP_INVOICE_TITLE_SEASONAL,
+        description=TICKET_CAP_INVOICE_DESCRIPTION.format(bonus=TICKET_CAP_SLOT_BONUS),
+        payload=f"ticket_cap_seasonal:{price}",
+        provider_token=get_settings().yookassa_provider_token,
+        currency="RUB",
+        prices=[LabeledPrice(label=TICKET_CAP_INVOICE_LABEL, amount=price * _KOPECKS_PER_RUB)],
+    )
+
+
+@router.callback_query(F.data == CB_COINSHOP_TICKET_CAP_PERMANENT)
+async def cb_buy_ticket_cap_permanent(callback: CallbackQuery, bot: Bot) -> None:
+    if not get_settings().yookassa_provider_token:
+        await callback.answer(TICKET_CAP_NOT_CONFIGURED, show_alert=True)
+        return
+
+    await callback.answer()
+    price = TICKET_CAP_SLOT_PRICE_PERMANENT_RUB
+    await bot.send_invoice(
+        chat_id=callback.message.chat.id,
+        title=TICKET_CAP_INVOICE_TITLE_PERMANENT,
+        description=TICKET_CAP_INVOICE_DESCRIPTION.format(bonus=TICKET_CAP_SLOT_BONUS),
+        payload=f"ticket_cap_permanent:{price}",
+        provider_token=get_settings().yookassa_provider_token,
+        currency="RUB",
+        prices=[LabeledPrice(label=TICKET_CAP_INVOICE_LABEL, amount=price * _KOPECKS_PER_RUB)],
+    )

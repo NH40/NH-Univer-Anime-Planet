@@ -25,6 +25,7 @@ from bot.texts.clan import (
     WAR_STARTED,
     WAR_TARGET_PROMPT,
 )
+from bot.utils.formatting import format_number
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="clan_war")
@@ -47,14 +48,14 @@ async def _render_war(session: AsyncSession, clan_id: int, actor_rank: ClanRank)
             text = WAR_FINISHED_DRAW
         else:
             winner = clan_a if progress.war.winner_clan_id == progress.war.clan_a_id else clan_b
-            text = WAR_FINISHED_WIN.format(winner=winner.name if winner else "", reward=CLAN_WAR_REWARD_DUST)
+            text = WAR_FINISHED_WIN.format(winner=winner.name if winner else "", reward=format_number(CLAN_WAR_REWARD_DUST))
         return text, war_menu(can_manage=can_manage, has_active_war=False)
 
     text = WAR_ACTIVE.format(
         name_a=clan_a.name if clan_a else "",
-        gained_a=progress.gained_a,
+        gained_a=format_number(progress.gained_a),
         name_b=clan_b.name if clan_b else "",
-        gained_b=progress.gained_b,
+        gained_b=format_number(progress.gained_b),
         ends_at=progress.war.ends_at.strftime(_DATE_FMT),
     )
     return text, war_menu(can_manage=can_manage, has_active_war=True)

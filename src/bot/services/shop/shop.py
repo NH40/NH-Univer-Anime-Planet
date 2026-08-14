@@ -10,6 +10,7 @@ from bot.config.game import (
     SHOP_TICKET_PRICE_DUST,
     SUBSCRIPTION_DURATION_DAYS,
     SUBSCRIPTION_PRICE_COINS,
+    TICKET_CAP_SLOT_BONUS,
 )
 from bot.constant.shop import (
     TRANSACTION_REASON_BATTLE_PASS,
@@ -17,11 +18,18 @@ from bot.constant.shop import (
     TRANSACTION_REASON_SHOP_TICKET,
     TRANSACTION_REASON_SUBSCRIPTION,
 )
-from bot.db.models.enums import TransactionCurrency
+from bot.db.models.enums import PaymentItemKind, TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import battle_pass as pass_repo
+from bot.db.repositories import payment as payment_repo
 from bot.db.repositories import season as season_repo
-from bot.db.repositories.user import extend_subscription, spend_coins, spend_dust
+from bot.db.repositories.user import (
+    extend_subscription,
+    grant_ticket_cap_permanent_bonus,
+    grant_ticket_cap_seasonal_bonus,
+    spend_coins,
+    spend_dust,
+)
 from bot.services import ticket
 
 
@@ -140,3 +148,36 @@ async def buy_premium_pass(session: AsyncSession, *, user_id: int) -> None:
     )
 
     await session.commit()
+
+
+async def credit_ticket_cap_purchase(
+    session: AsyncSession, *, telegram_payment_charge_id: str, user_id: int, amount_rub: int, kind: PaymentItemKind
+) -> int | None:
+    """Идемпотентно начисляет +TICKET_CAP_SLOT_BONUS к капу тикетов за успешный рублёвый
+    платёж (см. CLAUDE.md, "Магазин: слот капа тикетов") — тот же паттерн идемпотентности,
+    что services/donate.credit_payment (unique telegram_payment_charge_id, не Redis-лок,
+    т.к. источник повтора — сервер Telegram, может передоставить апдейт). None — платёж уже
+    обработан раньше. Возвращает новое значение бонуса (перманентного или сезонного, смотря
+    по `kind`)."""
+    ok = await payment_repo.create_succeeded(
+        session, telegram_payment_charge_id=telegram_payment_charge_id, user_id=user_id, amount_rub=amount_rub, item_kind=kind
+    )
+    if not ok:
+        return None
+
+    if kind == PaymentItemKind.ticket_cap_permanent:
+        new_bonus = await grant_ticket_cap_permanent_bonus(session, user_id=user_id, amount=TICKET_CAP_SLOT_BONUS)
+    else:
+        season = await season_repo.get_active(session)
+        if season is None:
+            # Не должно случаться в норме (экран покупки гейтит сезонный вариант активным
+            # сезоном ДО инвойса) — но деньги Telegram уже списал, платёж всё равно
+            # фиксируем для ручной сверки админом, просто без начисления бонуса без сезона.
+            await session.commit()
+            return None
+        new_bonus = await grant_ticket_cap_seasonal_bonus(
+            session, user_id=user_id, season_id=season.id, amount=TICKET_CAP_SLOT_BONUS
+        )
+
+    await session.commit()
+    return new_bonus

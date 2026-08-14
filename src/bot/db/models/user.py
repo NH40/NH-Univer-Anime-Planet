@@ -83,6 +83,19 @@ class User(Base):
     # флаг/срок premium-доступа, сам Battle Pass ещё не спроектирован (см. TODO, Этап 8).
     premium_pass_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Слоты капа тикетов, купленные в магазине за рубли (см. CLAUDE.md, "Магазин: слот капа
+    # тикетов") — прибавляются к TICKET_NATURAL_CAP в services/ticket, а не заменяют его.
+    # Перманентный — простой стакающийся счётчик. Сезонный — тоже счётчик, но действует
+    # ТОЛЬКО пока ticket_cap_seasonal_season_id совпадает с ID ещё активного сезона (сезон
+    # переключается админом, не календарным таймером — тот же принцип границы, что у
+    # ubp_season/UBP клана); при смене сезона старый seasonal-бонус перестаёт учитываться
+    # сам собой, без отдельной миграции/сброса.
+    ticket_cap_permanent_bonus: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    ticket_cap_seasonal_bonus: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    ticket_cap_seasonal_season_id: Mapped[int | None] = mapped_column(
+        ForeignKey("seasons.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Отдельные тумблеры уведомлений (Настройки -> Уведомления) — не переиспользуют общий
     # notifications_enabled (тот теперь только про обменник пыли в клане, см. handlers/clan).
     notify_tickets_full: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")

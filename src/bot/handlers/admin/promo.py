@@ -33,6 +33,11 @@ router = Router(name="admin_promo")
 
 _CODE_RE = re.compile(r"^[A-Za-z0-9]{1,32}$")
 _TYPES = {"uses": PromoCodeType.uses, "time": PromoCodeType.time, "users": PromoCodeType.user_list}
+# Только валюты, которые реально существуют в этой игре (см. CLAUDE.md, "Промокоды:
+# многострочный ввод -> одна строка с несколькими наградами" — формат-пример, присланный
+# пользователем 2026-08-14, включал фрагменты/очки мастерства и т.п. из другого проекта,
+# в этой игре их нет, добавлять не стали).
+_REWARD_TOKEN_RE = re.compile(r"^(tickets|coins|dust):(-?\d+)$")
 
 
 def _reward_line(status: promo_service.PromoStatus) -> str:
@@ -81,21 +86,32 @@ async def cancel_promo_create(message: Message, state: FSMContext) -> None:
 
 @router.message(StateFilter(AdminStates.waiting_promo_create))
 async def apply_promo_create(message: Message, state: FSMContext, session: AsyncSession) -> None:
-    lines = [line.strip() for line in (message.text or "").split("\n") if line.strip()]
-    if len(lines) != 4:
+    # Одна строка: КОД [uses|time|users] ПАРАМ НАГРАДА1:КОЛ НАГРАДА2:КОЛ ... (переработано
+    # 2026-08-14 по запросу пользователя — было 4 строки, ровно один тип награды каждая).
+    parts = (message.text or "").split()
+    if len(parts) < 4:
         await message.answer(PROMO_CREATE_INVALID)
         return
 
-    code, type_str, param, reward_str = lines
-    code = code.upper()
-    type_enum = _TYPES.get(type_str.lower())
-    reward_parts = reward_str.split()
+    code = parts[0].upper()
+    type_enum = _TYPES.get(parts[1].lower())
+    param = parts[2]
 
-    if not _CODE_RE.match(code) or type_enum is None or len(reward_parts) != 3 or not all(p.isdigit() for p in reward_parts):
+    if not _CODE_RE.match(code) or type_enum is None:
         await message.answer(PROMO_CREATE_INVALID)
         return
 
-    dust, coins, tickets = (int(p) for p in reward_parts)
+    reward: dict[str, int] = {}
+    for token in parts[3:]:
+        match = _REWARD_TOKEN_RE.match(token)
+        if match is None:
+            await message.answer(PROMO_CREATE_INVALID)
+            return
+        key, amount = match.group(1), int(match.group(2))
+        reward[key] = reward.get(key, 0) + amount
+    if not any(reward.values()):
+        await message.answer(PROMO_CREATE_INVALID)
+        return
 
     max_uses: int | None = None
     expires_at: datetime | None = None
@@ -110,7 +126,9 @@ async def apply_promo_create(message: Message, state: FSMContext, session: Async
         if not param.isdigit() or int(param) <= 0:
             await message.answer(PROMO_CREATE_INVALID)
             return
-        expires_at = datetime.now(timezone.utc) + timedelta(days=int(param))
+        # Часы, не дни (изменено 2026-08-14 по запросу пользователя — раньше параметр time
+        # значил "дней действия").
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=int(param))
     else:
         allowed_usernames = [u.strip().lstrip("@") for u in param.split(",") if u.strip()]
         if not allowed_usernames:
@@ -127,9 +145,7 @@ async def apply_promo_create(message: Message, state: FSMContext, session: Async
             max_uses=max_uses,
             expires_at=expires_at,
             allowed_usernames=allowed_usernames,
-            dust=dust,
-            coins=coins,
-            tickets=tickets,
+            reward=reward,
         )
     except promo_service.PromoTakenError:
         await message.answer(PROMO_CREATE_TAKEN)
