@@ -122,11 +122,11 @@ export function CollectionPage({
 								})}
 							</div>
 							{loading && (
-								<div class='grid-loading'>
+								<div class='grid-loading' key='grid-loading'>
 									<Loader2 size={18} class='spin' />
 								</div>
 							)}
-							{hasMore && <div ref={sentinelRef} class='grid-sentinel' />}
+							{hasMore && <div ref={sentinelRef} class='grid-sentinel' key='grid-sentinel' />}
 						</>
 					)}
 				</>
