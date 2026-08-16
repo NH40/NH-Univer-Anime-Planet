@@ -76,4 +76,9 @@ async def get_collection(
     stacks, has_more = await list_owned_stacks_in_universe_page(
         session, user_id=user_id, universe_code=universe_code, offset=offset, limit=limit, search=search, tier=tier
     )
+    print(
+        f"collection debug: user={user_id} universe={universe_code} offset={offset} limit={limit} "
+        f"search={search!r} tier={tier} -> items={len(stacks)} has_more={has_more}",
+        flush=True,
+    )
     return CardStackPageOut(items=_stacks_out(stacks), has_more=has_more)
