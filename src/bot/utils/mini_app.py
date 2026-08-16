@@ -9,7 +9,7 @@ from aiogram.enums import ChatType
 # клиентом ДО того, как на Caddy появился no-cache. Приклеенный ?v=N делает URL кнопки
 # формально НОВЫМ при каждом бампе — Telegram не может отдать под него старый кэш, которого
 # для этого URL ещё не существовало.
-MINI_APP_ASSET_VERSION = 2
+MINI_APP_ASSET_VERSION = 3
 
 
 def mini_app_url(base_url: str, *, view: str | None = None) -> str:

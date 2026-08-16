@@ -60,23 +60,23 @@ select {
 /* --- Плавный переход между вкладками --- */
 
 .page-transition {
-  opacity: 0;
-  transform: translateY(6px);
-  transition:
-    opacity 0.22s ease,
-    transform 0.22s ease;
+  animation: page-transition-in 0.22s ease;
 }
 
-.page-transition-in {
-  opacity: 1;
-  transform: translateY(0);
+@keyframes page-transition-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .page-transition {
-    transition: none;
-    opacity: 1;
-    transform: none;
+    animation: none;
   }
 }
 
