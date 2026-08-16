@@ -69,16 +69,11 @@ async def get_collection(
 ) -> CardStackPageOut:
     """Коллекция игрока в вселенной, постранично (см. CLAUDE.md, "Долгая загрузка карт в
     Mini App") — фронтенд запрашивает `limit` карт за раз и подгружает следующую порцию по
-    мере скролла, вместо того чтобы тянуть всю коллекцию одним ответом. `search`/`tier` —
-    те же фильтры, что раньше применялись на уже загруженном массиве на клиенте, теперь в
+    кнопке "Показать ещё", вместо того чтобы тянуть всю коллекцию одним ответом. `search`/`tier`
+    — те же фильтры, что раньше применялись на уже загруженном массиве на клиенте, теперь в
     SQL, иначе поиск не находил бы карты, которые ещё не подгрузились. Пустая страница для
     чужой/несуществующей вселенной — не 404, чужих данных тут и так нет."""
     stacks, has_more = await list_owned_stacks_in_universe_page(
         session, user_id=user_id, universe_code=universe_code, offset=offset, limit=limit, search=search, tier=tier
-    )
-    print(
-        f"collection debug: user={user_id} universe={universe_code} offset={offset} limit={limit} "
-        f"search={search!r} tier={tier} -> items={len(stacks)} has_more={has_more}",
-        flush=True,
     )
     return CardStackPageOut(items=_stacks_out(stacks), has_more=has_more)

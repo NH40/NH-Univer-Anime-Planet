@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { type CardStack, fetchCollection, fetchEventCollection } from '../api'
 import { EVENTS_TAB_CODE } from '../constants'
 
-// 20 карт за раз, следующая порция — по скроллу до сентинела внизу сетки (см.
+// 20 карт за раз, следующая порция — по кнопке "Показать ещё" внизу сетки (см.
 // CollectionPage) — не вся коллекция вселенной одним ответом (см. CLAUDE.md, "Долгая
-// загрузка карт в Mini App").
+// загрузка карт в Mini App"). Автоматическая подгрузка по скроллу (IntersectionObserver,
+// потом обычное scroll-событие) в Telegram Desktop Mini App WebView ни разу не сработала —
+// явная кнопка не зависит от таких особенностей конкретного WebView (2026-08-17).
 const PAGE_SIZE = 20
 // Поиск не долбит API на каждое нажатие клавиши — та же идея, что debounce везде.
 const SEARCH_DEBOUNCE_MS = 350

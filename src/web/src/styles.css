@@ -236,6 +236,20 @@ select {
   color: var(--tg-theme-hint-color, #999);
 }
 
+.load-more-button {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--tg-theme-text-color, #111111);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .card {
   position: relative;
   display: block;
