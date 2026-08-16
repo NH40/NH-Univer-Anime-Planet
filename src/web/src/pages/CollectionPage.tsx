@@ -1,9 +1,13 @@
 import { Loader2, PartyPopper, Star } from 'lucide-react'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import type { CardStack, Universe } from '../api'
 import { TIER_INFO } from '../config'
 import { EVENTS_TAB_CODE } from '../constants'
 import { useCollection } from '../hooks/useCollection'
+
+// Насколько рано (в пикселях до конца страницы) подгружать следующую порцию — тот же
+// смысл, что у прежнего IntersectionObserver rootMargin.
+const LOAD_MORE_THRESHOLD_PX = 400
 
 export function CollectionPage({
 	universes,
@@ -19,22 +23,25 @@ export function CollectionPage({
 	const [search, setSearch] = useState('')
 	const [tierFilter, setTierFilter] = useState<number | 'all'>('all')
 	const { cards, hasMore, loading, loadMore } = useCollection(selectedUniverse, search, tierFilter)
-	const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-	// Пагинация по скроллу — сентинел внизу сетки подгружает следующую порцию карт с
-	// сервера (см. hooks/useCollection), а не рендерит уже загруженное быстрее.
+	// Пагинация по скроллу — раньше на IntersectionObserver (сентинел внизу сетки), но в
+	// Telegram Desktop Mini App WebView он ни разу не сработал (та же категория проблем,
+	// что requestAnimationFrame у PageTransition — см. CLAUDE.md, 2026-08-17). Обычное
+	// событие scroll не зависит от подобных API и надёжно работает везде.
 	useEffect(() => {
 		if (!hasMore) return
-		const sentinel = sentinelRef.current
-		if (!sentinel) return
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0]?.isIntersecting) loadMore()
-			},
-			{ rootMargin: '400px' },
-		)
-		observer.observe(sentinel)
-		return () => observer.disconnect()
+		function checkScroll() {
+			const scrolledToBottom =
+				document.documentElement.scrollHeight - (window.scrollY + window.innerHeight) < LOAD_MORE_THRESHOLD_PX
+			if (scrolledToBottom) loadMore()
+		}
+		checkScroll() // короткая страница может не требовать скролла вовсе
+		window.addEventListener('scroll', checkScroll, { passive: true })
+		window.addEventListener('resize', checkScroll)
+		return () => {
+			window.removeEventListener('scroll', checkScroll)
+			window.removeEventListener('resize', checkScroll)
+		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [hasMore, selectedUniverse, search, tierFilter])
 
@@ -93,6 +100,9 @@ export function CollectionPage({
 						</select>
 					</div>
 
+					<div style={{ opacity: 0.6, fontSize: 11, marginBottom: 4 }}>
+						DEBUG cards.length={cards.length} hasMore={String(hasMore)} loading={String(loading)}
+					</div>
 					{cards.length === 0 && !loading ? (
 						<div class='empty'>Ничего не найдено.</div>
 					) : (
@@ -126,7 +136,6 @@ export function CollectionPage({
 									<Loader2 size={18} class='spin' />
 								</div>
 							)}
-							{hasMore && <div ref={sentinelRef} class='grid-sentinel' key='grid-sentinel' />}
 						</>
 					)}
 				</>

@@ -229,10 +229,6 @@ select {
   gap: 10px;
 }
 
-.grid-sentinel {
-  height: 1px;
-}
-
 .grid-loading {
   display: flex;
   justify-content: center;
