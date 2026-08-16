@@ -107,24 +107,20 @@ CLAN_TOP_IMAGE_ELIGIBLE_COUNT = 10  # картинку клана можно с�
 # пользователя — предыдущая 30-уровневая модель с ручной таблицей стоимости признана
 # "слишком большой", см. CLAUDE.md, "Сезонный пасс: 500 циклических уровней").
 #
-# Стоимость перехода на уровень — от АБСОЛЮТНОГО номера уровня (не циклится): линейная
-# рампа от BATTLE_PASS_COST_START (уровень 1) до BATTLE_PASS_COST_ENDLESS (уровень 500),
-# дальше — плоская BATTLE_PASS_COST_ENDLESS навсегда (без разрыва в точке 500, т.к. рампа
-# и так достигает этого значения к этому уровню). Подтверждено пользователем: "бесконечный
-# цикл, 30000 UBP/уровень навсегда" после первого прохождения 500 уровней.
+# Стоимость перехода на уровень — ФЛАТ BATTLE_PASS_LEVEL_COST на каждый уровень, без рампы
+# (изменено 2026-08-15 по запросу пользователя — прежняя линейная рампа от 300 до 30000 UBP
+# на первых 500 уровнях цикла делала ранние уровни неоправданно дешёвыми; дневной буст
+# `BATTLE_PASS_BOOST_TIER_*` ниже не тронут, он по-прежнему множит начисляемый в прогресс
+# UBP, а не даёт скидку на стоимость уровня). BATTLE_PASS_CYCLE_LEVELS остаётся — им
+# по-прежнему циклятся НАГРАДЫ (см. battle_pass_free_reward/battle_pass_premium_reward), к
+# стоимости уровня отношения больше не имеет.
 BATTLE_PASS_CYCLE_LEVELS = 500
-BATTLE_PASS_COST_START = 300
-BATTLE_PASS_COST_ENDLESS = 30000
+BATTLE_PASS_LEVEL_COST = 75000
 
 
 def battle_pass_level_cost(level: int) -> int:
-    """UBP-стоимость перехода С уровня level-1 НА уровень level (level >= 1)."""
-    if level >= BATTLE_PASS_CYCLE_LEVELS:
-        return BATTLE_PASS_COST_ENDLESS
-    return round(
-        BATTLE_PASS_COST_START
-        + (BATTLE_PASS_COST_ENDLESS - BATTLE_PASS_COST_START) * (level - 1) / (BATTLE_PASS_CYCLE_LEVELS - 1)
-    )
+    """UBP-стоимость перехода С уровня level-1 НА уровень level (level >= 1) — флат."""
+    return BATTLE_PASS_LEVEL_COST
 
 
 # Награды циклятся каждые BATTLE_PASS_CYCLE_LEVELS уровней (см. battle_pass_free_reward) —
@@ -157,28 +153,14 @@ def _battle_pass_roll(seed: int) -> tuple[int, int]:
 
 def battle_pass_cumulative(level: int) -> int:
     """Суммарный прогресс (UBP-эквивалент), нужный чтобы ДОСТИЧЬ уровня `level` (0 -> 0).
-    За пределами первого прохождения (level > 500) считается в O(1), не циклом."""
-    if level <= BATTLE_PASS_CYCLE_LEVELS:
-        return sum(battle_pass_level_cost(lvl) for lvl in range(1, level + 1))
-    base = sum(battle_pass_level_cost(lvl) for lvl in range(1, BATTLE_PASS_CYCLE_LEVELS + 1))
-    return base + (level - BATTLE_PASS_CYCLE_LEVELS) * BATTLE_PASS_COST_ENDLESS
+    Стоимость флат — просто level * BATTLE_PASS_LEVEL_COST, без циклов/веток по 500."""
+    return level * BATTLE_PASS_LEVEL_COST
 
 
 def battle_pass_level_from_progress(progress: int) -> int:
     """Текущий уровень пасса по накопленному прогрессу (см. `BattlePass.progress` —
-    ОТДЕЛЬНЫЙ от `User.ubp_season` счётчик, см. CLAUDE.md). Уровни > 500 считаются в O(1)."""
-    cap_total = battle_pass_cumulative(BATTLE_PASS_CYCLE_LEVELS)
-    if progress >= cap_total:
-        return BATTLE_PASS_CYCLE_LEVELS + (progress - cap_total) // BATTLE_PASS_COST_ENDLESS
-
-    level = 0
-    total = 0
-    for lvl in range(1, BATTLE_PASS_CYCLE_LEVELS + 1):
-        total += battle_pass_level_cost(lvl)
-        if progress < total:
-            break
-        level += 1
-    return level
+    ОТДЕЛЬНЫЙ от `User.ubp_season` счётчик, см. CLAUDE.md)."""
+    return progress // BATTLE_PASS_LEVEL_COST
 
 
 def battle_pass_free_reward(level: int) -> tuple[int, int]:

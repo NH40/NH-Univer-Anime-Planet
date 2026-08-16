@@ -32,7 +32,7 @@ from bot.keyboards.profile import back_to_profile, players_pager, profile_menu
 from bot.services import ticket
 from bot.services.referral import REFERRAL_REWARD_REASONS
 from bot.states.profile import ProfileStates
-from bot.texts.common import BTN_PROFILE, DIVIDER, NEED_START
+from bot.texts.common import BTN_PROFILE, NEED_START
 from bot.texts.profile import (
     NO_CLAN,
     NO_RANK,
@@ -58,6 +58,7 @@ from bot.texts.profile import (
     TOP_LINE,
 )
 from bot.utils.formatting import esc, format_countdown, format_number, progress_bar
+from bot.utils.mini_app import resolve_mini_app_base_url
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="profile")
@@ -106,7 +107,6 @@ async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> 
         name=esc(user.display_name or "—"),
         username=f"@{esc(user.username)}" if user.username else NO_USERNAME,
         clan=esc(clan_name) if clan_name else NO_CLAN,
-        divider=DIVIDER,
         ubp_season=format_number(user.ubp_season),
         rank=format_number(rank) if rank else NO_RANK,
         ubp_total=format_number(user.ubp_total),
@@ -126,7 +126,8 @@ async def show_profile(message: Message, session: AsyncSession, redis: Redis) ->
         await message.answer(NEED_START)
         return
     settings = get_settings()
-    await message.answer(text, reply_markup=profile_menu(mini_app_url=settings.mini_app_url or None))
+    mini_app_url = resolve_mini_app_base_url(settings.mini_app_url, message.chat.type)
+    await message.answer(text, reply_markup=profile_menu(mini_app_url=mini_app_url))
 
 
 @router.callback_query(F.data == CB_PROFILE_OPEN)
@@ -139,9 +140,8 @@ async def cb_open_profile(callback: CallbackQuery, session: AsyncSession, redis:
         await callback.message.answer(NEED_START)
         return
     settings = get_settings()
-    await safe_edit_text(
-        callback.message, text, reply_markup=profile_menu(mini_app_url=settings.mini_app_url or None)
-    )
+    mini_app_url = resolve_mini_app_base_url(settings.mini_app_url, callback.message.chat.type)
+    await safe_edit_text(callback.message, text, reply_markup=profile_menu(mini_app_url=mini_app_url))
 
 
 @router.callback_query(F.data == CB_PROFILE_RENAME)

@@ -45,6 +45,7 @@ from bot.texts.deck import (
 )
 from bot.utils.card_media import cache_card_photo, get_card_photo
 from bot.utils.formatting import description_block, esc
+from bot.utils.mini_app import resolve_mini_app_base_url
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="deck")
@@ -64,7 +65,7 @@ def _card_caption(card: Card, stars: int, universe_title: str, quantity: int) ->
     )
 
 
-async def _render_deck(session: AsyncSession, user_id: int) -> tuple[str, object | None]:
+async def _render_deck(session: AsyncSession, user_id: int, chat_type: str) -> tuple[str, object | None]:
     user = await get_by_id(session, user_id)
     if user is None:
         return NEED_START, None
@@ -79,19 +80,20 @@ async def _render_deck(session: AsyncSession, user_id: int) -> tuple[str, object
         universe=esc(universe.title), tickets=ticket_status.count, cap=ticket_status.cap, dust=user.dust
     )
     settings = get_settings()
-    return text, deck_menu(mini_app_url=settings.mini_app_url or None)
+    mini_app_url = resolve_mini_app_base_url(settings.mini_app_url, chat_type)
+    return text, deck_menu(mini_app_url=mini_app_url)
 
 
 @router.message(Command("deck"))
 @router.message(F.text == BTN_DECK)
 async def show_deck(message: Message, session: AsyncSession) -> None:
-    text, markup = await _render_deck(session, message.from_user.id)
+    text, markup = await _render_deck(session, message.from_user.id, message.chat.type)
     await message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == CB_DECK_OPEN)
 async def cb_open_deck(callback: CallbackQuery, session: AsyncSession) -> None:
-    text, markup = await _render_deck(session, callback.from_user.id)
+    text, markup = await _render_deck(session, callback.from_user.id, callback.message.chat.type)
     await callback.answer()
     # Экран крутки/шансов — это фото с подписью, редактировать его в текстовое
     # сообщение нельзя (разные типы контента у Telegram) — поэтому всегда новое сообщение.

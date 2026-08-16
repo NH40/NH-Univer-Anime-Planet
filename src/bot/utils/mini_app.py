@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from aiogram.enums import ChatType
+
 # Версия статики Mini App — бампить вручную при каждом деплое фронтенда. Telegram кэширует
 # Mini App URL агрессивнее, чем можно управлять серверными заголовками Cache-Control (см.
 # CLAUDE.md, "Долгая загрузка картинок..." — там же баг, из-за которого это завели): один
@@ -15,3 +17,14 @@ def mini_app_url(base_url: str, *, view: str | None = None) -> str:
     if view:
         params.append(f"view={view}")
     return f"{base_url}?{'&'.join(params)}"
+
+
+def resolve_mini_app_base_url(raw_url: str | None, chat_type: str) -> str | None:
+    """Telegram разрешает web_app-кнопки ТОЛЬКО в приватных чатах — вне личных чатов
+    Bot API целиком отклоняет sendMessage с такой кнопкой (400 Bad Request), а не просто
+    не показывает её. Раньше mini_app_url прокидывался в клавиатуры (profile/deck/battle
+    pass) без учёта типа чата — из-за этого экраны с "(веб)"-кнопкой не отправлялись
+    вообще, ни текст, ни остальные кнопки, стоило открыть их в группе (2026-08-15)."""
+    if not raw_url or chat_type != ChatType.PRIVATE:
+        return None
+    return raw_url

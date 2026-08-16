@@ -9,17 +9,15 @@ PROFILE_CARD = (
     "<b>Имя:</b> {name}\n"
     "<b>Username:</b> {username}\n"
     "<b>Клан:</b> {clan}\n\n"
-    "{divider}\n\n"
+    "————— <b>РЕЙТИНГ:</b> —————\n\n"
     "⭐ <b>UBP за сезон:</b> {ubp_season}\n"
     "🏆 <b>UBP за всё время:</b> {ubp_total}\n"
     "📊 <b>Топ:</b> {rank}\n\n"
-    "{divider}\n\n"
+    "————— <b>РЕСУРСЫ:</b> —————\n"
     "{tickets_line}\n"
     "🎴 <b>Круток за всё время:</b> {total_rolls}\n\n"
-    "{divider}\n\n"
     "✨ <b>Пыль:</b> {dust}\n"
     "💎 <b>Коины:</b> {coins}\n\n"
-    "{divider}\n\n"
     "{progress}"
 )
 NO_USERNAME = "—"
@@ -35,7 +33,7 @@ PROGRESS_QUOTE_OPEN = "<blockquote expandable>"
 PROGRESS_QUOTE_CLOSE = "</blockquote>"
 PROGRESS_EMPTY = "📚 Пока нет ни одной карты — крутите в «Колоде»!"
 
-TICKETS_LINE_READY = "🎫 <b>Тикеты:</b> {count}/{cap} (бесплатный лимит заполнен)"
+TICKETS_LINE_READY = "🎫 <b>Тикеты:</b> {count}/{cap}"
 TICKETS_LINE_COUNTDOWN = "🎫 <b>Тикеты:</b> {count}/{cap} (следующий через {time})"
 
 REFERRALS_SCREEN = (

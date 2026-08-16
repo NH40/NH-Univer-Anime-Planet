@@ -6,6 +6,7 @@ from bot.config.quest.quest import (
     QUEST_DEFS,
     QUEST_DEFS_BY_CODE,
     QUEST_METRICS,
+    MetricMode,
     QuestDef,
     QuestMetric,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "QUEST_DEFS",
     "QUEST_DEFS_BY_CODE",
     "QUEST_METRICS",
+    "MetricMode",
     "QuestDef",
     "QuestMetric",
 ]

@@ -14,4 +14,9 @@ def main_menu() -> ReplyKeyboardMarkup:
     # is_persistent=False (по явной просьбе пользователя 2026-08-06, см. CLAUDE.md) — даёт
     # клиенту Telegram показать стандартную стрелку сворачивания клавиатуры рядом с полем
     # ввода. is_persistent=True форсит клавиатуру всегда открытой без возможности свернуть.
-    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, is_persistent=False)
+    # selective=True (2026-08-15) — в группе клавиатура иначе одна на весь чат: показывается
+    # ВСЕМ участникам и заменяется, стоит боту прислать её кому угодно ещё, из-за чего игроки
+    # путали чужие кнопки со своими. С selective=True Telegram показывает её только тому, чьё
+    # сообщение бот реплаит (см. вызовы .reply(...) вместо .answer(...) в handlers/start) —
+    # в личных чатах эффекта не даёт (там и так один пользователь).
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, is_persistent=False, selective=True)

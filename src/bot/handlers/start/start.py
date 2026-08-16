@@ -57,7 +57,7 @@ async def cmd_start(message: Message, command: CommandObject, session: AsyncSess
         # сообщении Telegram не даёт совместить inline (profile_menu, у самой карточки) и
         # reply (main_menu) разметку, а /start обязан гарантированно вернуть игроку нижнюю
         # клавиатуру, даже если клиент её потерял (см. CLAUDE.md).
-        await message.answer(WELCOME_BACK, reply_markup=main_menu())
+        await message.reply(WELCOME_BACK, reply_markup=main_menu())
         await show_profile(message, session, redis)
         return
-    await message.answer(WELCOME, reply_markup=main_menu())
+    await message.reply(WELCOME, reply_markup=main_menu())

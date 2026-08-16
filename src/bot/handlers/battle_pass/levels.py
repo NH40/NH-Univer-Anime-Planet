@@ -39,6 +39,7 @@ from bot.texts.battle_pass import (
     PASS_REWARD_TICKETS_ONLY,
 )
 from bot.utils.formatting import format_countdown, progress_bar
+from bot.utils.mini_app import resolve_mini_app_base_url
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="battle_pass_levels")
@@ -95,7 +96,8 @@ async def show_page(target: Message, session: AsyncSession, user_id: int, *, pag
         else:
             await target.answer(PASS_NO_SEASON)
         return
-    text, keyboard = _render(page_view, mini_app_url=settings.mini_app_url or None)
+    mini_app_url = resolve_mini_app_base_url(settings.mini_app_url, target.chat.type)
+    text, keyboard = _render(page_view, mini_app_url=mini_app_url)
     if edit:
         await safe_edit_text(target, text, reply_markup=keyboard)
     else:
