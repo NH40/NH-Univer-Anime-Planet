@@ -47,6 +47,8 @@ NO_CLAN = "—"
 BTN_GIVE_DUST = "✨ Выдать пыль"
 BTN_GIVE_COINS = "💎 Выдать коины"
 BTN_GIVE_CARD = "🃏 Выдать карточку"
+BTN_GIVE_TICKET_CAP_SEASONAL = "🗓 Выдать сезон. слот капа"
+BTN_GIVE_TICKET_CAP_PERMANENT = "♾ Выдать перм. слот капа"
 BTN_BAN = "⛔️ Забанить"
 BTN_UNBAN = "✅ Разбанить"
 BTN_FIND_ANOTHER = "🔍 Другой игрок"
@@ -55,6 +57,9 @@ BTN_ADMIN_PAGE_NEXT = "▶️"
 
 GIVE_DUST_PROMPT = "Сколько пыли выдать? /cancel — отменить."
 GIVE_COINS_PROMPT = "Сколько коинов выдать? /cancel — отменить."
+GIVE_TICKET_CAP_SEASONAL_PROMPT = "Сколько сезонных слотов капа выдать? /cancel — отменить."
+GIVE_TICKET_CAP_PERMANENT_PROMPT = "Сколько перманентных слотов капа выдать? /cancel — отменить."
+GIVE_TICKET_CAP_NO_SEASON = "Сейчас нет активного сезона — сезонный слот выдавать не за что."
 
 # Выдача карточки — вселенная и карта выбираются кнопками (см. handlers/admin/admin.py),
 # текстом вводятся только звёзды и количество на последнем шаге.
@@ -72,6 +77,8 @@ GIVE_CARD_NOT_ENOUGH = "У игрока нет столько копий это�
 
 GIVE_DUST_DONE = "✅ Выдано {amount} пыли игроку {name}."
 GIVE_COINS_DONE = "✅ Выдано {amount} коинов игроку {name}."
+GIVE_TICKET_CAP_SEASONAL_DONE = "✅ Выдано {amount} сезонных слотов капа игроку {name}. Новый бонус: +{bonus}."
+GIVE_TICKET_CAP_PERMANENT_DONE = "✅ Выдано {amount} перманентных слотов капа игроку {name}. Новый бонус: +{bonus}."
 GIVE_CARD_DONE = "✅ Выдана карта «{card_name}» {stars}★ x{qty} игроку {name}."
 GIVE_CARD_REVOKED = "✅ Забрана карта «{card_name}» {stars}★ x{qty} у игрока {name}."
 BAN_DONE = "⛔️ {name} забанен."

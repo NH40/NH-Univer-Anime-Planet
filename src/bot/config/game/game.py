@@ -72,13 +72,19 @@ BATTLE_PASS_PRICE_COINS = 500
 SHOP_COIN_TICKET_PRICE = 5  # 5 коинов = 1 тикет
 SHOP_COIN_TICKET_MAX_QUANTITY = 1000
 
-# --- Магазин: слоты капа тикетов (за рубли через YooKassa/Telegram Bot Payments,
-# подтверждено пользователем 2026-08-14) --- Каждый слот добавляет TICKET_CAP_SLOT_BONUS
-# к TICKET_NATURAL_CAP. Сезонный слот действует, пока это ЕЩЁ ID активного сезона (см.
-# User.ticket_cap_seasonal_season_id) — не календарный таймер, сезон переключается админом.
+# --- Магазин: слоты капа тикетов (за коины, в магазине коинов — изменено 2026-08-17 с
+# прежней продажи за рубли через YooKassa/Telegram Bot Payments: тот же паттерн покупки за
+# коины, что тикеты/подписка/Battle Pass, вместо отдельного рублёвого инвойса). Каждый слот
+# добавляет TICKET_CAP_SLOT_BONUS к TICKET_NATURAL_CAP. Сезонный слот действует, пока это
+# ЕЩЁ ID активного сезона (см. User.ticket_cap_seasonal_season_id) — не календарный таймер,
+# сезон переключается админом. Игрок выбирает количество слотов за раз (пресеты + своё
+# число, тот же UX, что SHOP_TICKET_PRESETS) — цена ниже за ШТУКУ, итоговая стоимость
+# умножается на количество.
 TICKET_CAP_SLOT_BONUS = 1
-TICKET_CAP_SLOT_PRICE_SEASONAL_RUB = 50
-TICKET_CAP_SLOT_PRICE_PERMANENT_RUB = 250
+TICKET_CAP_SLOT_PRICE_SEASONAL_COINS = 50
+TICKET_CAP_SLOT_PRICE_PERMANENT_COINS = 250
+TICKET_CAP_SLOT_PRESETS = (1, 5, 10)
+TICKET_CAP_SLOT_MAX_QUANTITY = 1000  # защита от абсурдного ввода в "своё число", не игровой лимит
 
 # --- Казино (подтверждено пользователем 2026-08-05: одно правило на все 4 игры) ---
 CASINO_ROLL_COST_COINS = 15

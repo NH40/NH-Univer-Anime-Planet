@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from aiogram import Bot, F, Router
+from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, LabeledPrice, Message
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,11 +20,11 @@ from bot.config.game import (
     SUBSCRIPTION_DURATION_DAYS,
     SUBSCRIPTION_PRICE_COINS,
     TICKET_CAP_SLOT_BONUS,
-    TICKET_CAP_SLOT_PRICE_PERMANENT_RUB,
-    TICKET_CAP_SLOT_PRICE_SEASONAL_RUB,
+    TICKET_CAP_SLOT_MAX_QUANTITY,
+    TICKET_CAP_SLOT_PRICE_PERMANENT_COINS,
+    TICKET_CAP_SLOT_PRICE_SEASONAL_COINS,
     TICKET_NATURAL_CAP,
 )
-from bot.config.settings import get_settings
 from bot.constant.shop import (
     CB_COINSHOP_BATTLE_PASS,
     CB_COINSHOP_BATTLE_PASS_CONFIRM,
@@ -32,6 +32,9 @@ from bot.constant.shop import (
     CB_COINSHOP_SUBSCRIPTION,
     CB_COINSHOP_SUBSCRIPTION_CONFIRM,
     CB_COINSHOP_TICKET_CAP,
+    CB_COINSHOP_TICKET_CAP_ASK_PREFIX,
+    CB_COINSHOP_TICKET_CAP_BUY_PREFIX,
+    CB_COINSHOP_TICKET_CAP_CUSTOM_PREFIX,
     CB_COINSHOP_TICKET_CAP_PERMANENT,
     CB_COINSHOP_TICKET_CAP_SEASONAL,
     CB_COINSHOP_TICKETS,
@@ -44,10 +47,12 @@ from bot.constant.shop import (
     CB_SHOP_OPEN,
     LOCK_ACTION_BUY_BATTLE_PASS,
     LOCK_ACTION_BUY_SUBSCRIPTION,
+    LOCK_ACTION_BUY_TICKET_CAP,
     LOCK_ACTION_BUY_TICKETS,
+    TICKET_CAP_KIND_PERMANENT,
+    TICKET_CAP_KIND_SEASONAL,
 )
 from bot.db.models.user import User
-from bot.db.repositories import season as season_repo
 from bot.db.repositories.user import get_by_id
 from bot.keyboards.shop import (
     battle_pass_menu,
@@ -56,7 +61,9 @@ from bot.keyboards.shop import (
     dust_shop_menu,
     shop_menu,
     subscription_menu,
+    ticket_cap_ask_menu,
     ticket_cap_menu,
+    ticket_cap_quantity_menu,
 )
 from bot.services import battle_pass as pass_service
 from bot.services import shop
@@ -89,17 +96,17 @@ from bot.texts.shop import (
     SUBSCRIPTION_SCREEN,
     SUBSCRIPTION_STATUS_ACTIVE,
     SUBSCRIPTION_STATUS_NONE,
-    TICKET_CAP_INVOICE_DESCRIPTION,
-    TICKET_CAP_INVOICE_LABEL,
-    TICKET_CAP_INVOICE_TITLE_PERMANENT,
-    TICKET_CAP_INVOICE_TITLE_SEASONAL,
+    TICKET_CAP_ASK_PERMANENT,
+    TICKET_CAP_ASK_SEASONAL,
+    TICKET_CAP_BOUGHT,
+    TICKET_CAP_CUSTOM_INVALID,
+    TICKET_CAP_CUSTOM_PROMPT,
     TICKET_CAP_NO_SEASON,
-    TICKET_CAP_NOT_CONFIGURED,
+    TICKET_CAP_QUANTITY_SCREEN_PERMANENT,
+    TICKET_CAP_QUANTITY_SCREEN_SEASONAL,
     TICKET_CAP_SCREEN,
 )
 from bot.utils.safe_edit import safe_edit_text
-
-_KOPECKS_PER_RUB = 100
 
 router = Router(name="shop")
 
@@ -414,7 +421,21 @@ async def cb_cancel_pending_purchase(callback: CallbackQuery, state: FSMContext)
     await callback.message.answer(CANCELLED)
 
 
-# --- Слот капа тикетов (за рубли, см. CLAUDE.md, "Магазин: слот капа тикетов") ---
+# --- Слот капа тикетов (за коины — пакет в магазине коинов, см. CLAUDE.md, "Магазин: слот
+# капа тикетов"; изменено 2026-08-17, раньше был за рубли через YooKassa-инвойс) ---
+
+_TICKET_CAP_PRICE_BY_KIND = {
+    TICKET_CAP_KIND_SEASONAL: TICKET_CAP_SLOT_PRICE_SEASONAL_COINS,
+    TICKET_CAP_KIND_PERMANENT: TICKET_CAP_SLOT_PRICE_PERMANENT_COINS,
+}
+_TICKET_CAP_QUANTITY_SCREEN_BY_KIND = {
+    TICKET_CAP_KIND_SEASONAL: TICKET_CAP_QUANTITY_SCREEN_SEASONAL,
+    TICKET_CAP_KIND_PERMANENT: TICKET_CAP_QUANTITY_SCREEN_PERMANENT,
+}
+_TICKET_CAP_ASK_TEXT_BY_KIND = {
+    TICKET_CAP_KIND_SEASONAL: TICKET_CAP_ASK_SEASONAL,
+    TICKET_CAP_KIND_PERMANENT: TICKET_CAP_ASK_PERMANENT,
+}
 
 
 def _ticket_cap_text(user: User) -> str:
@@ -438,45 +459,99 @@ async def cb_open_ticket_cap(callback: CallbackQuery, session: AsyncSession) -> 
     await safe_edit_text(callback.message, _ticket_cap_text(user), reply_markup=ticket_cap_menu())
 
 
-@router.callback_query(F.data == CB_COINSHOP_TICKET_CAP_SEASONAL)
-async def cb_buy_ticket_cap_seasonal(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
-    if not get_settings().yookassa_provider_token:
-        await callback.answer(TICKET_CAP_NOT_CONFIGURED, show_alert=True)
-        return
-    # Сезонный слот без активного сезона покупать не за что (см. CLAUDE.md) — гейтим ДО
-    # инвойса, деньги ещё не списаны, в отличие от проверки внутри successful_payment.
-    season = await season_repo.get_active(session)
-    if season is None:
-        await callback.answer(TICKET_CAP_NO_SEASON, show_alert=True)
-        return
-
+async def _open_ticket_cap_quantity(callback: CallbackQuery, session: AsyncSession, *, kind: str) -> None:
+    user = await get_by_id(session, callback.from_user.id)
     await callback.answer()
-    price = TICKET_CAP_SLOT_PRICE_SEASONAL_RUB
-    await bot.send_invoice(
-        chat_id=callback.message.chat.id,
-        title=TICKET_CAP_INVOICE_TITLE_SEASONAL,
-        description=TICKET_CAP_INVOICE_DESCRIPTION.format(bonus=TICKET_CAP_SLOT_BONUS),
-        payload=f"ticket_cap_seasonal:{price}",
-        provider_token=get_settings().yookassa_provider_token,
-        currency="RUB",
-        prices=[LabeledPrice(label=TICKET_CAP_INVOICE_LABEL, amount=price * _KOPECKS_PER_RUB)],
-    )
+    if user is None:
+        await callback.message.answer(NEED_START)
+        return
+    text = _TICKET_CAP_QUANTITY_SCREEN_BY_KIND[kind].format(price=_TICKET_CAP_PRICE_BY_KIND[kind], coins=user.coins)
+    await safe_edit_text(callback.message, text, reply_markup=ticket_cap_quantity_menu(kind))
+
+
+@router.callback_query(F.data == CB_COINSHOP_TICKET_CAP_SEASONAL)
+async def cb_open_ticket_cap_seasonal(callback: CallbackQuery, session: AsyncSession) -> None:
+    await _open_ticket_cap_quantity(callback, session, kind=TICKET_CAP_KIND_SEASONAL)
 
 
 @router.callback_query(F.data == CB_COINSHOP_TICKET_CAP_PERMANENT)
-async def cb_buy_ticket_cap_permanent(callback: CallbackQuery, bot: Bot) -> None:
-    if not get_settings().yookassa_provider_token:
-        await callback.answer(TICKET_CAP_NOT_CONFIGURED, show_alert=True)
+async def cb_open_ticket_cap_permanent(callback: CallbackQuery, session: AsyncSession) -> None:
+    await _open_ticket_cap_quantity(callback, session, kind=TICKET_CAP_KIND_PERMANENT)
+
+
+def _ticket_cap_ask_text(*, kind: str, quantity: int) -> str:
+    cost = quantity * _TICKET_CAP_PRICE_BY_KIND[kind]
+    return _TICKET_CAP_ASK_TEXT_BY_KIND[kind].format(qty=quantity, cost=cost)
+
+
+@router.callback_query(F.data.startswith(CB_COINSHOP_TICKET_CAP_ASK_PREFIX))
+async def cb_ask_ticket_cap_preset(callback: CallbackQuery) -> None:
+    """Клик по пресету (1/5/10) — сразу показывает подтверждение, не покупает (тот же
+    принцип, что распыление, см. CLAUDE.md)."""
+    kind, qty_raw = callback.data[len(CB_COINSHOP_TICKET_CAP_ASK_PREFIX) :].split(":")
+    quantity = int(qty_raw)
+    await callback.answer()
+    await callback.message.answer(
+        _ticket_cap_ask_text(kind=kind, quantity=quantity),
+        reply_markup=ticket_cap_ask_menu(f"{CB_COINSHOP_TICKET_CAP_BUY_PREFIX}{kind}:{quantity}"),
+    )
+
+
+@router.callback_query(F.data.startswith(CB_COINSHOP_TICKET_CAP_CUSTOM_PREFIX))
+async def cb_start_ticket_cap_custom(callback: CallbackQuery, state: FSMContext) -> None:
+    kind = callback.data[len(CB_COINSHOP_TICKET_CAP_CUSTOM_PREFIX) :]
+    await state.set_state(ShopStates.waiting_ticket_cap_quantity)
+    await state.update_data(ticket_cap_kind=kind)
+    await callback.answer()
+    await callback.message.answer(TICKET_CAP_CUSTOM_PROMPT.format(max=TICKET_CAP_SLOT_MAX_QUANTITY))
+
+
+@router.message(StateFilter(ShopStates.waiting_ticket_cap_quantity), Command("cancel"))
+async def cancel_ticket_cap_custom(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer(CUSTOM_QUANTITY_CANCELLED)
+
+
+@router.message(StateFilter(ShopStates.waiting_ticket_cap_quantity))
+async def apply_ticket_cap_custom(message: Message, state: FSMContext) -> None:
+    raw = (message.text or "").strip()
+    if not raw.isdigit() or not (1 <= int(raw) <= TICKET_CAP_SLOT_MAX_QUANTITY):
+        await message.answer(TICKET_CAP_CUSTOM_INVALID.format(max=TICKET_CAP_SLOT_MAX_QUANTITY))
         return
 
-    await callback.answer()
-    price = TICKET_CAP_SLOT_PRICE_PERMANENT_RUB
-    await bot.send_invoice(
-        chat_id=callback.message.chat.id,
-        title=TICKET_CAP_INVOICE_TITLE_PERMANENT,
-        description=TICKET_CAP_INVOICE_DESCRIPTION.format(bonus=TICKET_CAP_SLOT_BONUS),
-        payload=f"ticket_cap_permanent:{price}",
-        provider_token=get_settings().yookassa_provider_token,
-        currency="RUB",
-        prices=[LabeledPrice(label=TICKET_CAP_INVOICE_LABEL, amount=price * _KOPECKS_PER_RUB)],
+    quantity = int(raw)
+    data = await state.get_data()
+    kind = data.get("ticket_cap_kind")
+    await state.clear()
+    if kind is None:
+        await message.answer(CANCELLED)
+        return
+
+    await message.answer(
+        _ticket_cap_ask_text(kind=kind, quantity=quantity),
+        reply_markup=ticket_cap_ask_menu(f"{CB_COINSHOP_TICKET_CAP_BUY_PREFIX}{kind}:{quantity}"),
     )
+
+
+@router.callback_query(F.data.startswith(CB_COINSHOP_TICKET_CAP_BUY_PREFIX))
+async def cb_buy_ticket_cap(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
+    kind, qty_raw = callback.data[len(CB_COINSHOP_TICKET_CAP_BUY_PREFIX) :].split(":")
+    quantity = int(qty_raw)
+
+    user_id = callback.from_user.id
+    async with try_acquire(redis, action_lock(user_id, LOCK_ACTION_BUY_TICKET_CAP)) as acquired:
+        if not acquired:
+            await callback.answer()
+            return
+
+        try:
+            cost, new_bonus = await shop.buy_ticket_cap_with_coins(session, user_id=user_id, kind=kind, quantity=quantity)
+        except shop.NoActiveSeasonError:
+            await callback.answer(TICKET_CAP_NO_SEASON, show_alert=True)
+            return
+        except shop.NotEnoughCoinsError as exc:
+            await callback.answer(NOT_ENOUGH_COINS.format(needed=exc.needed), show_alert=True)
+            return
+
+        await callback.answer()
+        await callback.message.answer(TICKET_CAP_BOUGHT.format(qty=quantity, cost=cost, bonus=new_bonus))

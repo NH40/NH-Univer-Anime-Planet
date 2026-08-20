@@ -18,16 +18,31 @@ CB_COINSHOP_TICKETS_CONFIRM = "cshop:tickets:confirm"
 # казино) — один и тот же смысл ("отменено"), не нужно два разных callback'а под него.
 CB_COINSHOP_CANCEL = "cshop:cancel"
 
-# Слот капа тикетов (см. CLAUDE.md, "Магазин: слот капа тикетов") — за рубли через
-# YooKassa/Telegram Bot Payments, тот же паттерн инвойса, что у Доната.
+# Слот капа тикетов (см. CLAUDE.md, "Магазин: слот капа тикетов") — за коины, тот же
+# паттерн покупки за коины, что тикеты/подписка/Battle Pass (изменено 2026-08-17, раньше
+# было за рубли через YooKassa-инвойс). SEASONAL/PERMANENT открывают экран выбора
+# количества (пресеты + своё число), не покупают напрямую.
 CB_COINSHOP_TICKET_CAP = "cshop:ticket_cap"
 CB_COINSHOP_TICKET_CAP_SEASONAL = "cshop:ticket_cap:seasonal"
 CB_COINSHOP_TICKET_CAP_PERMANENT = "cshop:ticket_cap:permanent"
+# +f"{kind}:{qty}", kind — "seasonal"/"permanent". ASK показывает подтверждение (тот же
+# принцип "тап не исполняет действие сразу", что у распыления, см. CLAUDE.md), BUY —
+# реальная покупка, на неё же ссылается кнопка "Подтвердить" экрана ASK.
+CB_COINSHOP_TICKET_CAP_ASK_PREFIX = "cshop:ticket_cap:ask:"
+CB_COINSHOP_TICKET_CAP_BUY_PREFIX = "cshop:ticket_cap:buy:"
+# +kind
+CB_COINSHOP_TICKET_CAP_CUSTOM_PREFIX = "cshop:ticket_cap:custom:"
+
+# `kind` для покупки/выдачи слота капа (сравнивается в services/shop, handlers/shop,
+# handlers/admin — константа, а не строковый литерал, см. CLAUDE.md).
+TICKET_CAP_KIND_SEASONAL = "seasonal"
+TICKET_CAP_KIND_PERMANENT = "permanent"
 
 LOCK_ACTION_BUY_TICKETS = "buy_tickets"
 LOCK_ACTION_BUY_SUBSCRIPTION = "buy_subscription"
 LOCK_ACTION_BUY_BATTLE_PASS = "buy_battle_pass"
 LOCK_ACTION_BUY_COIN_TICKETS = "buy_coin_tickets"
+LOCK_ACTION_BUY_TICKET_CAP = "buy_ticket_cap"
 
 TRANSACTION_REASON_SHOP_TICKET = "shop_ticket"
 TRANSACTION_REASON_SUBSCRIPTION = "subscription"

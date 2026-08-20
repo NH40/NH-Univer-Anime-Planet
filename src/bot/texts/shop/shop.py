@@ -81,7 +81,10 @@ COIN_TICKETS_INVALID = "Нужно целое число от 1 до {max}. По
 COIN_TICKETS_CONFIRM = "Купить {qty} тикетов за {cost} коинов?"
 COIN_TICKETS_BOUGHT = "✅ Куплено тикетов: <b>{qty}</b> за <b>{cost}</b> коинов."
 
-# Магазин: слот капа тикетов (за рубли, см. CLAUDE.md, "Магазин: слот капа тикетов").
+# Магазин: слот капа тикетов (за коины, см. CLAUDE.md, "Магазин: слот капа тикетов") —
+# изменено 2026-08-17: раньше продавался за рубли через YooKassa-инвойс, теперь пакет в
+# магазине коинов, тем же паттерном "пресеты + своё число -> подтверждение", что и другие
+# покупки за коины.
 TICKET_CAP_SCREEN = (
     "📦 <b>Макс хранилище</b>\n\n"
     "Каждый слот прибавляет +{bonus} к потолку пассивной регенерации тикетов "
@@ -90,12 +93,14 @@ TICKET_CAP_SCREEN = (
     "<b>Сезонный бонус:</b> +{seasonal}\n"
     "<b>Итоговый кап:</b> {total_cap}"
 )
-BTN_TICKET_CAP_SEASONAL = "🗓 Сезонный слот — {price}₽"
-BTN_TICKET_CAP_PERMANENT = "♾ Перманентный слот — {price}₽"
-TICKET_CAP_NOT_CONFIGURED = "Оплата временно недоступна."
+BTN_TICKET_CAP_SEASONAL = "🗓 Сезонный слот — {price} коинов/шт"
+BTN_TICKET_CAP_PERMANENT = "♾ Перманентный слот — {price} коинов/шт"
 TICKET_CAP_NO_SEASON = "Сейчас нет активного сезона — сезонный слот покупать не за чем."
-TICKET_CAP_INVOICE_TITLE_SEASONAL = "Сезонный слот капа тикетов"
-TICKET_CAP_INVOICE_TITLE_PERMANENT = "Перманентный слот капа тикетов"
-TICKET_CAP_INVOICE_DESCRIPTION = "+{bonus} к потолку регенерации тикетов."
-TICKET_CAP_INVOICE_LABEL = "Слот капа тикетов"
-TICKET_CAP_PURCHASE_SUCCESS = "✅ Слот капа тикетов куплен! Новый бонус: +{bonus}."
+
+TICKET_CAP_QUANTITY_SCREEN_SEASONAL = "🗓 <b>Сезонный слот капа</b>\n\n<b>Цена:</b> {price} коинов/шт\n<b>Коины:</b> {coins}\n\nСколько слотов купить?"
+TICKET_CAP_QUANTITY_SCREEN_PERMANENT = "♾ <b>Перманентный слот капа</b>\n\n<b>Цена:</b> {price} коинов/шт\n<b>Коины:</b> {coins}\n\nСколько слотов купить?"
+TICKET_CAP_CUSTOM_PROMPT = "Введите количество слотов (целое число от 1 до {max}).\n\n/cancel — отменить."
+TICKET_CAP_CUSTOM_INVALID = "Нужно целое число от 1 до {max}. Попробуйте ещё раз."
+TICKET_CAP_ASK_SEASONAL = "Купить {qty} сезонных слотов за {cost} коинов?"
+TICKET_CAP_ASK_PERMANENT = "Купить {qty} перманентных слотов за {cost} коинов?"
+TICKET_CAP_BOUGHT = "✅ Куплено слотов: <b>{qty}</b> за <b>{cost}</b> коинов. Новый бонус: +{bonus}."

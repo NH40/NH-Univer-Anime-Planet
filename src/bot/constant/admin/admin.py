@@ -13,6 +13,11 @@ CB_ADMIN_FIND_PLAYER_START = "admin:find_player"
 CB_ADMIN_PLAYER_GIVE_DUST_PREFIX = "admin:give_dust:"
 CB_ADMIN_PLAYER_GIVE_COINS_PREFIX = "admin:give_coins:"
 CB_ADMIN_PLAYER_GIVE_CARD_PREFIX = "admin:give_card:"
+# Слот капа тикетов (см. CLAUDE.md, "Магазин: слот капа тикетов") — та же выдача текстом
+# числа, что give_dust/give_coins, только без Transaction (нет варианта "слот капа" в
+# TransactionCurrency, тот же принцип, что у выдачи карточки — см. CLAUDE.md).
+CB_ADMIN_PLAYER_GIVE_TICKET_CAP_SEASONAL_PREFIX = "admin:give_cap_s:"
+CB_ADMIN_PLAYER_GIVE_TICKET_CAP_PERMANENT_PREFIX = "admin:give_cap_p:"
 CB_ADMIN_PLAYER_BAN_TOGGLE_PREFIX = "admin:ban_toggle:"
 CB_ADMIN_PLAYER_VIEW_PREFIX = "admin:player_view:"
 

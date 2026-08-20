@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config.settings import get_settings
+from bot.config.game import TICKET_CAP_SLOT_BONUS
 from bot.constant.admin import (
     CB_ADMIN_FIND_PLAYER_START,
     CB_ADMIN_GIVE_CARD_CARD_PREFIX,
@@ -20,6 +21,8 @@ from bot.constant.admin import (
     CB_ADMIN_PLAYER_GIVE_CARD_PREFIX,
     CB_ADMIN_PLAYER_GIVE_COINS_PREFIX,
     CB_ADMIN_PLAYER_GIVE_DUST_PREFIX,
+    CB_ADMIN_PLAYER_GIVE_TICKET_CAP_PERMANENT_PREFIX,
+    CB_ADMIN_PLAYER_GIVE_TICKET_CAP_SEASONAL_PREFIX,
     CB_ADMIN_PLAYER_VIEW_PREFIX,
     CB_ADMIN_STATS,
     CB_ADMIN_TECH_MODE_TOGGLE,
@@ -31,9 +34,18 @@ from bot.db.models.transaction import Transaction
 from bot.db.models.user import User
 from bot.db.repositories import card as card_repo
 from bot.db.repositories import clan as clan_repo
+from bot.db.repositories import season as season_repo
 from bot.db.repositories import universe as universe_repo
 from bot.db.repositories.inventory import add_card, decrement_by
-from bot.db.repositories.user import add_coins, add_dust, get_by_id, get_by_username, set_is_banned
+from bot.db.repositories.user import (
+    add_coins,
+    add_dust,
+    get_by_id,
+    get_by_username,
+    grant_ticket_cap_permanent_bonus,
+    grant_ticket_cap_seasonal_bonus,
+    set_is_banned,
+)
 from bot.keyboards.admin import (
     admin_menu,
     back_to_admin_menu,
@@ -62,6 +74,11 @@ from bot.texts.admin import (
     GIVE_COINS_PROMPT,
     GIVE_DUST_DONE,
     GIVE_DUST_PROMPT,
+    GIVE_TICKET_CAP_NO_SEASON,
+    GIVE_TICKET_CAP_PERMANENT_DONE,
+    GIVE_TICKET_CAP_PERMANENT_PROMPT,
+    GIVE_TICKET_CAP_SEASONAL_DONE,
+    GIVE_TICKET_CAP_SEASONAL_PROMPT,
     NO_CLAN,
     PLAYER_CARD,
     STATS_SCREEN,
@@ -287,6 +304,115 @@ async def apply_give_coins(message: Message, state: FSMContext, session: AsyncSe
 
     name = target.display_name or str(target.id)
     await message.answer(GIVE_COINS_DONE.format(amount=amount, name=name))
+
+    target = await get_by_id(session, target_id)
+    text, keyboard = await _render_player_card(session, target)
+    await message.answer(text, reply_markup=keyboard)
+
+
+# --- Выдать слот капа тикетов (см. CLAUDE.md, "Магазин: слот капа тикетов") — тот же
+# паттерн текстового ввода числа, что выдача пыли/коинов выше. Без Transaction — у
+# TransactionCurrency нет варианта "слот капа", тот же принцип, что и у выдачи карточки
+# ниже (не пишет Transaction). ---
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PLAYER_GIVE_TICKET_CAP_SEASONAL_PREFIX))
+async def cb_give_ticket_cap_seasonal_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    # Сезонный слот без активного сезона выдавать не на что (некуда писать
+    # ticket_cap_seasonal_season_id) — гейтим сразу, до запроса количества.
+    season = await season_repo.get_active(session)
+    if season is None:
+        await callback.answer(GIVE_TICKET_CAP_NO_SEASON, show_alert=True)
+        return
+
+    target_id = int(callback.data[len(CB_ADMIN_PLAYER_GIVE_TICKET_CAP_SEASONAL_PREFIX) :])
+    await state.set_state(AdminStates.waiting_give_ticket_cap_seasonal)
+    await state.update_data(target_user_id=target_id)
+    await callback.answer()
+    await safe_edit_text(
+        callback.message, GIVE_TICKET_CAP_SEASONAL_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[])
+    )
+
+
+@router.message(StateFilter(AdminStates.waiting_give_ticket_cap_seasonal), Command("cancel"))
+async def cancel_give_ticket_cap_seasonal(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer(ACTION_CANCELLED)
+
+
+@router.message(StateFilter(AdminStates.waiting_give_ticket_cap_seasonal))
+async def apply_give_ticket_cap_seasonal(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    raw = (message.text or "").strip()
+    if not raw.isdigit() or int(raw) <= 0:
+        await message.answer(GIVE_AMOUNT_INVALID)
+        return
+
+    amount = int(raw)
+    data = await state.get_data()
+    target_id = data.get("target_user_id")
+    await state.clear()
+
+    target = await get_by_id(session, target_id) if target_id is not None else None
+    season = await season_repo.get_active(session)
+    if target is None:
+        await message.answer(FIND_PLAYER_NOT_FOUND)
+        return
+    if season is None:
+        await message.answer(GIVE_TICKET_CAP_NO_SEASON)
+        return
+
+    new_bonus = await grant_ticket_cap_seasonal_bonus(
+        session, user_id=target_id, season_id=season.id, amount=amount * TICKET_CAP_SLOT_BONUS
+    )
+    await session.commit()
+
+    name = target.display_name or str(target.id)
+    await message.answer(GIVE_TICKET_CAP_SEASONAL_DONE.format(amount=amount, name=name, bonus=new_bonus))
+
+    target = await get_by_id(session, target_id)
+    text, keyboard = await _render_player_card(session, target)
+    await message.answer(text, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PLAYER_GIVE_TICKET_CAP_PERMANENT_PREFIX))
+async def cb_give_ticket_cap_permanent_start(callback: CallbackQuery, state: FSMContext) -> None:
+    target_id = int(callback.data[len(CB_ADMIN_PLAYER_GIVE_TICKET_CAP_PERMANENT_PREFIX) :])
+    await state.set_state(AdminStates.waiting_give_ticket_cap_permanent)
+    await state.update_data(target_user_id=target_id)
+    await callback.answer()
+    await safe_edit_text(
+        callback.message, GIVE_TICKET_CAP_PERMANENT_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[])
+    )
+
+
+@router.message(StateFilter(AdminStates.waiting_give_ticket_cap_permanent), Command("cancel"))
+async def cancel_give_ticket_cap_permanent(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer(ACTION_CANCELLED)
+
+
+@router.message(StateFilter(AdminStates.waiting_give_ticket_cap_permanent))
+async def apply_give_ticket_cap_permanent(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    raw = (message.text or "").strip()
+    if not raw.isdigit() or int(raw) <= 0:
+        await message.answer(GIVE_AMOUNT_INVALID)
+        return
+
+    amount = int(raw)
+    data = await state.get_data()
+    target_id = data.get("target_user_id")
+    await state.clear()
+
+    target = await get_by_id(session, target_id) if target_id is not None else None
+    if target is None:
+        await message.answer(FIND_PLAYER_NOT_FOUND)
+        return
+
+    new_bonus = await grant_ticket_cap_permanent_bonus(session, user_id=target_id, amount=amount * TICKET_CAP_SLOT_BONUS)
+    await session.commit()
+
+    name = target.display_name or str(target.id)
+    await message.answer(GIVE_TICKET_CAP_PERMANENT_DONE.format(amount=amount, name=name, bonus=new_bonus))
 
     target = await get_by_id(session, target_id)
     text, keyboard = await _render_player_card(session, target)

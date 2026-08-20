@@ -19,10 +19,12 @@ async def create_succeeded(
 ) -> bool:
     """Атомарный insert — False, если `telegram_payment_charge_id` уже есть (Telegram
     повторно доставил апдейт `successful_payment`) — тогда это не ошибка, просто сигнал
-    вызывающему не начислять награду повторно (см. CLAUDE.md, "Донат"/"Магазин: слот капа
-    тикетов"). `coins_amount` — только для item_kind=donate_coins, иначе NULL (не 0, см.
-    db/models/payment.py). Не коммитит — часть составной операции credit_payment/
-    credit_ticket_cap_purchase."""
+    вызывающему не начислять награду повторно (см. CLAUDE.md, "Донат"). `coins_amount` —
+    только для item_kind=donate_coins, иначе NULL (не 0, см. db/models/payment.py). Не
+    коммитит — часть составной операции services/donate.credit_payment. Слот капа тикетов
+    с 2026-08-17 продаётся за коины (см. services/shop.buy_ticket_cap_with_coins), а не за
+    рубли — этой функцией больше не пользуется, но сама она осталась (донат по-прежнему
+    рублёвый)."""
     stmt = (
         pg_insert(Payment)
         .values(

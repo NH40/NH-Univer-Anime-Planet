@@ -11,17 +11,21 @@ from bot.config.game import (
     SUBSCRIPTION_DURATION_DAYS,
     SUBSCRIPTION_PRICE_COINS,
     TICKET_CAP_SLOT_BONUS,
+    TICKET_CAP_SLOT_PRICE_PERMANENT_COINS,
+    TICKET_CAP_SLOT_PRICE_SEASONAL_COINS,
 )
 from bot.constant.shop import (
+    TICKET_CAP_KIND_SEASONAL,
     TRANSACTION_REASON_BATTLE_PASS,
     TRANSACTION_REASON_SHOP_COIN_TICKET,
     TRANSACTION_REASON_SHOP_TICKET,
     TRANSACTION_REASON_SUBSCRIPTION,
+    TRANSACTION_REASON_TICKET_CAP_PERMANENT,
+    TRANSACTION_REASON_TICKET_CAP_SEASONAL,
 )
-from bot.db.models.enums import PaymentItemKind, TransactionCurrency
+from bot.db.models.enums import TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import battle_pass as pass_repo
-from bot.db.repositories import payment as payment_repo
 from bot.db.repositories import season as season_repo
 from bot.db.repositories.user import (
     extend_subscription,
@@ -150,34 +154,34 @@ async def buy_premium_pass(session: AsyncSession, *, user_id: int) -> None:
     await session.commit()
 
 
-async def credit_ticket_cap_purchase(
-    session: AsyncSession, *, telegram_payment_charge_id: str, user_id: int, amount_rub: int, kind: PaymentItemKind
-) -> int | None:
-    """Идемпотентно начисляет +TICKET_CAP_SLOT_BONUS к капу тикетов за успешный рублёвый
-    платёж (см. CLAUDE.md, "Магазин: слот капа тикетов") — тот же паттерн идемпотентности,
-    что services/donate.credit_payment (unique telegram_payment_charge_id, не Redis-лок,
-    т.к. источник повтора — сервер Telegram, может передоставить апдейт). None — платёж уже
-    обработан раньше. Возвращает новое значение бонуса (перманентного или сезонного, смотря
-    по `kind`)."""
-    ok = await payment_repo.create_succeeded(
-        session, telegram_payment_charge_id=telegram_payment_charge_id, user_id=user_id, amount_rub=amount_rub, item_kind=kind
-    )
-    if not ok:
-        return None
+async def buy_ticket_cap_with_coins(session: AsyncSession, *, user_id: int, kind: str, quantity: int) -> tuple[int, int]:
+    """Покупка `quantity` слотов капа тикетов за коины (изменено 2026-08-17 — раньше слот
+    продавался за рубли через YooKassa-инвойс, см. CLAUDE.md). `kind` —
+    TICKET_CAP_KIND_SEASONAL/PERMANENT. Возвращает (потраченные коины, новое значение
+    бонуса)."""
+    is_seasonal = kind == TICKET_CAP_KIND_SEASONAL
+    price = TICKET_CAP_SLOT_PRICE_SEASONAL_COINS if is_seasonal else TICKET_CAP_SLOT_PRICE_PERMANENT_COINS
+    cost = quantity * price
+    bonus = quantity * TICKET_CAP_SLOT_BONUS
 
-    if kind == PaymentItemKind.ticket_cap_permanent:
-        new_bonus = await grant_ticket_cap_permanent_bonus(session, user_id=user_id, amount=TICKET_CAP_SLOT_BONUS)
+    season = await season_repo.get_active(session) if is_seasonal else None
+    if is_seasonal and season is None:
+        raise NoActiveSeasonError
+
+    ok = await spend_coins(session, user_id=user_id, amount=cost)
+    if not ok:
+        raise NotEnoughCoinsError(needed=cost)
+
+    if is_seasonal:
+        new_bonus = await grant_ticket_cap_seasonal_bonus(session, user_id=user_id, season_id=season.id, amount=bonus)
+        reason = TRANSACTION_REASON_TICKET_CAP_SEASONAL
     else:
-        season = await season_repo.get_active(session)
-        if season is None:
-            # Не должно случаться в норме (экран покупки гейтит сезонный вариант активным
-            # сезоном ДО инвойса) — но деньги Telegram уже списал, платёж всё равно
-            # фиксируем для ручной сверки админом, просто без начисления бонуса без сезона.
-            await session.commit()
-            return None
-        new_bonus = await grant_ticket_cap_seasonal_bonus(
-            session, user_id=user_id, season_id=season.id, amount=TICKET_CAP_SLOT_BONUS
-        )
+        new_bonus = await grant_ticket_cap_permanent_bonus(session, user_id=user_id, amount=bonus)
+        reason = TRANSACTION_REASON_TICKET_CAP_PERMANENT
+
+    session.add(
+        Transaction(user_id=user_id, currency=TransactionCurrency.coins, amount=-cost, reason=reason)
+    )
 
     await session.commit()
-    return new_bonus
+    return cost, new_bonus

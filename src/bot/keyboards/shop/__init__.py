@@ -6,7 +6,9 @@ from bot.keyboards.shop.shop import (
     dust_shop_menu,
     shop_menu,
     subscription_menu,
+    ticket_cap_ask_menu,
     ticket_cap_menu,
+    ticket_cap_quantity_menu,
 )
 
 __all__ = [
@@ -17,5 +19,7 @@ __all__ = [
     "dust_shop_menu",
     "shop_menu",
     "subscription_menu",
+    "ticket_cap_ask_menu",
     "ticket_cap_menu",
+    "ticket_cap_quantity_menu",
 ]

@@ -5,9 +5,9 @@ from bot.services.shop.shop import (
     NotEnoughDustError,
     buy_premium_pass,
     buy_subscription,
+    buy_ticket_cap_with_coins,
     buy_tickets,
     buy_tickets_with_coins,
-    credit_ticket_cap_purchase,
 )
 
 __all__ = [
@@ -17,7 +17,7 @@ __all__ = [
     "NotEnoughDustError",
     "buy_premium_pass",
     "buy_subscription",
+    "buy_ticket_cap_with_coins",
     "buy_tickets",
     "buy_tickets_with_coins",
-    "credit_ticket_cap_purchase",
 ]

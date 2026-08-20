@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot.config.game import SHOP_TICKET_PRESETS, TICKET_CAP_SLOT_PRICE_PERMANENT_RUB, TICKET_CAP_SLOT_PRICE_SEASONAL_RUB
+from bot.config.game import (
+    SHOP_TICKET_PRESETS,
+    TICKET_CAP_SLOT_PRESETS,
+    TICKET_CAP_SLOT_PRICE_PERMANENT_COINS,
+    TICKET_CAP_SLOT_PRICE_SEASONAL_COINS,
+)
 from bot.constant.casino import CB_CASINO_OPEN
 from bot.constant.shop import (
     CB_COINSHOP_BATTLE_PASS,
@@ -11,6 +16,8 @@ from bot.constant.shop import (
     CB_COINSHOP_SUBSCRIPTION,
     CB_COINSHOP_SUBSCRIPTION_CONFIRM,
     CB_COINSHOP_TICKET_CAP,
+    CB_COINSHOP_TICKET_CAP_ASK_PREFIX,
+    CB_COINSHOP_TICKET_CAP_CUSTOM_PREFIX,
     CB_COINSHOP_TICKET_CAP_PERMANENT,
     CB_COINSHOP_TICKET_CAP_SEASONAL,
     CB_COINSHOP_TICKETS,
@@ -131,20 +138,44 @@ def coin_tickets_confirm_menu() -> InlineKeyboardMarkup:
 
 
 def ticket_cap_menu() -> InlineKeyboardMarkup:
+    """Seasonal/Permanent ведут на экран выбора количества (ticket_cap_quantity_menu), не
+    покупают напрямую — см. CLAUDE.md, "Магазин: слот капа тикетов"."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=BTN_TICKET_CAP_SEASONAL.format(price=TICKET_CAP_SLOT_PRICE_SEASONAL_RUB),
+                    text=BTN_TICKET_CAP_SEASONAL.format(price=TICKET_CAP_SLOT_PRICE_SEASONAL_COINS),
                     callback_data=CB_COINSHOP_TICKET_CAP_SEASONAL,
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text=BTN_TICKET_CAP_PERMANENT.format(price=TICKET_CAP_SLOT_PRICE_PERMANENT_RUB),
+                    text=BTN_TICKET_CAP_PERMANENT.format(price=TICKET_CAP_SLOT_PRICE_PERMANENT_COINS),
                     callback_data=CB_COINSHOP_TICKET_CAP_PERMANENT,
                 )
             ],
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_COINS)],
         ]
     )
+
+
+def ticket_cap_quantity_menu(kind: str) -> InlineKeyboardMarkup:
+    """Пресеты (TICKET_CAP_SLOT_PRESETS) + своё число — каждый ведёт на экран подтверждения
+    (ASK), не покупает сразу (тот же принцип, что распыление, см. CLAUDE.md)."""
+    presets_row = [
+        InlineKeyboardButton(
+            text=BTN_TICKET_PRESET.format(qty=qty), callback_data=f"{CB_COINSHOP_TICKET_CAP_ASK_PREFIX}{kind}:{qty}"
+        )
+        for qty in TICKET_CAP_SLOT_PRESETS
+    ]
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            presets_row,
+            [InlineKeyboardButton(text=BTN_CUSTOM_QUANTITY, callback_data=f"{CB_COINSHOP_TICKET_CAP_CUSTOM_PREFIX}{kind}")],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_COINSHOP_TICKET_CAP)],
+        ]
+    )
+
+
+def ticket_cap_ask_menu(confirm_callback: str) -> InlineKeyboardMarkup:
+    return confirm_cancel_menu(confirm_callback)
