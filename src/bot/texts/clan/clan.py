@@ -7,7 +7,7 @@ BTN_CREATE_CLAN = "➕ Создать клан"
 BTN_FIND_CLAN = "🔍 Найти клан"
 BTN_MY_INVITES = "✉️ Мои приглашения ({count})"
 
-CREATE_CLAN_PROMPT = "Введите название клана ({min}-{max} символов). /cancel — отменить."
+CREATE_CLAN_PROMPT = "Введите название клана ({min}-{max} символов)."
 CREATE_CLAN_INVALID = "Название должно быть от {min} до {max} символов, без переносов строк."
 CREATE_CLAN_TAKEN = "Клан с таким названием уже существует."
 CREATE_CLAN_ALREADY_IN_CLAN = "Вы уже состоите в клане."
@@ -59,7 +59,7 @@ CLAN_FULL = "В клане уже максимум участников ({max}).
 NOTIFY_NEW_APPLICATION = "📬 @{username} подал(а) заявку в клан «{clan_name}»."
 
 # --- Приглашение игрока ---
-INVITE_PROMPT = "Введите @username игрока, которого хотите пригласить. /cancel — отменить."
+INVITE_PROMPT = "Введите @username игрока, которого хотите пригласить."
 INVITE_USER_NOT_FOUND = "Игрок с таким username не найден (он должен хотя бы раз запустить бота)."
 INVITE_ALREADY_IN_CLAN = "Этот игрок уже состоит в клане."
 INVITE_SENT = "✅ Приглашение отправлено @{username}."
@@ -91,13 +91,13 @@ EDIT_MENU = "✏️ <b>Редактирование клана</b>"
 BTN_EDIT_NAME = "Название"
 BTN_EDIT_DESCRIPTION = "Описание"
 BTN_EDIT_IMAGE = "Картинка"
-EDIT_NAME_PROMPT = "Введите новое название клана ({min}-{max} символов). /cancel — отменить."
+EDIT_NAME_PROMPT = "Введите новое название клана ({min}-{max} символов)."
 EDIT_NAME_DONE = "✅ Название обновлено."
-EDIT_DESCRIPTION_PROMPT = "Введите новое описание клана (до {max} символов). /cancel — отменить."
+EDIT_DESCRIPTION_PROMPT = "Введите новое описание клана (до {max} символов)."
 EDIT_DESCRIPTION_TOO_LONG = "Слишком длинное описание (максимум {max} символов)."
 EDIT_DESCRIPTION_DONE = "✅ Описание обновлено."
 EDIT_IMAGE_NOT_ELIGIBLE = "Картинку клана может ставить только топ-{n} по UBP за всё время."
-EDIT_IMAGE_PROMPT = "Отправьте картинку клана. /cancel — отменить."
+EDIT_IMAGE_PROMPT = "Отправьте картинку клана."
 EDIT_IMAGE_DONE = "✅ Картинка клана обновлена."
 NOT_AUTHORIZED = "Недостаточно прав."
 
@@ -119,10 +119,7 @@ EXCHANGE_TARGET_GONE = "Этот игрок уже не в вашем клане
 # на 3 валюты). Ключ — значение TransactionCurrency.
 CURRENCY_NAMES_GENITIVE = {"dust": "пыли", "tickets": "тикетов", "coins": "коинов"}
 
-EXCHANGE_PROMPT = (
-    "Сколько {currency} передать игроку {name}?\n"
-    "Например: <code>50</code>\n/cancel — отменить."
-)
+EXCHANGE_PROMPT = "Сколько {currency} передать игроку {name}?\nНапример: <code>50</code>"
 EXCHANGE_INVALID = "Нужно целое число больше 0. Попробуйте ещё раз."
 EXCHANGE_NOT_IN_CLAN = "Этот игрок не в вашем клане."
 EXCHANGE_NOT_ENOUGH = "Не хватает {currency}: нужно {needed}."

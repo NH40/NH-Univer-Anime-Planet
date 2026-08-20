@@ -28,6 +28,7 @@ from bot.db.repositories.clan import get_name as get_clan_name
 from bot.db.repositories.inventory import UniverseProgress, get_universe_progress
 from bot.db.repositories.season import get_active as get_active_season
 from bot.db.repositories.user import get_by_id, get_many_by_ids, get_referral_stats, set_display_name
+from bot.keyboards.common import back_button_menu
 from bot.keyboards.profile import back_to_profile, players_pager, profile_menu
 from bot.services import ticket
 from bot.services.referral import REFERRAL_REWARD_REASONS
@@ -131,9 +132,10 @@ async def show_profile(message: Message, session: AsyncSession, redis: Redis) ->
 
 
 @router.callback_query(F.data == CB_PROFILE_OPEN)
-async def cb_open_profile(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
+async def cb_open_profile(callback: CallbackQuery, session: AsyncSession, redis: Redis, state: FSMContext) -> None:
     """"Назад" с под-экранов профиля (рефералы и т.п.) — редактирует то же сообщение
     обратно в карточку профиля, тот же паттерн "_OPEN", что у остальных доменов."""
+    await state.clear()
     text = await _render_profile(session, redis, callback.from_user.id)
     await callback.answer()
     if text is None:
@@ -148,7 +150,7 @@ async def cb_open_profile(callback: CallbackQuery, session: AsyncSession, redis:
 async def cb_rename_start(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(ProfileStates.waiting_new_name)
     await callback.answer()
-    await callback.message.answer(RENAME_PROMPT)
+    await callback.message.answer(RENAME_PROMPT, reply_markup=back_button_menu(CB_PROFILE_OPEN))
 
 
 @router.callback_query(F.data == CB_PROFILE_REFERRALS)

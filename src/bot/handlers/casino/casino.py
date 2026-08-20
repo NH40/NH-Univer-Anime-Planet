@@ -21,6 +21,7 @@ from bot.constant.casino import (
 )
 from bot.db.repositories.user import get_by_id
 from bot.keyboards.casino import casino_menu, game_menu, mass_roll_confirm_menu
+from bot.keyboards.common import back_button_menu
 from bot.services import casino
 from bot.states.casino import CasinoStates
 from bot.texts.casino import (
@@ -53,12 +54,14 @@ async def cb_open_casino(callback: CallbackQuery, session: AsyncSession) -> None
 
 
 @router.callback_query(F.data.startswith(CB_CASINO_GAME_PREFIX))
-async def cb_open_game(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_open_game(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
     game = callback.data[len(CB_CASINO_GAME_PREFIX) :]
     if game not in CASINO_EMOJI:
         await callback.answer()
         return
 
+    # Точка возврата "Назад" для waiting_mass_roll_quantity (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     user = await get_by_id(session, callback.from_user.id)
     await callback.answer()
     if user is None:
@@ -111,7 +114,9 @@ async def cb_mass_roll_start(callback: CallbackQuery, state: FSMContext) -> None
     await state.set_state(CasinoStates.waiting_mass_roll_quantity)
     await state.update_data(game=game)
     await callback.answer()
-    await callback.message.answer(MASS_ROLL_PROMPT.format(max=CASINO_MASS_ROLL_MAX))
+    await callback.message.answer(
+        MASS_ROLL_PROMPT.format(max=CASINO_MASS_ROLL_MAX), reply_markup=back_button_menu(f"{CB_CASINO_GAME_PREFIX}{game}")
+    )
 
 
 @router.message(StateFilter(CasinoStates.waiting_mass_roll_quantity), Command("cancel"))

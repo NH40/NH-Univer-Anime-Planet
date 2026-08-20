@@ -6,12 +6,13 @@ import logging
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from bot.constant.admin import CB_ADMIN_BROADCAST_CONFIRM, CB_ADMIN_BROADCAST_START
+from bot.constant.admin import CB_ADMIN_BROADCAST_CONFIRM, CB_ADMIN_BROADCAST_START, CB_ADMIN_OPEN
 from bot.db.repositories.user import count_all
 from bot.keyboards.admin import broadcast_confirm_menu
+from bot.keyboards.common import back_button_menu
 from bot.services import broadcast as broadcast_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import ACTION_CANCELLED, BROADCAST_CONFIRM, BROADCAST_DONE, BROADCAST_PROMPT, BROADCAST_STARTED
@@ -45,7 +46,7 @@ async def _run_and_report(
 async def cb_broadcast_start(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(AdminStates.waiting_broadcast_text)
     await callback.answer()
-    await safe_edit_text(callback.message, BROADCAST_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, BROADCAST_PROMPT, reply_markup=back_button_menu(CB_ADMIN_OPEN))
 
 
 @router.message(StateFilter(AdminStates.waiting_broadcast_text), Command("cancel"))

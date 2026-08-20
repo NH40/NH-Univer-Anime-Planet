@@ -6,7 +6,7 @@ DONATE_SCREEN = (
     "Текущий баланс: <b>{coins}</b> коинов."
 )
 BTN_DONATE_CUSTOM = "✏️ Своя сумма"
-DONATE_CUSTOM_PROMPT = "Введите сумму пополнения в рублях ({min}-{max} ₽). /cancel — отменить."
+DONATE_CUSTOM_PROMPT = "Введите сумму пополнения в рублях ({min}-{max} ₽)."
 DONATE_CUSTOM_INVALID = "Сумма должна быть целым числом от {min} до {max} ₽."
 DONATE_CANCELLED = "Отменено."
 DONATE_NOT_CONFIGURED = "Донат временно недоступен."

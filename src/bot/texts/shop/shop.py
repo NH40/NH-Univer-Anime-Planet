@@ -14,7 +14,7 @@ BTN_TICKET_PRESET = "{qty} шт."
 BTN_BUY_MAX = "🔝 Максимум"
 BTN_CUSTOM_QUANTITY = "✏️ Своё число"
 
-CUSTOM_QUANTITY_PROMPT = "Введите количество тикетов (целое число от 1 до {max}).\n\n/cancel — отменить."
+CUSTOM_QUANTITY_PROMPT = "Введите количество тикетов (целое число от 1 до {max})."
 CUSTOM_QUANTITY_INVALID = "Нужно целое число от 1 до {max}. Попробуйте ещё раз."
 CUSTOM_QUANTITY_CANCELLED = "Покупка отменена."
 
@@ -33,6 +33,7 @@ BTN_SUBSCRIPTION = "⭐ Подписка"
 BTN_BATTLE_PASS = "🎫 Battle Pass"
 BTN_COIN_TICKETS = "🎫 Тикеты"
 BTN_CASINO = "🎰 Казино"
+BTN_PACKS = "📦 Паки"
 BTN_TICKET_CAP = "📦 Макс хранилище"
 BTN_CONFIRM = "✅ Подтвердить"
 BTN_CANCEL = "❌ Отменить"
@@ -74,12 +75,15 @@ COIN_TICKETS_SCREEN = (
     "🎫 <b>Тикеты за коины</b>\n\n"
     "<b>Курс:</b> 1 тикет = {price} коинов\n"
     "<b>Коины:</b> {coins}\n\n"
-    "Сколько тикетов купить? (1-{max})\n\n"
-    "/cancel — отменить."
+    "Сколько тикетов купить? (1-{max})"
 )
 COIN_TICKETS_INVALID = "Нужно целое число от 1 до {max}. Попробуйте ещё раз."
 COIN_TICKETS_CONFIRM = "Купить {qty} тикетов за {cost} коинов?"
 COIN_TICKETS_BOUGHT = "✅ Куплено тикетов: <b>{qty}</b> за <b>{cost}</b> коинов."
+
+# Паки — отдельная категория (см. CLAUDE.md), список пак-типов кнопками; сейчас только
+# "Макс хранилище", задел на будущие паки без переделки структуры меню.
+PACKS_SCREEN = "📦 <b>Паки</b>\n\nВыбери пак:"
 
 # Магазин: слот капа тикетов (за коины, см. CLAUDE.md, "Магазин: слот капа тикетов") —
 # изменено 2026-08-17: раньше продавался за рубли через YooKassa-инвойс, теперь пакет в
@@ -99,7 +103,7 @@ TICKET_CAP_NO_SEASON = "Сейчас нет активного сезона — 
 
 TICKET_CAP_QUANTITY_SCREEN_SEASONAL = "🗓 <b>Сезонный слот капа</b>\n\n<b>Цена:</b> {price} коинов/шт\n<b>Коины:</b> {coins}\n\nСколько слотов купить?"
 TICKET_CAP_QUANTITY_SCREEN_PERMANENT = "♾ <b>Перманентный слот капа</b>\n\n<b>Цена:</b> {price} коинов/шт\n<b>Коины:</b> {coins}\n\nСколько слотов купить?"
-TICKET_CAP_CUSTOM_PROMPT = "Введите количество слотов (целое число от 1 до {max}).\n\n/cancel — отменить."
+TICKET_CAP_CUSTOM_PROMPT = "Введите количество слотов (целое число от 1 до {max})."
 TICKET_CAP_CUSTOM_INVALID = "Нужно целое число от 1 до {max}. Попробуйте ещё раз."
 TICKET_CAP_ASK_SEASONAL = "Купить {qty} сезонных слотов за {cost} коинов?"
 TICKET_CAP_ASK_PERMANENT = "Купить {qty} перманентных слотов за {cost} коинов?"

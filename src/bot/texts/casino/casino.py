@@ -20,7 +20,7 @@ BTN_MASS_ROLL = "🔁 Масс-крутка"
 
 ROLL_RESULT = "{emoji} Выпало: {value}! Получено тикетов: {value}."
 
-MASS_ROLL_PROMPT = "Сколько раз крутить кубик? (1-{max}) /cancel — отменить."
+MASS_ROLL_PROMPT = "Сколько раз крутить кубик? (1-{max})"
 MASS_ROLL_INVALID = "Нужно целое число от 1 до {max}. Попробуйте ещё раз."
 MASS_ROLL_CONFIRM = "Крутить {qty} раз за {cost} коинов?"
 MASS_ROLL_RESULT = "🎲 Результаты: {values}\nВсего тикетов: {total} (потрачено {cost} коинов)."

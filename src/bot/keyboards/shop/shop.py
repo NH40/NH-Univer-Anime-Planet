@@ -13,6 +13,7 @@ from bot.constant.shop import (
     CB_COINSHOP_BATTLE_PASS,
     CB_COINSHOP_BATTLE_PASS_CONFIRM,
     CB_COINSHOP_CANCEL,
+    CB_COINSHOP_PACKS,
     CB_COINSHOP_SUBSCRIPTION,
     CB_COINSHOP_SUBSCRIPTION_CONFIRM,
     CB_COINSHOP_TICKET_CAP,
@@ -40,6 +41,7 @@ from bot.texts.shop import (
     BTN_COIN_TICKETS,
     BTN_CONFIRM,
     BTN_CUSTOM_QUANTITY,
+    BTN_PACKS,
     BTN_SHOP_COINS,
     BTN_SHOP_DUST,
     BTN_SUBSCRIPTION,
@@ -85,8 +87,19 @@ def coin_shop_menu() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=BTN_BATTLE_PASS, callback_data=CB_COINSHOP_BATTLE_PASS)],
             [InlineKeyboardButton(text=BTN_COIN_TICKETS, callback_data=CB_COINSHOP_TICKETS)],
             [InlineKeyboardButton(text=BTN_CASINO, callback_data=CB_CASINO_OPEN)],
-            [InlineKeyboardButton(text=BTN_TICKET_CAP, callback_data=CB_COINSHOP_TICKET_CAP)],
+            [InlineKeyboardButton(text=BTN_PACKS, callback_data=CB_COINSHOP_PACKS)],
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_OPEN)],
+        ]
+    )
+
+
+def packs_menu() -> InlineKeyboardMarkup:
+    """Список пак-типов — сейчас только "Макс хранилище", задел на будущие паки (см.
+    CLAUDE.md) без переделки структуры меню."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_TICKET_CAP, callback_data=CB_COINSHOP_TICKET_CAP)],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_COINS)],
         ]
     )
 
@@ -154,7 +167,7 @@ def ticket_cap_menu() -> InlineKeyboardMarkup:
                     callback_data=CB_COINSHOP_TICKET_CAP_PERMANENT,
                 )
             ],
-            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_SHOP_COINS)],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_COINSHOP_PACKS)],
         ]
     )
 

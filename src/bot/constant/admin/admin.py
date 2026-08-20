@@ -18,6 +18,11 @@ CB_ADMIN_PLAYER_GIVE_CARD_PREFIX = "admin:give_card:"
 # TransactionCurrency, тот же принцип, что у выдачи карточки — см. CLAUDE.md).
 CB_ADMIN_PLAYER_GIVE_TICKET_CAP_SEASONAL_PREFIX = "admin:give_cap_s:"
 CB_ADMIN_PLAYER_GIVE_TICKET_CAP_PERMANENT_PREFIX = "admin:give_cap_p:"
+# Battle Pass — разовое включение премиум-ветки текущего сезона, без ввода числа (нечего
+# регулировать, см. CLAUDE.md, "Сезонный пасс"). Подписка — ввод количества дней (админ
+# сам решает, на сколько продлить), тот же паттерн, что give_dust/give_coins.
+CB_ADMIN_PLAYER_GIVE_BATTLE_PASS_PREFIX = "admin:give_bp:"
+CB_ADMIN_PLAYER_GIVE_SUBSCRIPTION_PREFIX = "admin:give_sub:"
 CB_ADMIN_PLAYER_BAN_TOGGLE_PREFIX = "admin:ban_toggle:"
 CB_ADMIN_PLAYER_VIEW_PREFIX = "admin:player_view:"
 

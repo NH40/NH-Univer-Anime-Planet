@@ -34,6 +34,7 @@ from bot.constant.dust import (
 from bot.db.repositories.inventory import OwnedStack, list_owned_stacks_in_event_universes, list_owned_stacks_in_tier
 from bot.db.repositories.universe import get_by_code as get_universe
 from bot.db.repositories.user import get_by_id
+from bot.keyboards.common import back_button_menu
 from bot.keyboards.dust import card_actions, confirm_menu, mode_menu, point_confirm_menu, stack_list, tier_picker
 from bot.services import dust
 from bot.states.dust import DustStates
@@ -208,8 +209,10 @@ async def _find_stack(session: AsyncSession, user_id: int, universe_code: str | 
 
 
 @router.callback_query(F.data.startswith(CB_DUST_STACK_PREFIX))
-async def cb_select_stack(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_select_stack(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
     tier, card_id, stars = _parse_stack_key(callback.data, CB_DUST_STACK_PREFIX)
+    # Точка возврата "Назад" для флоу ввода своего числа (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     user = await get_by_id(session, callback.from_user.id)
     if user is None or (tier != EVENT_CARD_UBP and user.universe_selected is None):
         await callback.answer(NO_UNIVERSE_SELECTED, show_alert=True)
@@ -372,7 +375,10 @@ async def cb_custom_start(callback: CallbackQuery, session: AsyncSession, state:
     await state.update_data(tier=tier, card_id=card_id, stars=stars)
     await state.set_state(DustStates.waiting_amount)
     await callback.answer()
-    await callback.message.answer(CUSTOM_AMOUNT_PROMPT.format(max=match.quantity))
+    await callback.message.answer(
+        CUSTOM_AMOUNT_PROMPT.format(max=match.quantity),
+        reply_markup=back_button_menu(f"{CB_DUST_STACK_PREFIX}{tier}:{card_id}:{stars}"),
+    )
 
 
 @router.message(StateFilter(DustStates.waiting_amount), Command("cancel"))

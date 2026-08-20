@@ -3,7 +3,7 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.constant.admin import (
@@ -15,6 +15,7 @@ from bot.constant.admin import (
 )
 from bot.db.repositories.user import count_all
 from bot.keyboards.admin import mass_grant_confirm_menu, mass_grant_menu
+from bot.keyboards.common import back_button_menu
 from bot.services import admin as admin_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
@@ -46,7 +47,9 @@ _CURRENCY_BY_CALLBACK = {
 
 
 @router.callback_query(F.data == CB_ADMIN_MASS_GRANT)
-async def cb_mass_grant(callback: CallbackQuery) -> None:
+async def cb_mass_grant(callback: CallbackQuery, state: FSMContext) -> None:
+    # Точка возврата "Назад" для waiting_mass_grant_amount (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     await callback.answer()
     await safe_edit_text(callback.message, MASS_GRANT_SCREEN, reply_markup=mass_grant_menu())
 
@@ -60,7 +63,7 @@ async def cb_mass_grant_pick_currency(callback: CallbackQuery, state: FSMContext
     await safe_edit_text(
         callback.message,
         MASS_GRANT_AMOUNT_PROMPT.format(currency=_CURRENCY_LABELS[currency]),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
+        reply_markup=back_button_menu(CB_ADMIN_MASS_GRANT),
     )
 
 

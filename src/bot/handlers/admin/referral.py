@@ -5,11 +5,12 @@ import re
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.constant.admin import CB_ADMIN_REFERRAL, CB_ADMIN_REFERRAL_CREATE, CB_ADMIN_REFERRAL_DETAIL_PREFIX
 from bot.keyboards.admin import referral_detail_menu, referral_menu
+from bot.keyboards.common import back_button_menu
 from bot.services import referral as referral_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
@@ -32,7 +33,9 @@ _CODE_RE = re.compile(r"^[A-Za-z0-9_]{1,32}$")
 
 
 @router.callback_query(F.data == CB_ADMIN_REFERRAL)
-async def cb_referral(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_referral(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
+    # Точка возврата "Назад" для waiting_referral_create (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     await callback.answer()
     links = await referral_service.list_links_with_stats(session)
     if not links:
@@ -71,7 +74,7 @@ async def cb_referral_detail(callback: CallbackQuery, session: AsyncSession, bot
 async def cb_referral_create_start(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(AdminStates.waiting_referral_create)
     await callback.answer()
-    await safe_edit_text(callback.message, REFERRAL_CREATE_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, REFERRAL_CREATE_PROMPT, reply_markup=back_button_menu(CB_ADMIN_REFERRAL))
 
 
 @router.message(StateFilter(AdminStates.waiting_referral_create), Command("cancel"))

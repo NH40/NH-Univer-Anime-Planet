@@ -22,9 +22,11 @@ from bot.constant.admin import (
     CB_ADMIN_MASS_GRANT_TICKETS,
     CB_ADMIN_OPEN,
     CB_ADMIN_PLAYER_BAN_TOGGLE_PREFIX,
+    CB_ADMIN_PLAYER_GIVE_BATTLE_PASS_PREFIX,
     CB_ADMIN_PLAYER_GIVE_CARD_PREFIX,
     CB_ADMIN_PLAYER_GIVE_COINS_PREFIX,
     CB_ADMIN_PLAYER_GIVE_DUST_PREFIX,
+    CB_ADMIN_PLAYER_GIVE_SUBSCRIPTION_PREFIX,
     CB_ADMIN_PLAYER_GIVE_TICKET_CAP_PERMANENT_PREFIX,
     CB_ADMIN_PLAYER_GIVE_TICKET_CAP_SEASONAL_PREFIX,
     CB_ADMIN_PLAYER_VIEW_PREFIX,
@@ -63,9 +65,11 @@ from bot.texts.admin import (
     BTN_EVENT_ACTIVATE_PREFIX,
     BTN_EVENT_DEACTIVATE_PREFIX,
     BTN_FIND_ANOTHER,
+    BTN_GIVE_BATTLE_PASS,
     BTN_GIVE_CARD,
     BTN_GIVE_COINS,
     BTN_GIVE_DUST,
+    BTN_GIVE_SUBSCRIPTION,
     BTN_GIVE_TICKET_CAP_PERMANENT,
     BTN_GIVE_TICKET_CAP_SEASONAL,
     BTN_GRANT_ADMIN,
@@ -164,6 +168,14 @@ def player_card_menu(*, user_id: int, is_banned: bool) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text=BTN_GIVE_TICKET_CAP_PERMANENT,
                     callback_data=f"{CB_ADMIN_PLAYER_GIVE_TICKET_CAP_PERMANENT_PREFIX}{user_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=BTN_GIVE_BATTLE_PASS, callback_data=f"{CB_ADMIN_PLAYER_GIVE_BATTLE_PASS_PREFIX}{user_id}"
+                ),
+                InlineKeyboardButton(
+                    text=BTN_GIVE_SUBSCRIPTION, callback_data=f"{CB_ADMIN_PLAYER_GIVE_SUBSCRIPTION_PREFIX}{user_id}"
                 ),
             ],
             [ban_button],

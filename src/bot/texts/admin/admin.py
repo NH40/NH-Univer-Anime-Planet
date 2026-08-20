@@ -27,7 +27,7 @@ STATS_SCREEN = (
     "💾 Диск: {disk_used_gb:.1f}/{disk_total_gb:.1f} ГБ ({disk_percent:.0f}%)"
 )
 
-FIND_PLAYER_PROMPT = "Введите username (с @ или без) или id игрока. /cancel — отменить."
+FIND_PLAYER_PROMPT = "Введите username (с @ или без) или id игрока."
 FIND_PLAYER_NOT_FOUND = "Игрок не найден."
 ACTION_CANCELLED = "Отменено."
 
@@ -49,17 +49,24 @@ BTN_GIVE_COINS = "💎 Выдать коины"
 BTN_GIVE_CARD = "🃏 Выдать карточку"
 BTN_GIVE_TICKET_CAP_SEASONAL = "🗓 Выдать сезон. слот капа"
 BTN_GIVE_TICKET_CAP_PERMANENT = "♾ Выдать перм. слот капа"
+BTN_GIVE_BATTLE_PASS = "🎫 Выдать Battle Pass"
+BTN_GIVE_SUBSCRIPTION = "⭐ Выдать подписку"
 BTN_BAN = "⛔️ Забанить"
 BTN_UNBAN = "✅ Разбанить"
 BTN_FIND_ANOTHER = "🔍 Другой игрок"
 BTN_ADMIN_PAGE_PREV = "◀️"
 BTN_ADMIN_PAGE_NEXT = "▶️"
 
-GIVE_DUST_PROMPT = "Сколько пыли выдать? /cancel — отменить."
-GIVE_COINS_PROMPT = "Сколько коинов выдать? /cancel — отменить."
-GIVE_TICKET_CAP_SEASONAL_PROMPT = "Сколько сезонных слотов капа выдать? /cancel — отменить."
-GIVE_TICKET_CAP_PERMANENT_PROMPT = "Сколько перманентных слотов капа выдать? /cancel — отменить."
+GIVE_DUST_PROMPT = "Сколько пыли выдать?"
+GIVE_COINS_PROMPT = "Сколько коинов выдать?"
+GIVE_TICKET_CAP_SEASONAL_PROMPT = "Сколько сезонных слотов капа выдать?"
+GIVE_TICKET_CAP_PERMANENT_PROMPT = "Сколько перманентных слотов капа выдать?"
 GIVE_TICKET_CAP_NO_SEASON = "Сейчас нет активного сезона — сезонный слот выдавать не за что."
+GIVE_SUBSCRIPTION_PROMPT = "На сколько дней выдать подписку?"
+GIVE_SUBSCRIPTION_DONE = "✅ Подписка игроку {name} продлена на {days} дней, до {until}."
+GIVE_BATTLE_PASS_DONE = "✅ Battle Pass (премиум-ветка) выдан игроку {name}."
+GIVE_BATTLE_PASS_ALREADY = "У игрока уже есть премиум-ветка Battle Pass в этом сезоне."
+GIVE_BATTLE_PASS_NO_SEASON = "Сейчас нет активного сезона — Battle Pass выдавать не за что."
 
 # Выдача карточки — вселенная и карта выбираются кнопками (см. handlers/admin/admin.py),
 # текстом вводятся только звёзды и количество на последнем шаге.
@@ -68,7 +75,7 @@ GIVE_CARD_PICK_CARD = "🃏 {universe} — выберите карту (стр. 
 GIVE_CARD_PROMPT = (
     "🃏 «{card_name}»\n\n"
     "Введите звёзды и количество через пробел, например: <code>1 3</code>.\n"
-    "Отрицательное количество — забрать. /cancel — отменить."
+    "Отрицательное количество — забрать."
 )
 GIVE_AMOUNT_INVALID = "Нужно целое число больше 0."
 GIVE_CARD_INVALID = "Формат: звёзды количество — оба целые числа, звёзды > 0, количество ≠ 0."
@@ -95,14 +102,25 @@ BTN_SEASON_NEW = "🔄 Новый сезон (сброс UBP)"
 BTN_SEASON_BUMP_VERSION = "🔢 Сменить версию (без сброса)"
 SEASON_NEW_PROMPT = (
     "Введите версию НОВОГО сезона (например 1.1, до 16 символов). "
-    "Обнулит UBP сезона всем игрокам и раздаст награды топ-10. /cancel — отменить."
+    "Обнулит UBP сезона всем игрокам и раздаст награды топ-10."
 )
-SEASON_BUMP_PROMPT = "Введите новую версию (например 1.0.1) — сезон НЕ обнулится. /cancel — отменить."
+SEASON_BUMP_PROMPT = "Введите новую версию (например 1.0.1) — сезон НЕ обнулится."
 SEASON_VERSION_INVALID = "Версия должна быть непустой строкой до 16 символов."
 SEASON_NEW_CONFIRM = "Точно начать новый сезон «{version}»? UBP сезона обнулится у ВСЕХ игроков, топ-10 получит награду."
 BTN_CONFIRM = "✅ Подтвердить"
 SEASON_NEW_DONE = "✅ Новый сезон «{version}» начат. Награду получили: {count} игроков."
 SEASON_BUMP_DONE = "✅ Версия обновлена: {version}."
+
+# Уведомления игрокам о смене сезона (см. handlers/admin/season.py) — объявление всем +
+# отдельное персональное уведомление топ-10 с их местом и наградой.
+SEASON_CHANGE_BROADCAST = (
+    "🏆 Сезон завершён! Начался новый сезон «{version}» — UBP сезона обнулён у всех, "
+    "круткам открыт свежий старт. Топ-10 игроков получили награду."
+)
+SEASON_TOP_REWARD_NOTIFY = (
+    "🏆 Сезон завершён! Ты занял {place} место с {ubp_season} UBP и получил {coins} коинов.\n\n"
+    "Начался новый сезон «{version}» — удачи!"
+)
 
 # --- Промокоды ---
 PROMO_SCREEN = "🎟 <b>Промокоды</b> — всего: {count}\n\n{lines}"
@@ -125,15 +143,14 @@ PROMO_CREATE_PROMPT = (
     "<code>EVENT2026 time 24 dust:200 coins:500</code>\n"
     "  → действует 24 часа, пыль + коины\n"
     "<code>PENALTY uses 999 tickets:-500</code>\n"
-    "  → отнять 500 тикетов (не уйдёт ниже 0)\n\n"
-    "/cancel — отменить."
+    "  → отнять 500 тикетов (не уйдёт ниже 0)"
 )
 PROMO_CREATE_INVALID = "Не разобрал формат — см. подсказку выше."
 PROMO_CREATE_TAKEN = "Такой код уже существует."
 PROMO_CREATE_DONE = "✅ Промокод «{code}» создан."
 
 # --- Активация промокода (игрок) ---
-PROMO_REDEEM_PROMPT = "Введите промокод. /cancel — отменить."
+PROMO_REDEEM_PROMPT = "Введите промокод."
 PROMO_NOT_FOUND = "Промокод не найден."
 PROMO_EXPIRED = "Срок действия промокода истёк."
 PROMO_NOT_ALLOWED = "Этот промокод не для вас."
@@ -146,7 +163,7 @@ REFERRAL_SCREEN = "🔗 <b>Реферальные ссылки</b>"
 REFERRAL_CHOOSE = "Выбери кампанию:"
 REFERRAL_EMPTY = "Ссылок пока нет."
 BTN_REFERRAL_CREATE = "➕ Создать ссылку"
-REFERRAL_CREATE_PROMPT = "Введите название кампании (латиница/цифры/подчёркивания, до 32 симв.). /cancel — отменить."
+REFERRAL_CREATE_PROMPT = "Введите название кампании (латиница/цифры/подчёркивания, до 32 симв.)."
 REFERRAL_CREATE_INVALID = "Только латиница, цифры и подчёркивания, до 32 символов."
 REFERRAL_CREATE_TAKEN = "Кампания с таким названием уже существует."
 REFERRAL_CREATE_DONE = "✅ Ссылка создана:\n{url}"
@@ -163,7 +180,7 @@ REFERRAL_DETAIL_SCREEN = (
 REFERRAL_DETAIL_NOT_FOUND = "Кампания не найдена — возможно, экран устарел."
 
 # --- Рассылка ---
-BROADCAST_PROMPT = "Введите текст рассылки (уйдёт всем игрокам). /cancel — отменить."
+BROADCAST_PROMPT = "Введите текст рассылки (уйдёт всем игрокам)."
 BROADCAST_CONFIRM = "Разослать это сообщение ВСЕМ игрокам ({count} чел.)?\n\n---\n{text}"
 BROADCAST_STARTED = "📣 Рассылка начата в фоне: {count} получателей."
 BROADCAST_DONE = "📣 Рассылка «{preview}» завершена: доставлено {sent}, не доставлено {failed}."
@@ -173,7 +190,7 @@ MASS_GRANT_SCREEN = "🎁 <b>Выдать всем игрокам</b>"
 BTN_MASS_GRANT_DUST = "✨ Пыль"
 BTN_MASS_GRANT_COINS = "💎 Коины"
 BTN_MASS_GRANT_TICKETS = "🎫 Тикеты"
-MASS_GRANT_AMOUNT_PROMPT = "Сколько {currency} выдать КАЖДОМУ игроку? /cancel — отменить."
+MASS_GRANT_AMOUNT_PROMPT = "Сколько {currency} выдать КАЖДОМУ игроку?"
 MASS_GRANT_CONFIRM = "Выдать {amount} {currency} ВСЕМ игрокам ({count} чел.)?"
 MASS_GRANT_DONE = "✅ Выдано {amount} {currency} игрокам: {count} чел."
 CURRENCY_DUST = "пыли"
@@ -181,7 +198,7 @@ CURRENCY_COINS = "коинов"
 CURRENCY_TICKETS = "тикетов"
 
 # --- Удаление аккаунта ---
-DELETE_ACCOUNT_PROMPT = "Введите username или id игрока для полного удаления. /cancel — отменить."
+DELETE_ACCOUNT_PROMPT = "Введите username или id игрока для полного удаления."
 DELETE_ACCOUNT_CONFIRM = (
     "⚠️ Точно ПОЛНОСТЬЮ удалить аккаунт {name} (id {id})? Это необратимо и сотрёт все "
     "данные игрока (карточки, прогресс, кланы, платежи, транзакции)."
@@ -197,7 +214,7 @@ MANAGE_ADMINS_HEADER = "👑 <b>Администраторы</b>\n\nСупер-�
 MANAGE_ADMINS_LINE = "• {name} (id <code>{id}</code>{username})\n"
 MANAGE_ADMINS_EMPTY = "Пока нет ни одного дополнительного админа."
 BTN_MANAGE_FIND_PLAYER = "🔍 Найти игрока"
-MANAGE_FIND_PLAYER_PROMPT = "Введите username (с @ или без) или id игрока. /cancel — отменить."
+MANAGE_FIND_PLAYER_PROMPT = "Введите username (с @ или без) или id игрока."
 
 MANAGE_ADMIN_CARD = "👤 <b>{name}</b> (id <code>{id}</code>{username})\n\n<b>Права админа:</b> {status}"
 BTN_GRANT_ADMIN = "👑 Выдать админку"

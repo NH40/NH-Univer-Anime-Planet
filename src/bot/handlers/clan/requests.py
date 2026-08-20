@@ -15,6 +15,7 @@ from bot.constant.clan import (
     CB_CLAN_DECLINE_INVITE_PREFIX,
     CB_CLAN_INVITE_START,
     CB_CLAN_MY_INVITES,
+    CB_CLAN_OPEN,
     CB_CLAN_REJECT_PREFIX,
     CB_CLAN_REQUESTS,
     LOCK_ACTION_ACCEPT_APPLICATION,
@@ -26,6 +27,7 @@ from bot.db.repositories.user import get_by_username as get_user_by_username
 from bot.db.repositories.user import get_many_by_ids
 from bot.handlers.clan.clan import render_clan_card
 from bot.keyboards.clan import my_invites_menu, requests_menu
+from bot.keyboards.common import back_button_menu
 from bot.services import clan as clan_service
 from bot.states.clan import ClanStates
 from bot.texts.clan import (
@@ -169,7 +171,7 @@ async def cb_invite_start(callback: CallbackQuery, session: AsyncSession, state:
         return
     await state.set_state(ClanStates.waiting_invite_username)
     await callback.answer()
-    await safe_edit_text(callback.message, INVITE_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, INVITE_PROMPT, reply_markup=back_button_menu(CB_CLAN_OPEN))
 
 
 @router.message(StateFilter(ClanStates.waiting_invite_username), Command("cancel"))

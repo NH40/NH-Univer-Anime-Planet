@@ -3,7 +3,7 @@ from __future__ import annotations
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config.settings import get_settings
@@ -12,6 +12,7 @@ from bot.db.models.user import User
 from bot.db.repositories.user import get_by_id, list_admins, set_is_admin
 from bot.handlers.admin.admin import resolve_player
 from bot.keyboards.admin import manage_admin_card_menu, manage_admins_menu
+from bot.keyboards.common import back_button_menu
 from bot.services.admin import is_config_admin
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
@@ -42,12 +43,14 @@ def _manage_admin_card_text(user: User) -> str:
 
 
 @router.callback_query(F.data == CB_ADMIN_MANAGE_ADMINS)
-async def cb_manage_admins(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_manage_admins(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
     settings = get_settings()
     if not is_config_admin(callback.from_user.id, settings):
         await callback.answer(NOT_SUPER_ADMIN, show_alert=True)
         return
 
+    # Точка возврата "Назад" для waiting_manage_admin_search (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     admins = await list_admins(session)
     await callback.answer()
 
@@ -73,7 +76,7 @@ async def cb_manage_find_player_start(callback: CallbackQuery, session: AsyncSes
     await state.set_state(AdminStates.waiting_manage_admin_search)
     await callback.answer()
     await safe_edit_text(
-        callback.message, MANAGE_FIND_PLAYER_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[])
+        callback.message, MANAGE_FIND_PLAYER_PROMPT, reply_markup=back_button_menu(CB_ADMIN_MANAGE_ADMINS)
     )
 
 

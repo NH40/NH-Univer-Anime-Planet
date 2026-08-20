@@ -37,6 +37,7 @@ from bot.keyboards.clan import (
     leave_confirm_menu,
     no_clan_menu,
 )
+from bot.keyboards.common import back_button_menu
 from bot.services import clan as clan_service
 from bot.states.clan import ClanStates
 from bot.texts.clan import (
@@ -191,7 +192,10 @@ async def show_clan(message: Message, session: AsyncSession, bot: Bot) -> None:
 
 
 @router.callback_query(F.data == CB_CLAN_OPEN)
-async def cb_open_clan(callback: CallbackQuery, session: AsyncSession, bot: Bot) -> None:
+async def cb_open_clan(callback: CallbackQuery, session: AsyncSession, bot: Bot, state: FSMContext) -> None:
+    # Точка возврата "Назад" для нескольких флоу ожидания ввода в этом домене (см.
+    # CLAUDE.md, 2026-08-21).
+    await state.clear()
     await callback.answer()
     member = await clan_repo.get_member(session, callback.from_user.id)
     if member is None:
@@ -210,7 +214,7 @@ async def cb_create_start(callback: CallbackQuery, state: FSMContext) -> None:
     await safe_edit_text(
         callback.message,
         CREATE_CLAN_PROMPT.format(min=CLAN_NAME_MIN_LENGTH, max=CLAN_NAME_MAX_LENGTH),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
+        reply_markup=back_button_menu(CB_CLAN_OPEN),
     )
 
 

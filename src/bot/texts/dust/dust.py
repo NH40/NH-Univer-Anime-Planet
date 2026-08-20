@@ -41,6 +41,6 @@ CONFIRM_AMOUNT = "⚠️ Распылить {amount} шт. «{name}» {stars}? �
 CONFIRM_DUPES_ONE = "⚠️ Распылить все дубликаты «{name}» {stars}, оставив 1 копию? Действие необратимо."
 CONFIRM_ALL_ONE = "⚠️ Распылить ВСЕ «{name}» {stars} ({quantity} шт.)? Действие необратимо."
 
-CUSTOM_AMOUNT_PROMPT = "Введи количество карт для распыления (целое число от 1 до {max}).\n\n/cancel — отменить."
+CUSTOM_AMOUNT_PROMPT = "Введи количество карт для распыления (целое число от 1 до {max})."
 CUSTOM_AMOUNT_INVALID = "Некорректное число. Введи целое число от 1 до {max}."
 CUSTOM_AMOUNT_CANCELLED = "Отменено."

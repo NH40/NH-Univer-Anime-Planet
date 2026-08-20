@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +29,7 @@ from bot.constant.shop import (
     CB_COINSHOP_BATTLE_PASS,
     CB_COINSHOP_BATTLE_PASS_CONFIRM,
     CB_COINSHOP_CANCEL,
+    CB_COINSHOP_PACKS,
     CB_COINSHOP_SUBSCRIPTION,
     CB_COINSHOP_SUBSCRIPTION_CONFIRM,
     CB_COINSHOP_TICKET_CAP,
@@ -54,11 +55,13 @@ from bot.constant.shop import (
 )
 from bot.db.models.user import User
 from bot.db.repositories.user import get_by_id
+from bot.keyboards.common import back_button_menu
 from bot.keyboards.shop import (
     battle_pass_menu,
     coin_shop_menu,
     coin_tickets_confirm_menu,
     dust_shop_menu,
+    packs_menu,
     shop_menu,
     subscription_menu,
     ticket_cap_ask_menu,
@@ -91,6 +94,7 @@ from bot.texts.shop import (
     DUST_SHOP_SCREEN,
     NOT_ENOUGH_COINS,
     NOT_ENOUGH_DUST,
+    PACKS_SCREEN,
     SHOP_SCREEN,
     SUBSCRIPTION_BOUGHT,
     SUBSCRIPTION_SCREEN,
@@ -177,7 +181,9 @@ async def cb_open_shop(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 @router.callback_query(F.data == CB_SHOP_DUST)
-async def cb_open_dust_shop(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_open_dust_shop(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
+    # Точка возврата "Назад" для флоу ввода своего числа тикетов (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     user = await get_by_id(session, callback.from_user.id)
     await callback.answer()
     if user is None:
@@ -187,13 +193,23 @@ async def cb_open_dust_shop(callback: CallbackQuery, session: AsyncSession) -> N
 
 
 @router.callback_query(F.data == CB_SHOP_COINS)
-async def cb_open_coin_shop(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_open_coin_shop(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
+    # Точка возврата "Назад" для флоу ввода числа тикетов за коины (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     user = await get_by_id(session, callback.from_user.id)
     await callback.answer()
     if user is None:
         await callback.message.answer(NEED_START)
         return
     await safe_edit_text(callback.message, _coin_shop_text(user), reply_markup=coin_shop_menu())
+
+
+@router.callback_query(F.data == CB_COINSHOP_PACKS)
+async def cb_open_packs(callback: CallbackQuery) -> None:
+    """Список пак-типов (сейчас только "Макс хранилище") — отдельная категория, задел на
+    будущие паки без переделки структуры меню (см. CLAUDE.md)."""
+    await callback.answer()
+    await safe_edit_text(callback.message, PACKS_SCREEN, reply_markup=packs_menu())
 
 
 async def _buy_tickets_and_refresh(
@@ -242,7 +258,9 @@ async def cb_buy_tickets_max(callback: CallbackQuery, session: AsyncSession, red
 async def cb_buy_tickets_custom_start(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(ShopStates.waiting_ticket_quantity)
     await callback.answer()
-    await callback.message.answer(CUSTOM_QUANTITY_PROMPT.format(max=SHOP_TICKET_MAX_QUANTITY))
+    await callback.message.answer(
+        CUSTOM_QUANTITY_PROMPT.format(max=SHOP_TICKET_MAX_QUANTITY), reply_markup=back_button_menu(CB_SHOP_DUST)
+    )
 
 
 @router.message(StateFilter(ShopStates.waiting_ticket_quantity), Command("cancel"))
@@ -368,7 +386,7 @@ async def cb_open_coin_tickets(callback: CallbackQuery, state: FSMContext, sessi
     # edit_text без reply_markup СОХРАНЯЕТ старую клавиатуру (кнопки категорий магазина
     # коинов), а не убирает — явно очищаем, иначе можно нажать "Battle Pass" прямо во
     # время ожидания ввода числа и запутать FSM-состояние (см. CLAUDE.md).
-    await safe_edit_text(callback.message, _coin_tickets_text(user), reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, _coin_tickets_text(user), reply_markup=back_button_menu(CB_SHOP_COINS))
 
 
 @router.message(StateFilter(ShopStates.waiting_coin_ticket_quantity), Command("cancel"))
@@ -459,7 +477,9 @@ async def cb_open_ticket_cap(callback: CallbackQuery, session: AsyncSession) -> 
     await safe_edit_text(callback.message, _ticket_cap_text(user), reply_markup=ticket_cap_menu())
 
 
-async def _open_ticket_cap_quantity(callback: CallbackQuery, session: AsyncSession, *, kind: str) -> None:
+async def _open_ticket_cap_quantity(callback: CallbackQuery, session: AsyncSession, state: FSMContext, *, kind: str) -> None:
+    # Точка возврата "Назад" для флоу ввода своего числа (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     user = await get_by_id(session, callback.from_user.id)
     await callback.answer()
     if user is None:
@@ -470,13 +490,13 @@ async def _open_ticket_cap_quantity(callback: CallbackQuery, session: AsyncSessi
 
 
 @router.callback_query(F.data == CB_COINSHOP_TICKET_CAP_SEASONAL)
-async def cb_open_ticket_cap_seasonal(callback: CallbackQuery, session: AsyncSession) -> None:
-    await _open_ticket_cap_quantity(callback, session, kind=TICKET_CAP_KIND_SEASONAL)
+async def cb_open_ticket_cap_seasonal(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
+    await _open_ticket_cap_quantity(callback, session, state, kind=TICKET_CAP_KIND_SEASONAL)
 
 
 @router.callback_query(F.data == CB_COINSHOP_TICKET_CAP_PERMANENT)
-async def cb_open_ticket_cap_permanent(callback: CallbackQuery, session: AsyncSession) -> None:
-    await _open_ticket_cap_quantity(callback, session, kind=TICKET_CAP_KIND_PERMANENT)
+async def cb_open_ticket_cap_permanent(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
+    await _open_ticket_cap_quantity(callback, session, state, kind=TICKET_CAP_KIND_PERMANENT)
 
 
 def _ticket_cap_ask_text(*, kind: str, quantity: int) -> str:
@@ -503,7 +523,10 @@ async def cb_start_ticket_cap_custom(callback: CallbackQuery, state: FSMContext)
     await state.set_state(ShopStates.waiting_ticket_cap_quantity)
     await state.update_data(ticket_cap_kind=kind)
     await callback.answer()
-    await callback.message.answer(TICKET_CAP_CUSTOM_PROMPT.format(max=TICKET_CAP_SLOT_MAX_QUANTITY))
+    back_cb = CB_COINSHOP_TICKET_CAP_SEASONAL if kind == TICKET_CAP_KIND_SEASONAL else CB_COINSHOP_TICKET_CAP_PERMANENT
+    await callback.message.answer(
+        TICKET_CAP_CUSTOM_PROMPT.format(max=TICKET_CAP_SLOT_MAX_QUANTITY), reply_markup=back_button_menu(back_cb)
+    )
 
 
 @router.message(StateFilter(ShopStates.waiting_ticket_cap_quantity), Command("cancel"))

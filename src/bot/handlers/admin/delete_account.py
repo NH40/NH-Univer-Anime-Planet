@@ -3,12 +3,13 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.constant.admin import CB_ADMIN_DELETE_ACCOUNT_CONFIRM_PREFIX, CB_ADMIN_DELETE_ACCOUNT_START
+from bot.constant.admin import CB_ADMIN_DELETE_ACCOUNT_CONFIRM_PREFIX, CB_ADMIN_DELETE_ACCOUNT_START, CB_ADMIN_OPEN
 from bot.handlers.admin.admin import resolve_player
 from bot.keyboards.admin import delete_account_confirm_menu
+from bot.keyboards.common import back_button_menu
 from bot.services import admin as admin_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
@@ -28,7 +29,7 @@ router = Router(name="admin_delete_account")
 async def cb_delete_account_start(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(AdminStates.waiting_delete_account)
     await callback.answer()
-    await safe_edit_text(callback.message, DELETE_ACCOUNT_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, DELETE_ACCOUNT_PROMPT, reply_markup=back_button_menu(CB_ADMIN_OPEN))
 
 
 @router.message(StateFilter(AdminStates.waiting_delete_account), Command("cancel"))

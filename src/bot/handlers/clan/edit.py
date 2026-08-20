@@ -3,13 +3,14 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config.game import CLAN_DESCRIPTION_MAX_LENGTH, CLAN_NAME_MAX_LENGTH, CLAN_NAME_MIN_LENGTH, CLAN_TOP_IMAGE_ELIGIBLE_COUNT
 from bot.constant.clan import CB_CLAN_EDIT, CB_CLAN_EDIT_DESCRIPTION, CB_CLAN_EDIT_IMAGE, CB_CLAN_EDIT_NAME
 from bot.db.repositories import clan as clan_repo
 from bot.keyboards.clan import edit_menu
+from bot.keyboards.common import back_button_menu
 from bot.services import clan as clan_service
 from bot.states.clan import ClanStates
 from bot.texts.clan import (
@@ -33,11 +34,13 @@ router = Router(name="clan_edit")
 
 
 @router.callback_query(F.data == CB_CLAN_EDIT)
-async def cb_edit_menu(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_edit_menu(callback: CallbackQuery, session: AsyncSession, state: FSMContext) -> None:
     member = await clan_repo.get_member(session, callback.from_user.id)
     if member is None or member.rank not in clan_service.MANAGER_RANKS:
         await callback.answer(NOT_AUTHORIZED, show_alert=True)
         return
+    # Точка возврата "Назад" для флоу ожидания ввода в этом домене (см. CLAUDE.md, 2026-08-21).
+    await state.clear()
     await callback.answer()
 
     top_ids = await clan_repo.list_top_all_time_ids(session, limit=CLAN_TOP_IMAGE_ELIGIBLE_COUNT)
@@ -58,7 +61,7 @@ async def cb_edit_name_start(callback: CallbackQuery, session: AsyncSession, sta
     await safe_edit_text(
         callback.message,
         EDIT_NAME_PROMPT.format(min=CLAN_NAME_MIN_LENGTH, max=CLAN_NAME_MAX_LENGTH),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
+        reply_markup=back_button_menu(CB_CLAN_EDIT),
     )
 
 
@@ -106,7 +109,7 @@ async def cb_edit_description_start(callback: CallbackQuery, session: AsyncSessi
     await safe_edit_text(
         callback.message,
         EDIT_DESCRIPTION_PROMPT.format(max=CLAN_DESCRIPTION_MAX_LENGTH),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
+        reply_markup=back_button_menu(CB_CLAN_EDIT),
     )
 
 
@@ -155,7 +158,7 @@ async def cb_edit_image_start(callback: CallbackQuery, session: AsyncSession, st
 
     await state.set_state(ClanStates.waiting_edit_image)
     await callback.answer()
-    await safe_edit_text(callback.message, EDIT_IMAGE_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, EDIT_IMAGE_PROMPT, reply_markup=back_button_menu(CB_CLAN_EDIT))
 
 
 @router.message(StateFilter(ClanStates.waiting_edit_image), Command("cancel"))

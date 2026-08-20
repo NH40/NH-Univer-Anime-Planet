@@ -9,8 +9,8 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.config.settings import get_settings
 from bot.config.game import TICKET_CAP_SLOT_BONUS
+from bot.config.settings import get_settings
 from bot.constant.admin import (
     CB_ADMIN_FIND_PLAYER_START,
     CB_ADMIN_GIVE_CARD_CARD_PREFIX,
@@ -18,9 +18,11 @@ from bot.constant.admin import (
     CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX,
     CB_ADMIN_OPEN,
     CB_ADMIN_PLAYER_BAN_TOGGLE_PREFIX,
+    CB_ADMIN_PLAYER_GIVE_BATTLE_PASS_PREFIX,
     CB_ADMIN_PLAYER_GIVE_CARD_PREFIX,
     CB_ADMIN_PLAYER_GIVE_COINS_PREFIX,
     CB_ADMIN_PLAYER_GIVE_DUST_PREFIX,
+    CB_ADMIN_PLAYER_GIVE_SUBSCRIPTION_PREFIX,
     CB_ADMIN_PLAYER_GIVE_TICKET_CAP_PERMANENT_PREFIX,
     CB_ADMIN_PLAYER_GIVE_TICKET_CAP_SEASONAL_PREFIX,
     CB_ADMIN_PLAYER_VIEW_PREFIX,
@@ -32,6 +34,7 @@ from bot.constant.admin import (
 from bot.db.models.enums import TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.models.user import User
+from bot.db.repositories import battle_pass as pass_repo
 from bot.db.repositories import card as card_repo
 from bot.db.repositories import clan as clan_repo
 from bot.db.repositories import season as season_repo
@@ -40,6 +43,7 @@ from bot.db.repositories.inventory import add_card, decrement_by
 from bot.db.repositories.user import (
     add_coins,
     add_dust,
+    extend_subscription,
     get_by_id,
     get_by_username,
     grant_ticket_cap_permanent_bonus,
@@ -53,6 +57,7 @@ from bot.keyboards.admin import (
     give_card_universe_menu,
     player_card_menu,
 )
+from bot.keyboards.common import back_button_menu
 from bot.services import admin as admin_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
@@ -62,6 +67,9 @@ from bot.texts.admin import (
     FIND_PLAYER_NOT_FOUND,
     FIND_PLAYER_PROMPT,
     GIVE_AMOUNT_INVALID,
+    GIVE_BATTLE_PASS_ALREADY,
+    GIVE_BATTLE_PASS_DONE,
+    GIVE_BATTLE_PASS_NO_SEASON,
     GIVE_CARD_DONE,
     GIVE_CARD_INVALID,
     GIVE_CARD_NOT_ENOUGH,
@@ -74,6 +82,8 @@ from bot.texts.admin import (
     GIVE_COINS_PROMPT,
     GIVE_DUST_DONE,
     GIVE_DUST_PROMPT,
+    GIVE_SUBSCRIPTION_DONE,
+    GIVE_SUBSCRIPTION_PROMPT,
     GIVE_TICKET_CAP_NO_SEASON,
     GIVE_TICKET_CAP_PERMANENT_DONE,
     GIVE_TICKET_CAP_PERMANENT_PROMPT,
@@ -91,6 +101,7 @@ from bot.texts.admin import (
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="admin")
+_DATE_FMT = "%d.%m.%Y %H:%M"
 
 
 async def resolve_player(session: AsyncSession, raw: str) -> User | None:
@@ -132,7 +143,10 @@ async def cmd_admin(message: Message, redis: Redis) -> None:
 
 
 @router.callback_query(F.data == CB_ADMIN_OPEN)
-async def cb_admin_open(callback: CallbackQuery, redis: Redis) -> None:
+async def cb_admin_open(callback: CallbackQuery, state: FSMContext, redis: Redis) -> None:
+    # Точка возврата "Назад" для нескольких флоу ожидания ввода (см. CLAUDE.md, 2026-08-21)
+    # — чистим состояние defensively, даже если сюда зашли не из середины такого флоу.
+    await state.clear()
     tech_mode = await admin_service.get_tech_mode(redis)
     is_super_admin = admin_service.is_config_admin(callback.from_user.id, get_settings())
     await callback.answer()
@@ -179,7 +193,7 @@ async def cb_stats(callback: CallbackQuery, session: AsyncSession) -> None:
 async def cb_find_player_start(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(AdminStates.waiting_find_player)
     await callback.answer()
-    await safe_edit_text(callback.message, FIND_PLAYER_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(callback.message, FIND_PLAYER_PROMPT, reply_markup=back_button_menu(CB_ADMIN_OPEN))
 
 
 @router.message(StateFilter(AdminStates.waiting_find_player), Command("cancel"))
@@ -209,7 +223,9 @@ async def cb_give_dust_start(callback: CallbackQuery, state: FSMContext) -> None
     await state.set_state(AdminStates.waiting_give_dust)
     await state.update_data(target_user_id=target_id)
     await callback.answer()
-    await safe_edit_text(callback.message, GIVE_DUST_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(
+        callback.message, GIVE_DUST_PROMPT, reply_markup=back_button_menu(f"{CB_ADMIN_PLAYER_VIEW_PREFIX}{target_id}")
+    )
 
 
 @router.message(StateFilter(AdminStates.waiting_give_dust), Command("cancel"))
@@ -264,7 +280,9 @@ async def cb_give_coins_start(callback: CallbackQuery, state: FSMContext) -> Non
     await state.set_state(AdminStates.waiting_give_coins)
     await state.update_data(target_user_id=target_id)
     await callback.answer()
-    await safe_edit_text(callback.message, GIVE_COINS_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
+    await safe_edit_text(
+        callback.message, GIVE_COINS_PROMPT, reply_markup=back_button_menu(f"{CB_ADMIN_PLAYER_VIEW_PREFIX}{target_id}")
+    )
 
 
 @router.message(StateFilter(AdminStates.waiting_give_coins), Command("cancel"))
@@ -330,7 +348,9 @@ async def cb_give_ticket_cap_seasonal_start(callback: CallbackQuery, state: FSMC
     await state.update_data(target_user_id=target_id)
     await callback.answer()
     await safe_edit_text(
-        callback.message, GIVE_TICKET_CAP_SEASONAL_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[])
+        callback.message,
+        GIVE_TICKET_CAP_SEASONAL_PROMPT,
+        reply_markup=back_button_menu(f"{CB_ADMIN_PLAYER_VIEW_PREFIX}{target_id}"),
     )
 
 
@@ -381,7 +401,9 @@ async def cb_give_ticket_cap_permanent_start(callback: CallbackQuery, state: FSM
     await state.update_data(target_user_id=target_id)
     await callback.answer()
     await safe_edit_text(
-        callback.message, GIVE_TICKET_CAP_PERMANENT_PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[])
+        callback.message,
+        GIVE_TICKET_CAP_PERMANENT_PROMPT,
+        reply_markup=back_button_menu(f"{CB_ADMIN_PLAYER_VIEW_PREFIX}{target_id}"),
     )
 
 
@@ -413,6 +435,91 @@ async def apply_give_ticket_cap_permanent(message: Message, state: FSMContext, s
 
     name = target.display_name or str(target.id)
     await message.answer(GIVE_TICKET_CAP_PERMANENT_DONE.format(amount=amount, name=name, bonus=new_bonus))
+
+    target = await get_by_id(session, target_id)
+    text, keyboard = await _render_player_card(session, target)
+    await message.answer(text, reply_markup=keyboard)
+
+
+# --- Выдать Battle Pass (премиум-ветка текущего сезона) — разовое включение без ввода
+# числа, нечего регулировать (см. CLAUDE.md, "Сезонный пасс": разблокировка навсегда до
+# конца сезона, не по дням). Прямой тап, без промежуточного экрана — тот же принцип, что
+# у остальных админ-выдач. ---
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PLAYER_GIVE_BATTLE_PASS_PREFIX))
+async def cb_give_battle_pass(callback: CallbackQuery, session: AsyncSession) -> None:
+    target_id = int(callback.data[len(CB_ADMIN_PLAYER_GIVE_BATTLE_PASS_PREFIX) :])
+    target = await get_by_id(session, target_id)
+    if target is None:
+        await callback.answer(FIND_PLAYER_NOT_FOUND, show_alert=True)
+        return
+
+    season = await season_repo.get_active(session)
+    if season is None:
+        await callback.answer(GIVE_BATTLE_PASS_NO_SEASON, show_alert=True)
+        return
+
+    row = await pass_repo.get_or_create(session, user_id=target_id, season_id=season.id)
+    if row.is_premium:
+        await callback.answer(GIVE_BATTLE_PASS_ALREADY, show_alert=True)
+        return
+
+    await pass_repo.set_premium(session, user_id=target_id, season_id=season.id)
+    await session.commit()
+
+    name = target.display_name or str(target.id)
+    await callback.answer(GIVE_BATTLE_PASS_DONE.format(name=name), show_alert=True)
+
+    text, keyboard = await _render_player_card(session, target)
+    await callback.message.answer(text, reply_markup=keyboard)
+
+
+# --- Выдать подписку (количество дней регулирует админ — тот же паттерн ввода текстом,
+# что give_dust/give_coins) ---
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PLAYER_GIVE_SUBSCRIPTION_PREFIX))
+async def cb_give_subscription_start(callback: CallbackQuery, state: FSMContext) -> None:
+    target_id = int(callback.data[len(CB_ADMIN_PLAYER_GIVE_SUBSCRIPTION_PREFIX) :])
+    await state.set_state(AdminStates.waiting_give_subscription)
+    await state.update_data(target_user_id=target_id)
+    await callback.answer()
+    await safe_edit_text(
+        callback.message,
+        GIVE_SUBSCRIPTION_PROMPT,
+        reply_markup=back_button_menu(f"{CB_ADMIN_PLAYER_VIEW_PREFIX}{target_id}"),
+    )
+
+
+@router.message(StateFilter(AdminStates.waiting_give_subscription), Command("cancel"))
+async def cancel_give_subscription(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer(ACTION_CANCELLED)
+
+
+@router.message(StateFilter(AdminStates.waiting_give_subscription))
+async def apply_give_subscription(message: Message, state: FSMContext, session: AsyncSession) -> None:
+    raw = (message.text or "").strip()
+    if not raw.isdigit() or int(raw) <= 0:
+        await message.answer(GIVE_AMOUNT_INVALID)
+        return
+
+    days = int(raw)
+    data = await state.get_data()
+    target_id = data.get("target_user_id")
+    await state.clear()
+
+    target = await get_by_id(session, target_id) if target_id is not None else None
+    if target is None:
+        await message.answer(FIND_PLAYER_NOT_FOUND)
+        return
+
+    new_until = await extend_subscription(session, user_id=target_id, days=days)
+    await session.commit()
+
+    name = target.display_name or str(target.id)
+    await message.answer(GIVE_SUBSCRIPTION_DONE.format(name=name, days=days, until=new_until.strftime(_DATE_FMT)))
 
     target = await get_by_id(session, target_id)
     text, keyboard = await _render_player_card(session, target)
@@ -495,6 +602,10 @@ async def cb_give_card_pick_universe(callback: CallbackQuery, state: FSMContext,
 @router.callback_query(F.data.startswith(CB_ADMIN_GIVE_CARD_PAGE_PREFIX))
 async def cb_give_card_page(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     page = int(callback.data[len(CB_ADMIN_GIVE_CARD_PAGE_PREFIX) :])
+    # "Назад" с шага "звёзды/количество" (waiting_give_card) сюда возвращает — снимаем
+    # именно МАРКЕР состояния (не всю state data: target_user_id/give_card_universe/
+    # give_card_page ещё нужны _show_card_page ниже, см. CLAUDE.md, 2026-08-21).
+    await state.set_state(None)
     await callback.answer()
     await _show_card_page(callback, state, session, page=page)
 
@@ -508,12 +619,14 @@ async def cb_give_card_pick_card(callback: CallbackQuery, state: FSMContext, ses
         await safe_edit_text(callback.message, GIVE_CARD_NOT_FOUND, reply_markup=InlineKeyboardMarkup(inline_keyboard=[]))
         return
 
+    data = await state.get_data()
+    page = data.get("give_card_page", 1)
     await state.update_data(give_card_id=card_id)
     await state.set_state(AdminStates.waiting_give_card)
     await safe_edit_text(
         callback.message,
         GIVE_CARD_PROMPT.format(card_name=card.name),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
+        reply_markup=back_button_menu(f"{CB_ADMIN_GIVE_CARD_PAGE_PREFIX}{page}"),
     )
 
 
