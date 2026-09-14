@@ -21,6 +21,12 @@ ROLL_ONE_COST = 1
 # --- Подписка (см. CLAUDE.md, "Подписка") ---
 SUBSCRIPTION_DAILY_TICKETS = 5
 SUBSCRIPTION_DAILY_TICKET_INTERVAL_SECONDS = 24 * 60 * 60
+# Пока подписка активна — эффективный кап тикетов поднят на эту величину (3 -> 6), тем же
+# слагаемым, что и купленные слоты капа (см. services/ticket.CAP_SQL_EXPR), а не отдельным
+# необрезаемым бонусом поверх капа — раньше подписка не трогала кап вообще, только ускоряла
+# реген и добавляла +5/24ч сверху (тот бонус как раз НЕ клампится капом, см.
+# SUBSCRIPTION_DAILY_TICKETS выше — осознанно другое поведение, не трогаем).
+SUBSCRIPTION_TICKET_CAP_BONUS = 3
 
 # --- Уведомления (фоновый шедулер, см. services/notify) ---
 NOTIFY_ROLL_REMINDER_INTERVAL_SECONDS = 12 * 60 * 60

@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.config.game import TICKET_NATURAL_CAP
+from bot.config.game import SUBSCRIPTION_TICKET_CAP_BONUS, TICKET_NATURAL_CAP
 from bot.constant.admin import TRANSACTION_REASON_ADMIN_MASS_GRANT
 from bot.services.ticket import CAP_SQL_EXPR
 
@@ -74,6 +74,7 @@ async def mass_grant_tickets(session: AsyncSession, *, amount: int, admin_id: in
         {
             "amount": amount,
             "cap_base": TICKET_NATURAL_CAP,
+            "cap_sub_bonus": SUBSCRIPTION_TICKET_CAP_BONUS,
             "reason": TRANSACTION_REASON_ADMIN_MASS_GRANT,
             "admin_id": admin_id,
         },

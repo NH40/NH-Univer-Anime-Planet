@@ -9,6 +9,8 @@ from bot.constant.clan import (
     CB_CLAN_CANCEL_APPLICATION_PREFIX,
     CB_CLAN_CREATE_START,
     CB_CLAN_DECLINE_INVITE_PREFIX,
+    CB_CLAN_DELETE,
+    CB_CLAN_DELETE_CONFIRM,
     CB_CLAN_EDIT,
     CB_CLAN_EDIT_DESCRIPTION,
     CB_CLAN_EDIT_IMAGE,
@@ -46,6 +48,7 @@ from bot.texts.clan import (
     BTN_CANCEL_APPLICATION,
     BTN_CREATE_CLAN,
     BTN_DECLINE_INVITE,
+    BTN_DELETE_CLAN,
     BTN_EDIT,
     BTN_EDIT_DESCRIPTION,
     BTN_EDIT_IMAGE,
@@ -229,6 +232,7 @@ def ranks_menu(members: list[tuple[int, str]]) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text=name, callback_data=f"{CB_CLAN_SET_RANK_PREFIX}{uid}")] for uid, name in members
     ]
     rows.append([InlineKeyboardButton(text=BTN_TRANSFER, callback_data=CB_CLAN_TRANSFER_START)])
+    rows.append([InlineKeyboardButton(text=BTN_DELETE_CLAN, callback_data=CB_CLAN_DELETE)])
     rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_OPEN)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -293,6 +297,15 @@ def leave_confirm_menu() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text="✅ Подтвердить", callback_data=CB_CLAN_LEAVE_CONFIRM)],
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_OPEN)],
+        ]
+    )
+
+
+def delete_clan_confirm_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Подтвердить", callback_data=CB_CLAN_DELETE_CONFIRM)],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_RANKS)],
         ]
     )
 

@@ -70,6 +70,7 @@ from bot.keyboards.shop import (
 )
 from bot.services import battle_pass as pass_service
 from bot.services import shop
+from bot.services import ticket
 from bot.states.shop import ShopStates
 from bot.texts.common import BTN_SHOP, NEED_START
 from bot.texts.shop import (
@@ -456,8 +457,12 @@ _TICKET_CAP_ASK_TEXT_BY_KIND = {
 }
 
 
-def _ticket_cap_text(user: User) -> str:
-    total_cap = TICKET_NATURAL_CAP + user.ticket_cap_permanent_bonus + user.ticket_cap_seasonal_bonus
+def _ticket_cap_text(user: User, *, total_cap: int) -> str:
+    # total_cap приходит из ticket.get_status() — единственного места, которое реально
+    # считает эффективный кап (учитывает, что сезонный бонус действует только пока это
+    # ЕЩЁ активный сезон, и подписочный бонус — CAP_SQL_EXPR, см. services/ticket) —
+    # пересчитывать ту же формулу здесь второй раз означало бы риск разъехаться, если один
+    # из двух мест забудут обновить при следующей правке капа.
     return TICKET_CAP_SCREEN.format(
         bonus=TICKET_CAP_SLOT_BONUS,
         natural_cap=TICKET_NATURAL_CAP,
@@ -474,7 +479,9 @@ async def cb_open_ticket_cap(callback: CallbackQuery, session: AsyncSession) -> 
     if user is None:
         await callback.message.answer(NEED_START)
         return
-    await safe_edit_text(callback.message, _ticket_cap_text(user), reply_markup=ticket_cap_menu())
+    status = await ticket.get_status(session, user.id)
+    await session.commit()  # get_status могла применить лениво накопленный реген
+    await safe_edit_text(callback.message, _ticket_cap_text(user, total_cap=status.cap), reply_markup=ticket_cap_menu())
 
 
 async def _open_ticket_cap_quantity(callback: CallbackQuery, session: AsyncSession, state: FSMContext, *, kind: str) -> None:

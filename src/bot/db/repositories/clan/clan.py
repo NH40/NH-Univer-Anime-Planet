@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func as sa_func
 from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -51,6 +52,14 @@ async def create(session: AsyncSession, *, name: str, owner_id: int) -> Clan | N
 
 async def set_owner(session: AsyncSession, *, clan_id: int, owner_id: int) -> None:
     await session.execute(update(Clan).where(Clan.id == clan_id).values(owner_id=owner_id))
+
+
+async def delete(session: AsyncSession, clan_id: int) -> None:
+    """Удаляет клан целиком. ClanMember/ClanJoinRequest/ClanWar каскадируются на уровне БД
+    (ondelete="CASCADE", см. db/models/clan.py), users.clan_id участников обнуляется там же
+    (ondelete="SET NULL", см. db/models/user.py) — ничего не нужно чистить вручную здесь.
+    Не коммитит — часть композитной операции удаления клана (см. services/clan.delete_clan)."""
+    await session.execute(sa_delete(Clan).where(Clan.id == clan_id))
 
 
 async def update_profile(

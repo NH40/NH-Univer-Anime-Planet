@@ -10,6 +10,7 @@ from bot.config.game import (
     NOTIFY_ROLL_REMINDER_INTERVAL_SECONDS,
     SUBSCRIPTION_DAILY_TICKET_INTERVAL_SECONDS,
     SUBSCRIPTION_DAILY_TICKETS,
+    SUBSCRIPTION_TICKET_CAP_BONUS,
     TICKET_NATURAL_CAP,
     TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED,
 )
@@ -121,7 +122,11 @@ async def find_and_notify_tickets_full(session: AsyncSession) -> list[int]:
     проход шедулера напомнил бы повторно раньше чем через час. Коммитит сама."""
     result = await session.execute(
         _FIND_TICKETS_FULL_SQL,
-        {"cap_base": TICKET_NATURAL_CAP, "interval": TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED},
+        {
+            "cap_base": TICKET_NATURAL_CAP,
+            "cap_sub_bonus": SUBSCRIPTION_TICKET_CAP_BONUS,
+            "interval": TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED,
+        },
     )
     ids = [row[0] for row in result.all()]
     await session.commit()

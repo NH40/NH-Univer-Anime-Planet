@@ -8,19 +8,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
 from bot.constant.clan import (
+    CB_CLAN_DELETE,
+    CB_CLAN_DELETE_CONFIRM,
     CB_CLAN_RANKS,
     CB_CLAN_SET_RANK_PREFIX,
     CB_CLAN_TRANSFER_CONFIRM_PREFIX,
     CB_CLAN_TRANSFER_START,
+    LOCK_ACTION_DELETE_CLAN,
     LOCK_ACTION_TRANSFER_OWNERSHIP,
 )
 from bot.db.models.enums import ClanRank
 from bot.db.repositories import clan as clan_repo
 from bot.db.repositories.user import get_by_id as get_user_by_id
-from bot.handlers.clan.clan import render_clan_card
-from bot.keyboards.clan import rank_set_menu, ranks_menu, transfer_confirm_menu, transfer_menu
+from bot.handlers.clan.clan import render_clan_card, render_no_clan_screen
+from bot.keyboards.clan import delete_clan_confirm_menu, rank_set_menu, ranks_menu, transfer_confirm_menu, transfer_menu
 from bot.services import clan as clan_service
 from bot.texts.clan import (
+    DELETE_CLAN_CONFIRM,
+    DELETE_CLAN_DONE,
+    NOTIFY_CLAN_DELETED,
     NOT_AUTHORIZED,
     RANKS_HEADER,
     RANK_EMOJI,
@@ -32,6 +38,7 @@ from bot.texts.clan import (
     TRANSFER_DONE,
     TRANSFER_PROMPT,
 )
+from bot.utils.notify import notify
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="clan_ranks")
@@ -165,3 +172,48 @@ async def cb_transfer_confirm_step(callback: CallbackQuery, session: AsyncSessio
 
     new_member = await clan_repo.get_member(session, actor_id)
     await render_clan_card(bot, callback.message.chat.id, session, new_member, old_message=callback.message)
+
+
+@router.callback_query(F.data == CB_CLAN_DELETE)
+async def cb_delete_start(callback: CallbackQuery, session: AsyncSession) -> None:
+    member = await clan_repo.get_member(session, callback.from_user.id)
+    if member is None or member.rank != ClanRank.owner:
+        await callback.answer(NOT_AUTHORIZED, show_alert=True)
+        return
+    await callback.answer()
+
+    clan = await clan_repo.get_by_id(session, member.clan_id)
+    await safe_edit_text(
+        callback.message,
+        DELETE_CLAN_CONFIRM.format(name=clan.name if clan else ""),
+        reply_markup=delete_clan_confirm_menu(),
+    )
+
+
+@router.callback_query(F.data == CB_CLAN_DELETE_CONFIRM)
+async def cb_delete_confirm(callback: CallbackQuery, session: AsyncSession, redis: Redis, bot: Bot) -> None:
+    actor_id = callback.from_user.id
+    member = await clan_repo.get_member(session, actor_id)
+    if member is None or member.rank != ClanRank.owner:
+        await callback.answer(NOT_AUTHORIZED, show_alert=True)
+        return
+
+    clan = await clan_repo.get_by_id(session, member.clan_id)
+    clan_name = clan.name if clan else ""
+
+    async with try_acquire(redis, action_lock(actor_id, LOCK_ACTION_DELETE_CLAN)) as acquired:
+        if not acquired:
+            await callback.answer()
+            return
+
+        try:
+            other_member_ids = await clan_service.delete_clan(session, clan_id=member.clan_id, actor_id=actor_id)
+        except clan_service.NotAuthorizedError:
+            await callback.answer(NOT_AUTHORIZED, show_alert=True)
+            return
+        await callback.answer(DELETE_CLAN_DONE.format(name=clan_name), show_alert=True)
+
+    for other_id in other_member_ids:
+        await notify(bot, other_id, NOTIFY_CLAN_DELETED.format(name=clan_name))
+
+    await render_no_clan_screen(bot, callback.message.chat.id, callback.message, session, actor_id)

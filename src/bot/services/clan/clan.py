@@ -288,6 +288,22 @@ async def set_image(session: AsyncSession, *, clan_id: int, actor_id: int, image
     await session.commit()
 
 
+async def delete_clan(session: AsyncSession, *, clan_id: int, actor_id: int) -> list[int]:
+    """Удаляет клан целиком — доступно только владельцу (в отличие от leave_clan, где
+    владелец обязан СНАЧАЛА передать клан — удаление это альтернативный выход, когда
+    передавать некому/незачем). Список остальных участников читается ДО удаления — иначе
+    каскад (ondelete=CASCADE на ClanMember) уже стёр бы их строки в этой же транзакции,
+    а вызывающему хендлеру нужны их id, чтобы разослать уведомление о роспуске клана."""
+    member = await clan_repo.get_member(session, actor_id)
+    if member is None or member.clan_id != clan_id or member.rank != ClanRank.owner:
+        raise NotAuthorizedError
+
+    other_member_ids = [m.user_id for m in await clan_repo.list_members(session, clan_id) if m.user_id != actor_id]
+    await clan_repo.delete(session, clan_id)
+    await session.commit()
+    return other_member_ids
+
+
 async def leave_clan(session: AsyncSession, *, user_id: int) -> None:
     member = await clan_repo.get_member(session, user_id)
     if member is None:

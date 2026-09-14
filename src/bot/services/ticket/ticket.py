@@ -6,13 +6,21 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.config.game import TICKET_NATURAL_CAP, TICKET_REGEN_INTERVAL_SECONDS, TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED
+from bot.config.game import (
+    SUBSCRIPTION_TICKET_CAP_BONUS,
+    TICKET_NATURAL_CAP,
+    TICKET_REGEN_INTERVAL_SECONDS,
+    TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED,
+)
 
 # Эффективный кап тикета — не просто TICKET_NATURAL_CAP, а он же + купленные в магазине
 # слоты (см. CLAUDE.md, "Магазин: слот капа тикетов"): ticket_cap_permanent_bonus стакается
 # всегда, ticket_cap_seasonal_bonus — ТОЛЬКО пока ticket_cap_seasonal_season_id совпадает с
 # ID ещё активного сезона (сезон переключается админом, не календарным таймером — тот же
-# принцип границы, что у ubp_season). Строка `users` уже читается/блокируется в этой же CTE,
+# принцип границы, что у ubp_season). Плюс :cap_sub_bonus, пока подписка активна
+# (subscription_until > now()) — см. CLAUDE.md, "Подписка": подписчик получает эффективный
+# кап 3+3=6, а не 3, регена корректно замораживается на 6/6 (изменено 2026-09-14, раньше
+# подписка кап вообще не трогала). Строка `users` уже читается/блокируется в этой же CTE,
 # поэтому подзапрос к `seasons` не требует отдельного похода в БД сверху. Выражение
 # продублировано несколько раз внутри одного SELECT — Postgres не даёт сослаться на алиас
 # соседней колонки внутри того же SELECT (та же причина, по которой effective_interval ниже
@@ -20,11 +28,13 @@ from bot.config.game import TICKET_NATURAL_CAP, TICKET_REGEN_INTERVAL_SECONDS, T
 # services/notify (уведомление "тикеты заполнены") и services/admin/mass_grant (массовая
 # выдача тикетов), у которых тот же анти-эксплойт freeze-паттерн на СВОИХ raw SQL — те
 # запросы обязаны сравнивать с тем же эффективным капом, иначе игрок с купленным слотом
-# получит уведомление/заморозку регена раньше настоящего личного потолка.
+# или активной подпиской получит уведомление/заморозку регена раньше настоящего личного
+# потолка. Все три места обязаны биндить :cap_sub_bonus в параметрах наравне с :cap_base.
 CAP_SQL_EXPR = (
     "(:cap_base + ticket_cap_permanent_bonus + CASE "
     "WHEN ticket_cap_seasonal_season_id = (SELECT id FROM seasons WHERE is_active = true) "
-    "THEN ticket_cap_seasonal_bonus ELSE 0 END)"
+    "THEN ticket_cap_seasonal_bonus ELSE 0 END + "
+    "CASE WHEN subscription_until > now() THEN CAST(:cap_sub_bonus AS INTEGER) ELSE 0 END)"
 )
 
 # Один атомарный запрос: досчитывает лениво накопленный реген (с "заморозкой" таймера,
@@ -91,6 +101,7 @@ _GRANT_SQL = text(
 def _params(user_id: int, n: int) -> dict[str, object]:
     return {
         "cap_base": TICKET_NATURAL_CAP,
+        "cap_sub_bonus": SUBSCRIPTION_TICKET_CAP_BONUS,
         "interval_normal": TICKET_REGEN_INTERVAL_SECONDS,
         "interval_sub": TICKET_REGEN_INTERVAL_SECONDS_SUBSCRIBED,
         "user_id": user_id,
@@ -121,7 +132,12 @@ async def grant(session: AsyncSession, user_id: int, amount: int) -> int:
     клампится к 0 (GREATEST в _GRANT_SQL), не уходит в минус. Не коммитит — см. get_balance."""
     result = await session.execute(
         _GRANT_SQL,
-        {"amount": amount, "cap_base": TICKET_NATURAL_CAP, "user_id": user_id},
+        {
+            "amount": amount,
+            "cap_base": TICKET_NATURAL_CAP,
+            "cap_sub_bonus": SUBSCRIPTION_TICKET_CAP_BONUS,
+            "user_id": user_id,
+        },
     )
     return result.scalar_one()
 

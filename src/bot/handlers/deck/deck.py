@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from aiogram import F, Router
+from aiogram.exceptions import TelegramAPIError, TelegramRetryAfter
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from redis.asyncio import Redis
@@ -39,6 +43,7 @@ from bot.texts.deck import (
     NO_DESCRIPTION,
     NO_UNIVERSE_SELECTED,
     NOT_ENOUGH_TICKETS,
+    ROLL_DELIVERY_FAILED,
     TIER_EMOJI,
     TIER_NAMES,
     UNIVERSE_NOT_READY,
@@ -49,6 +54,7 @@ from bot.utils.mini_app import resolve_mini_app_base_url
 from bot.utils.safe_edit import safe_edit_text
 
 router = Router(name="deck")
+log = logging.getLogger(__name__)
 
 
 def _card_caption(card: Card, stars: int, universe_title: str, quantity: int) -> str:
@@ -149,8 +155,34 @@ async def cb_roll1(callback: CallbackQuery, session: AsyncSession, redis: Redis)
 
         universe = await get_universe(session, user.universe_selected)
         caption = _card_caption(result.card, result.stars, universe.title, result.owned_quantity)
-        photo = await get_card_photo(redis, result.card)
-        sent = await callback.message.answer_photo(photo, caption=caption, reply_markup=roll_result_menu())
+
+        # Тикет уже списан и карта уже в инвентаре (roll_one закоммитила транзакцию выше) —
+        # с этой точки отправка фото это чисто доставка результата игроку, а не часть
+        # игровой транзакции. При частых тапах (rate limit Telegram, первая отправка ещё
+        # не закэшированной картинки) sendPhoto может упасть — раньше исключение здесь
+        # улетало наружу необработанным, и игрок видел ощущение "тикет пропал, карты нет",
+        # хотя на самом деле карта уже лежала в коллекции, просто сообщение не дошло (см.
+        # CLAUDE.md, баг "недостижимые..." — тот же класс проблемы, другая причина). Один
+        # повтор после TelegramRetryAfter, иначе — честный текстовый фоллбэк вместо тишины.
+        sent = None
+        for attempt in range(2):
+            try:
+                photo = await get_card_photo(redis, result.card)
+                sent = await callback.message.answer_photo(photo, caption=caption, reply_markup=roll_result_menu())
+                break
+            except TelegramRetryAfter as exc:
+                if attempt == 0:
+                    await asyncio.sleep(exc.retry_after)
+                    continue
+                log.warning("roll photo delivery: retry_after exceeded for card_id=%s", result.card.id)
+            except TelegramAPIError:
+                log.exception("roll photo delivery failed for card_id=%s", result.card.id)
+                break
+
+        if sent is None:
+            await callback.message.answer(ROLL_DELIVERY_FAILED, reply_markup=roll_result_menu())
+            return
+
         await cache_card_photo(redis, result.card.id, sent)
 
 
