@@ -47,7 +47,17 @@ export function BattlePassTile({
 	)
 	return (
 		<button type='button' class={cls} disabled={state !== 'ready'} onClick={onClick}>
-			{state === 'locked' && <Lock size={16} />}
+			{state === 'locked' && (
+				// Награда детерминирована по позиции в круге и не зависит от того, дошёл ли до неё
+				// игрок — раньше локнутая ячейка показывала только замок, без превью того, что
+				// ждёт на будущем уровне (жалоба пользователя 2026-09-15). Показываем и то, и
+				// другое: замок остаётся основным сигналом "недоступно", награда — приглушённая
+				// (тем же .bp-tile-locked{opacity:0.4}, что уже приглушал всю ячейку целиком).
+				<span class='bp-tile-locked-content'>
+					<Lock size={12} />
+					<RewardContent dust={dust} tickets={tickets} coins={coins} />
+				</span>
+			)}
 			{state === 'claimed' && <Check size={18} />}
 			{state === 'ready' && <RewardContent dust={dust} tickets={tickets} coins={coins} />}
 		</button>

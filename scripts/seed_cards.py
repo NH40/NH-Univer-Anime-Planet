@@ -2,10 +2,28 @@
 карточки в БД (таблицы universes, cards). Безопасно перезапускать — используется upsert,
 повторный запуск подхватит переименования/новые файлы и не создаст дублей.
 
-Описания карт (необязательно) — один файл assets/cards/<universe>/descriptions.csv на
-вселенную, колонки "id,description" (id — то же число, что в имени файла карты, ведущие
-нули не важны). Значения с запятой берите в кавычки (обычный CSV). Карта, для которой в
-файле нет строки, останется без описания.
+Описания карт (необязательно) — один файл descriptions.csv на папку (обычную UBP-папку,
+или celestial/divine — см. ниже), колонки "id,description" (id — то же число, что в имени
+файла карты, ведущие нули не важны). Значения с запятой берите в кавычки (обычный CSV).
+Карта, для которой в файле нет строки, останется без описания.
+
+Небесные и божественные карты (см. CLAUDE.md, "Небесные карты") — два зарезервированных
+имени папки ВНУТРИ каждой вселенной, вместо "<ubp>UBP":
+    assets/cards/<universe>/celestial/<id>_<Name>.<ext> — ровно CELESTIAL_CARD_COUNT (10)
+        штук на весь бот суммарно (по несколько на разные вселенные, как решит админ).
+        base_ubp всегда CELESTIAL_CARD_BASE_UBP, id/имя — любые, не пересекаются между
+        вселенными по смыслу (просто уникальные внутри своей папки).
+    assets/cards/<universe>/divine/<id>_<Name>.<ext> — по одной "обычной" (полный сбор
+        ростера вселенной) карте на вселенную, ЛЮБОЙ id, КРОМЕ:
+          - id=1000 — единственная на весь бот, за одновременное владение ВСЕМИ небесными;
+          - id=999  — единственная на весь бот, псевдо-божественная (слабее 1000, за
+            владение всеми небесными КОГДА-ЛИБО, не обязательно одновременно).
+        Обе карты 1000/999 физически кладутся в папку divine/ ЛЮБОЙ одной вселенной на
+        выбор админа (просто как место хранения картинки) — они не привязаны к конкретной
+        вселенной по смыслу.
+Каждая из этих папок тоже может иметь свой descriptions.csv. Скрипт предупредит (не
+заблокирует запуск), если количество небесных/1000/999 карт не совпадает с ожидаемым —
+это ожидаемое переходное состояние, пока админ заполняет данные постепенно.
 
 Запуск (внутри контейнера бота или локально с тем же DATABASE_URL):
     python scripts/seed_cards.py [--assets-dir assets/cards] [--dry-run]
@@ -27,7 +45,13 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from bot.config.event import EVENT_DEFS  # noqa: E402
-from bot.config.game import TIER_CHANCE_PERCENT  # noqa: E402
+from bot.config.game import (  # noqa: E402
+    CELESTIAL_CARD_BASE_UBP,
+    CELESTIAL_CARD_COUNT,
+    DIVINE_CARD_BASE_UBP,
+    DIVINE_PSEUDO_CARD_BASE_UBP,
+    TIER_CHANCE_PERCENT,
+)
 from bot.config.settings import get_settings  # noqa: E402
 from bot.db.models.card import Card  # noqa: E402
 from bot.db.models.universe import Universe  # noqa: E402
@@ -60,6 +84,19 @@ KNOWN_UNIVERSE_TITLES = {
 
 DESCRIPTIONS_FILENAME = "descriptions.csv"
 
+# Небесные/божественные карты (см. CLAUDE.md, "Небесные карты") — не папки-тиры вида
+# "<n>UBP", а два зарезервированных имени папки внутри каждой вселенной, со своим
+# descriptions.csv по тому же формату, что и обычные карты. Не участвуют в проверке
+# полноты тиров (check_tier_completeness) и не попадают под предупреждение "тир не входит
+# в TIER_CHANCE_PERCENT" — у них своя, отдельная логика ниже, не общий UBP_DIR_RE проход.
+CELESTIAL_DIR_NAME = "celestial"
+DIVINE_DIR_NAME = "divine"
+# external_id, зарезервированные пользователем под особые подтипы божественной карты
+# (2026-09-15) — любой другой id в папке divine/ трактуется как обычный "000"-вариант
+# (полный сбор ростера СВОЕЙ вселенной), без отдельной метки в имени файла/CSV.
+DIVINE_GLOBAL_EXTERNAL_ID = "1000"
+DIVINE_PSEUDO_EXTERNAL_ID = "999"
+
 
 @dataclass
 class ParsedCard:
@@ -69,6 +106,16 @@ class ParsedCard:
     base_ubp: int
     image_path: str  # относительно assets-dir, например onepiece/6000UBP/001_Name.png
     description: str | None = None
+    is_celestial: bool = False
+    is_divine: bool = False
+    is_divine_global: bool = False
+    is_divine_pseudo: bool = False
+
+
+def _clean_name(raw: str) -> str:
+    name = raw.replace("_", " ").strip()
+    name = _PASCAL_CASE_BOUNDARY_RE.sub(" ", name)
+    return re.sub(r" {2,}", " ", name).strip()
 
 
 def load_descriptions(universe_dir: Path) -> dict[str, str]:
@@ -107,6 +154,9 @@ def scan_assets(assets_dir: Path) -> tuple[dict[str, str], list[ParsedCard]]:
         descriptions = load_descriptions(universe_dir)
 
         for ubp_dir in sorted(p for p in universe_dir.iterdir() if p.is_dir()):
+            if ubp_dir.name.lower() in (CELESTIAL_DIR_NAME, DIVINE_DIR_NAME):
+                continue  # разбираются отдельно ниже, не общим UBP-тир проходом
+
             match = UBP_DIR_RE.match(ubp_dir.name)
             if not match:
                 log.warning("Пропускаю папку с непонятным форматом UBP: %s", ubp_dir)
@@ -127,22 +177,62 @@ def scan_assets(assets_dir: Path) -> tuple[dict[str, str], list[ParsedCard]]:
                     log.warning("Пропускаю файл с непонятным именем: %s", file)
                     continue
 
-                raw_name = file_match.group("name").replace("_", " ").strip()
-                name = _PASCAL_CASE_BOUNDARY_RE.sub(" ", raw_name)
-                name = re.sub(r" {2,}", " ", name).strip()
                 card_id = file_match.group("id")
                 cards.append(
                     ParsedCard(
                         universe_code=code,
                         external_id=card_id,
-                        name=name,
+                        name=_clean_name(file_match.group("name")),
                         base_ubp=base_ubp,
                         image_path=str(file.relative_to(assets_dir)).replace("\\", "/"),
                         description=descriptions.get(str(int(card_id))),
                     )
                 )
 
+        cards.extend(_scan_relic_dir(assets_dir, universe_dir, code, CELESTIAL_DIR_NAME))
+        cards.extend(_scan_relic_dir(assets_dir, universe_dir, code, DIVINE_DIR_NAME))
+
     return universes, cards
+
+
+def _scan_relic_dir(assets_dir: Path, universe_dir: Path, universe_code: str, dir_name: str) -> list[ParsedCard]:
+    """Небесные (`celestial/`) или божественные (`divine/`) карты этой вселенной (см.
+    CLAUDE.md, "Небесные карты") — своя папка со своим descriptions.csv (тот же формат,
+    что у обычных карт), но фиксированный base_ubp из config/game (не из имени папки) и
+    отдельные флаги на Card вместо участия в обычном тир-пикере."""
+    relic_dir = next((p for p in universe_dir.iterdir() if p.is_dir() and p.name.lower() == dir_name), None)
+    if relic_dir is None:
+        return []
+
+    is_celestial = dir_name == CELESTIAL_DIR_NAME
+    base_ubp = CELESTIAL_CARD_BASE_UBP if is_celestial else DIVINE_CARD_BASE_UBP
+    descriptions = load_descriptions(relic_dir)
+
+    cards: list[ParsedCard] = []
+    for file in sorted(p for p in relic_dir.iterdir() if p.is_file() and p.name != DESCRIPTIONS_FILENAME):
+        file_match = CARD_FILE_RE.match(file.name)
+        if not file_match:
+            log.warning("Пропускаю файл с непонятным именем: %s", file)
+            continue
+
+        card_id = file_match.group("id")
+        is_divine_global = not is_celestial and card_id == DIVINE_GLOBAL_EXTERNAL_ID
+        is_divine_pseudo = not is_celestial and card_id == DIVINE_PSEUDO_EXTERNAL_ID
+        cards.append(
+            ParsedCard(
+                universe_code=universe_code,
+                external_id=card_id,
+                name=_clean_name(file_match.group("name")),
+                base_ubp=DIVINE_PSEUDO_CARD_BASE_UBP if is_divine_pseudo else base_ubp,
+                image_path=str(file.relative_to(assets_dir)).replace("\\", "/"),
+                description=descriptions.get(str(int(card_id))),
+                is_celestial=is_celestial,
+                is_divine=not is_celestial,
+                is_divine_global=is_divine_global or is_divine_pseudo,
+                is_divine_pseudo=is_divine_pseudo,
+            )
+        )
+    return cards
 
 
 def check_tier_completeness(universes: dict[str, str], cards: list[ParsedCard]) -> bool:
@@ -168,6 +258,38 @@ def check_tier_completeness(universes: dict[str, str], cards: list[ParsedCard]) 
                 missing,
             )
     return ok
+
+
+def check_relic_completeness(cards: list[ParsedCard]) -> None:
+    """Небесные/божественные карты (см. CLAUDE.md, "Небесные карты") — не блокирует крутку
+    (в отличие от check_tier_completeness, у этих карт нет обязательного минимума для
+    штатной работы бота), только предупреждает о несоответствии ожидаемому количеству —
+    админ заполняет эти карты вручную и постепенно, по одной."""
+    celestial_count = sum(1 for c in cards if c.is_celestial)
+    if celestial_count != CELESTIAL_CARD_COUNT:
+        log.warning(
+            "Небесных карт найдено %d, ожидается ровно %d (CELESTIAL_CARD_COUNT) — "
+            "остальные ещё не добавлены в assets/cards/<вселенная>/celestial/.",
+            celestial_count,
+            CELESTIAL_CARD_COUNT,
+        )
+
+    global_count = sum(1 for c in cards if c.is_divine_global and not c.is_divine_pseudo)
+    pseudo_count = sum(1 for c in cards if c.is_divine_pseudo)
+    if global_count != 1:
+        log.warning(
+            "Найдено %d карт с id=%s в папках divine/ (ожидается ровно 1 — единственная "
+            "\"1000\"-божественная на весь бот).",
+            global_count,
+            DIVINE_GLOBAL_EXTERNAL_ID,
+        )
+    if pseudo_count != 1:
+        log.warning(
+            "Найдено %d карт с id=%s в папках divine/ (ожидается ровно 1 — единственная "
+            "псевдо-божественная на весь бот).",
+            pseudo_count,
+            DIVINE_PSEUDO_EXTERNAL_ID,
+        )
 
 
 async def apply(universes: dict[str, str], cards: list[ParsedCard], *, dry_run: bool) -> None:
@@ -196,6 +318,10 @@ async def apply(universes: dict[str, str], cards: list[ParsedCard], *, dry_run: 
                     base_ubp=card.base_ubp,
                     image_path=card.image_path,
                     description=card.description,
+                    is_celestial=card.is_celestial,
+                    is_divine=card.is_divine,
+                    is_divine_global=card.is_divine_global,
+                    is_divine_pseudo=card.is_divine_pseudo,
                 )
                 .on_conflict_do_update(
                     index_elements=[Card.universe_code, Card.external_id],
@@ -204,6 +330,10 @@ async def apply(universes: dict[str, str], cards: list[ParsedCard], *, dry_run: 
                         "base_ubp": card.base_ubp,
                         "image_path": card.image_path,
                         "description": card.description,
+                        "is_celestial": card.is_celestial,
+                        "is_divine": card.is_divine,
+                        "is_divine_global": card.is_divine_global,
+                        "is_divine_pseudo": card.is_divine_pseudo,
                     },
                 )
             )
@@ -235,6 +365,7 @@ async def main() -> None:
         log.info("  вселенная: %s (%s)", u_code, u_title)
 
     check_tier_completeness(universes, cards)
+    check_relic_completeness(cards)
 
     await apply(universes, cards, dry_run=args.dry_run)
     log.info("Готово%s.", " (dry-run, ничего не записано)" if args.dry_run else "")

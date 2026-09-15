@@ -4,6 +4,9 @@ from bot.constant.profile.profile import (
     CB_PROFILE_OPEN,
     CB_PROFILE_REFERRALS,
     CB_PROFILE_RENAME,
+    CB_TOP_PREFIX,
+    TOP_SCOPE_SEASON,
+    TOP_SCOPE_TOTAL,
 )
 
 __all__ = [
@@ -12,4 +15,7 @@ __all__ = [
     "CB_PROFILE_OPEN",
     "CB_PROFILE_REFERRALS",
     "CB_PROFILE_RENAME",
+    "CB_TOP_PREFIX",
+    "TOP_SCOPE_SEASON",
+    "TOP_SCOPE_TOTAL",
 ]

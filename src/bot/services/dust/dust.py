@@ -29,6 +29,13 @@ class NotEnoughCopiesError(Exception):
         self.needed = needed
 
 
+class RelicCardError(Exception):
+    """Небесная/божественная карта (см. CLAUDE.md, "Небесные карты") — распыление
+    недоступно, они не участвуют в обычной экономике пыли. `distill_all_owned` защищена на
+    уровне SQL (JOIN cards с фильтром), сюда попадают только точечные вызовы (distill/
+    distill_amount) с конкретным card_id."""
+
+
 async def _credit_dust(session: AsyncSession, *, user_id: int, reward: int) -> None:
     """Общий хвост всех вариантов распыления: начислить пыль + один audit-ряд в
     transactions. Не коммитит — вызывающая функция коммитит один раз (правило 10)."""
@@ -48,6 +55,8 @@ async def distill(
     card = await get_card_by_id(session, card_id)
     if card is None:
         raise CardNotFoundError(card_id)
+    if card.is_celestial or card.is_divine:
+        raise RelicCardError
 
     target = 1 if keep_one else 0
     dusted = await decrement_to(session, user_id=user_id, card_id=card_id, stars=stars, target=target)
@@ -69,6 +78,8 @@ async def distill_amount(session: AsyncSession, *, user_id: int, card_id: int, s
     card = await get_card_by_id(session, card_id)
     if card is None:
         raise CardNotFoundError(card_id)
+    if card.is_celestial or card.is_divine:
+        raise RelicCardError
 
     ok = await decrement_by(session, user_id=user_id, card_id=card_id, stars=stars, amount=amount)
     if not ok:

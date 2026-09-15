@@ -12,6 +12,13 @@ def leaderboard_players_season(season_id: int) -> str:
     return f"leaderboard:players:season:{season_id}"
 
 
+def leaderboard_universe_season(season_id: int, universe_code: str) -> str:
+    """Отдельный отсортированный набор на каждую (сезон, вселенная) — см. CLAUDE.md, "Топ по
+    вселенной". Параллелен leaderboard_players_season, не заменяет его — общий счётчик
+    игрока по-прежнему нужен войнам кланов/Battle Pass."""
+    return f"leaderboard:players:universe:{season_id}:{universe_code}"
+
+
 def tech_mode_flag() -> str:
     return "flag:tech_mode"
 

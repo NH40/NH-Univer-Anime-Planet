@@ -9,9 +9,12 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from redis.asyncio import Redis
+
 from bot.cache.redis_client import make_redis, make_redis_pool
 from bot.config.settings import get_settings
 from bot.db.session import make_engine, make_session_factory
+from bot.handlers import celestial as celestial_handlers
 from bot.handlers import get_routers
 from bot.logging_setup import setup_logging
 from bot.middlewares.ban_check import BanCheckMiddleware
@@ -24,15 +27,20 @@ from bot.services.notify import SWEEP_INTERVAL_SECONDS, run_sweep
 log = logging.getLogger(__name__)
 
 
-async def _notify_sweep_loop(bot: Bot, session_factory: async_sessionmaker[AsyncSession]) -> None:
+async def _notify_sweep_loop(bot: Bot, session_factory: async_sessionmaker[AsyncSession], redis: Redis) -> None:
     """Единственный фоновый таск в проекте — раз в SWEEP_INTERVAL_SECONDS начисляет
-    тикеты подписчикам и рассылает push-уведомления (см. services/notify, CLAUDE.md
-    "Подписка"). Всё остальное в боте реагирует на действия игрока или считается лениво —
-    это единственная работа, которая обязана случиться сама по себе, по таймеру."""
+    тикеты подписчикам, рассылает push-уведомления (см. services/notify, CLAUDE.md
+    "Подписка") и разруливает истёкшие дедлайны небесных карт (решение владельца/игра боя —
+    см. CLAUDE.md, "Небесные карты", handlers/celestial.run_sweep) — тот же 5-минутный цикл,
+    отдельного шедулера под это заводить не стали (1ч/6ч дедлайны спокойно переживают
+    5-минутную гранулярность проверки). Всё остальное в боте реагирует на действия игрока
+    или считается лениво — это единственная работа, которая обязана случиться сама по себе,
+    по таймеру."""
     while True:
         try:
             async with session_factory() as session:
                 await run_sweep(bot, session)
+                await celestial_handlers.run_sweep(bot, session, redis)
         except Exception:
             log.exception("Notify sweep failed")
         await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
@@ -79,7 +87,7 @@ async def main() -> None:
 
     dp.include_routers(*get_routers())
 
-    sweep_task = asyncio.create_task(_notify_sweep_loop(bot, session_factory))
+    sweep_task = asyncio.create_task(_notify_sweep_loop(bot, session_factory, redis))
 
     try:
         log.info("Starting bot polling")

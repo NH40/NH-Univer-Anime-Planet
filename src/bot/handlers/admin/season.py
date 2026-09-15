@@ -59,7 +59,11 @@ async def _notify_season_change(
                 bot,
                 reward.user_id,
                 SEASON_TOP_REWARD_NOTIFY.format(
-                    place=reward.place, ubp_season=reward.ubp_season, coins=reward.coins, version=version
+                    place=reward.place,
+                    ubp_season=reward.ubp_season,
+                    coins=reward.coins,
+                    version=version,
+                    universe=reward.universe_title,
                 ),
             )
         async with session_factory() as session:

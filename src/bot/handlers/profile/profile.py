@@ -9,7 +9,8 @@ from aiogram.types import CallbackQuery, Message
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.cache.leaderboard import get_count, get_page, get_rank, get_top
+from bot.cache.leaderboard import get_count, get_page, get_rank
+from bot.cache.universe_leaderboard import get_top as get_universe_top_cached
 from bot.config.game import (
     REFERRAL_DONATE_CUT_PERCENT,
     REFERRAL_ROLL_REWARD_COINS,
@@ -22,14 +23,21 @@ from bot.constant.profile import (
     CB_PROFILE_OPEN,
     CB_PROFILE_REFERRALS,
     CB_PROFILE_RENAME,
+    CB_TOP_PREFIX,
+    TOP_SCOPE_SEASON,
+    TOP_SCOPE_TOTAL,
 )
 from bot.constant.referral import REFERRAL_DEEPLINK_PREFIX
 from bot.db.repositories.clan import get_name as get_clan_name
 from bot.db.repositories.inventory import UniverseProgress, get_universe_progress
 from bot.db.repositories.season import get_active as get_active_season
+from bot.db.repositories.universe import get_by_code as get_universe_by_code
+from bot.db.repositories.universe import list_active as list_active_universes
+from bot.db.repositories.universe_ubp import get_rank_row as get_universe_ubp_row
+from bot.db.repositories.universe_ubp import get_top_from_db as get_universe_top_from_db
 from bot.db.repositories.user import get_by_id, get_many_by_ids, get_referral_stats, set_display_name
 from bot.keyboards.common import back_button_menu
-from bot.keyboards.profile import back_to_profile, players_pager, profile_menu
+from bot.keyboards.profile import back_to_profile, players_pager, profile_menu, top_menu
 from bot.services import ticket
 from bot.services.referral import REFERRAL_REWARD_REASONS
 from bot.states.profile import ProfileStates
@@ -38,6 +46,7 @@ from bot.texts.profile import (
     NO_CLAN,
     NO_RANK,
     NO_USERNAME,
+    NO_UNIVERSE_SELECTED,
     PLAYERS_EMPTY,
     PLAYERS_HEADER,
     PLAYERS_LINE,
@@ -57,6 +66,10 @@ from bot.texts.profile import (
     TOP_EMPTY,
     TOP_HEADER,
     TOP_LINE,
+    TOP_NO_ACTIVE_UNIVERSES,
+    TOP_SCOPE_SEASON_LABEL,
+    TOP_SCOPE_TOTAL_LABEL,
+    TOP_SEASON_REWARD_NOTE,
 )
 from bot.utils.formatting import esc, format_countdown, format_number, progress_bar
 from bot.utils.mini_app import resolve_mini_app_base_url
@@ -102,6 +115,19 @@ async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> 
     rank = await get_rank(redis, season.id, user_id) if season else None
     ticket_status = await ticket.get_status(session, user_id)
     progress = await get_universe_progress(session, user_id)
+
+    # Одна строка "UBP вселенной" — только ТЕКУЩАЯ выбранная для крутки вселенная (см.
+    # CLAUDE.md, "Топ по вселенной"), не вся коллекция сразу (для этого есть /top по каждой
+    # вселенной отдельно).
+    universe_title = NO_UNIVERSE_SELECTED
+    universe_ubp = 0
+    if user.universe_selected:
+        universe = await get_universe_by_code(session, user.universe_selected)
+        if universe is not None:
+            universe_title = universe.title
+        universe_row = await get_universe_ubp_row(session, user_id=user_id, universe_code=user.universe_selected)
+        universe_ubp = universe_row.ubp_season if universe_row else 0
+
     await session.commit()  # get_status могла применить лениво накопленный реген тикетов
 
     return PROFILE_CARD.format(
@@ -111,6 +137,8 @@ async def _render_profile(session: AsyncSession, redis: Redis, user_id: int) -> 
         ubp_season=format_number(user.ubp_season),
         rank=format_number(rank) if rank else NO_RANK,
         ubp_total=format_number(user.ubp_total),
+        universe=esc(universe_title),
+        universe_ubp=format_number(universe_ubp),
         tickets_line=_tickets_line(ticket_status),
         total_rolls=format_number(user.total_rolls),
         dust=format_number(user.dust),
@@ -202,17 +230,28 @@ async def apply_rename(message: Message, state: FSMContext, session: AsyncSessio
     await message.answer(RENAME_DONE.format(name=esc(name)))
 
 
-@router.message(Command("top"))
-async def cmd_top(message: Message, session: AsyncSession, redis: Redis) -> None:
-    season = await get_active_season(session)
-    if season is None:
-        await message.answer(TOP_EMPTY)
-        return
+async def _render_top(
+    session: AsyncSession, redis: Redis, *, universe_code: str, universe_title: str, scope: str
+) -> str:
+    """Общий рендер топа ОДНОЙ вселенной за выбранный период (см. CLAUDE.md, "Топ по
+    вселенной") — общего топа по всем вселенным разом больше нет, только по конкретной.
+    "За сезон" читает Redis-лидерборд вселенной (с холодным восстановлением из Postgres),
+    "за всё время" — ubp_total, который никогда не сбрасывается и живого Redis-набора не
+    имеет (см. CLAUDE.md: чисто информационный экран без награды)."""
+    if scope == TOP_SCOPE_TOTAL:
+        rows = await get_universe_top_from_db(session, universe_code=universe_code, by_total=True, limit=10)
+        top = [(row.user_id, row.ubp) for row in rows]
+        scope_label = TOP_SCOPE_TOTAL_LABEL
+        reward_note = ""
+    else:
+        season = await get_active_season(session)
+        top = await get_universe_top_cached(redis, session, season.id, universe_code, 10) if season else []
+        scope_label = TOP_SCOPE_SEASON_LABEL
+        reward_note = TOP_SEASON_REWARD_NOTE
 
-    top = await get_top(redis, session, season.id, 10)
+    header = TOP_HEADER.format(universe=esc(universe_title), scope=scope_label)
     if not top:
-        await message.answer(TOP_EMPTY)
-        return
+        return header + TOP_EMPTY.format(scope=scope_label) + reward_note
 
     users = await get_many_by_ids(session, [uid for uid, _ in top])
     lines = "".join(
@@ -220,7 +259,40 @@ async def cmd_top(message: Message, session: AsyncSession, redis: Redis) -> None
         for i, (uid, ubp) in enumerate(top)
         if uid in users
     )
-    await message.answer(TOP_HEADER + lines)
+    return header + lines + reward_note
+
+
+@router.message(Command("top"))
+async def cmd_top(message: Message, session: AsyncSession, redis: Redis) -> None:
+    universes = await list_active_universes(session)
+    if not universes:
+        await message.answer(TOP_NO_ACTIVE_UNIVERSES)
+        return
+
+    user = await get_by_id(session, message.from_user.id)
+    default_code = user.universe_selected if user and user.universe_selected else universes[0].code
+    selected = next((u for u in universes if u.code == default_code), universes[0])
+
+    text = await _render_top(session, redis, universe_code=selected.code, universe_title=selected.title, scope=TOP_SCOPE_SEASON)
+    await message.answer(text, reply_markup=top_menu(universes, selected_universe=selected.code, scope=TOP_SCOPE_SEASON))
+
+
+@router.callback_query(F.data.startswith(CB_TOP_PREFIX))
+async def cb_top_select(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
+    universe_code, _, scope = callback.data[len(CB_TOP_PREFIX) :].partition(":")
+    if scope not in (TOP_SCOPE_SEASON, TOP_SCOPE_TOTAL):
+        scope = TOP_SCOPE_SEASON
+
+    universes = await list_active_universes(session)
+    selected = next((u for u in universes if u.code == universe_code), None)
+    await callback.answer()
+    if selected is None or not universes:
+        return
+
+    text = await _render_top(session, redis, universe_code=selected.code, universe_title=selected.title, scope=scope)
+    await safe_edit_text(
+        callback.message, text, reply_markup=top_menu(universes, selected_universe=selected.code, scope=scope)
+    )
 
 
 async def _render_players_page(session: AsyncSession, redis: Redis, page: int) -> tuple[str, int]:

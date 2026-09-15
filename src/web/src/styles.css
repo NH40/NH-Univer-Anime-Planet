@@ -560,6 +560,13 @@ select {
   opacity: 0.4;
 }
 
+.bp-tile-locked-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
 .bp-tile-claimed {
   opacity: 0.55;
 }

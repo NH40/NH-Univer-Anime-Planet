@@ -11,9 +11,11 @@ from bot.constant.deck import (
     CB_DECK_OPEN,
     CB_DECK_ROLL1,
 )
+from bot.constant.celestial import CB_CELESTIAL_OPEN
 from bot.constant.dust import CB_DUST_OPEN
 from bot.constant.merge import CB_MERGE_OPEN
 from bot.db.models.card import Card
+from bot.texts.celestial import BTN_CELESTIAL_MENU
 from bot.texts.common import BTN_BACK, BTN_COLLECTION_APP
 from bot.texts.deck import (
     BTN_BACK_CHANCES,
@@ -43,6 +45,7 @@ def deck_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text=BTN_DISENCHANT, callback_data=CB_DUST_OPEN),
             InlineKeyboardButton(text=BTN_MERGE, callback_data=CB_MERGE_OPEN),
         ],
+        [InlineKeyboardButton(text=BTN_CELESTIAL_MENU, callback_data=CB_CELESTIAL_OPEN)],
     ]
     if mini_app_url:
         # Mini App показывает ВСЮ коллекцию игрока сразу (по всем вселенным, см. CLAUDE.md,

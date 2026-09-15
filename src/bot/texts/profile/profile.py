@@ -12,6 +12,7 @@ PROFILE_CARD = (
     "————— <b>РЕЙТИНГ:</b> —————\n\n"
     "⭐ <b>UBP за сезон:</b> {ubp_season}\n"
     "🏆 <b>UBP за всё время:</b> {ubp_total}\n"
+    "🌌 <b>UBP вселенной ({universe}):</b> {universe_ubp}\n"
     "📊 <b>Топ:</b> {rank}\n\n"
     "————— <b>РЕСУРСЫ:</b> —————\n"
     "{tickets_line}\n"
@@ -23,6 +24,11 @@ PROFILE_CARD = (
 NO_USERNAME = "—"
 NO_CLAN = "нет клана"
 NO_RANK = "—"
+# Отдельная строка от общего "UBP за сезон" (см. CLAUDE.md, "Топ по вселенной") — только
+# ТЕКУЩАЯ выбранная для крутки вселенная (User.universe_selected), не все сразу: у игрока
+# может быть прогресс в нескольких вселенных, но профиль — не место для их перечисления
+# (для этого есть отдельный /top по каждой).
+NO_UNIVERSE_SELECTED = "вселенная не выбрана"
 
 PROGRESS_HEADER = "📚 <b>Прогресс по вселенным</b>\n"
 PROGRESS_LINE = "🌌 <b>{universe}</b>\n{bar} {percent}% ({owned}/{total})\n"
@@ -54,9 +60,17 @@ RENAME_INVALID = "Некорректное имя: от 2 до 32 символо
 RENAME_DONE = "Имя обновлено: {name}"
 RENAME_CANCELLED = "Смена имени отменена."
 
-TOP_HEADER = "🏆 <b>Топ-10 игроков сезона</b>\n\n"
+TOP_HEADER = "🏆 <b>Топ — {universe}</b> ({scope})\n\n"
 TOP_LINE = "{place}. {name} — <b>{ubp}</b> UBP\n"
-TOP_EMPTY = "Пока никто не набрал UBP в этом сезоне."
+TOP_EMPTY = "Пока никто не набрал UBP в этой вселенной ({scope})."
+TOP_SCOPE_SEASON_LABEL = "за этот сезон"
+TOP_SCOPE_TOTAL_LABEL = "за всё время"
+BTN_TOP_SCOPE_SEASON = "📅 За этот сезон"
+BTN_TOP_SCOPE_TOTAL = "🏆 За все время"
+# Только "за сезон" реально что-то раздаёт при смене сезона (см. services/season) — "за
+# всё время" чисто информационный, ubp_total никогда не сбрасывается.
+TOP_SEASON_REWARD_NOTE = "\nТоп-10 получит награду при смене сезона."
+TOP_NO_ACTIVE_UNIVERSES = "Пока нет ни одной активной вселенной."
 
 PLAYERS_HEADER = "📋 <b>Рейтинг игроков</b> (стр. {page}/{total_pages})\n\n"
 PLAYERS_LINE = "{place}. {name} (@{username}) — <b>{ubp}</b> UBP\n"

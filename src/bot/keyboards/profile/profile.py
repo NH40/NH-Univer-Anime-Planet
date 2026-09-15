@@ -8,9 +8,13 @@ from bot.constant.profile import (
     CB_PROFILE_OPEN,
     CB_PROFILE_REFERRALS,
     CB_PROFILE_RENAME,
+    CB_TOP_PREFIX,
+    TOP_SCOPE_SEASON,
+    TOP_SCOPE_TOTAL,
 )
+from bot.db.models.universe import Universe
 from bot.texts.common import BTN_BACK, BTN_PROFILE_APP
-from bot.texts.profile import BTN_DAILY_BONUS, BTN_REFERRALS, BTN_RENAME
+from bot.texts.profile import BTN_DAILY_BONUS, BTN_REFERRALS, BTN_RENAME, BTN_TOP_SCOPE_SEASON, BTN_TOP_SCOPE_TOTAL
 from bot.utils.mini_app import mini_app_url as build_mini_app_url
 
 
@@ -39,6 +43,33 @@ def profile_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
 
 def back_to_profile() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=BTN_BACK, callback_data=CB_PROFILE_OPEN)]])
+
+
+def top_menu(universes: list[Universe], *, selected_universe: str, scope: str) -> InlineKeyboardMarkup:
+    """Один экран с двумя независимыми селекторами (см. CLAUDE.md, "Топ по вселенной") —
+    тап по вселенной или по периоду перерисовывает список, сохраняя ВТОРОЙ выбор как есть
+    (оба закодированы в одном callback_data). Активная кнопка отмечена ✅, чтобы было видно
+    текущий выбор без отдельного текста."""
+    universe_row: list[InlineKeyboardButton] = []
+    for universe in universes:
+        label = f"✅ {universe.title}" if universe.code == selected_universe else universe.title
+        universe_row.append(
+            InlineKeyboardButton(text=label, callback_data=f"{CB_TOP_PREFIX}{universe.code}:{scope}")
+        )
+
+    season_label = f"✅ {BTN_TOP_SCOPE_SEASON}" if scope == TOP_SCOPE_SEASON else BTN_TOP_SCOPE_SEASON
+    total_label = f"✅ {BTN_TOP_SCOPE_TOTAL}" if scope == TOP_SCOPE_TOTAL else BTN_TOP_SCOPE_TOTAL
+    scope_row = [
+        InlineKeyboardButton(text=season_label, callback_data=f"{CB_TOP_PREFIX}{selected_universe}:{TOP_SCOPE_SEASON}"),
+        InlineKeyboardButton(text=total_label, callback_data=f"{CB_TOP_PREFIX}{selected_universe}:{TOP_SCOPE_TOTAL}"),
+    ]
+
+    # 2 вселенные в строке — при небольшом числе активных вселенных (сейчас 3) влезает без
+    # переполнения ширины инлайн-клавиатуры Telegram; новые вселенные просто добавляют
+    # ещё строки, без отдельного "другие вселенные"-подменю (см. CLAUDE.md).
+    rows = [universe_row[i : i + 2] for i in range(0, len(universe_row), 2)]
+    rows.append(scope_row)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def players_pager(page: int, total_pages: int) -> InlineKeyboardMarkup:

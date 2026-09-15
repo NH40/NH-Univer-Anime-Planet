@@ -14,11 +14,18 @@ from bot.db.models.season import Season
 from bot.db.models.transaction import Transaction
 from bot.db.models.universe import Universe
 from bot.db.models.user import User
+from bot.db.models.user_universe_ubp import UserUniverseUbp
+from bot.db.models.celestial_ownership import CelestialOwnership
+from bot.db.models.celestial_battle import CelestialBattle
+from bot.db.models.celestial_history import CelestialHistory
 
 __all__ = [
     "BattlePass",
     "BattlePassClaim",
     "Card",
+    "CelestialOwnership",
+    "CelestialBattle",
+    "CelestialHistory",
     "Clan",
     "ClanJoinRequest",
     "ClanMember",
@@ -35,4 +42,5 @@ __all__ = [
     "Transaction",
     "Universe",
     "User",
+    "UserUniverseUbp",
 ]

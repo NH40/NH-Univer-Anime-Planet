@@ -264,9 +264,15 @@ async def decrement_to(
 _DISTILL_ALL_OWNED_SQL = text(
     """
     WITH locked AS (
-        SELECT user_id, card_id, stars, quantity FROM user_cards
-        WHERE user_id = :user_id AND quantity > :target
-        FOR UPDATE
+        -- Небесные/божественные карты (см. CLAUDE.md, "Небесные карты") исключены явно —
+        -- они не участвуют в обычной экономике пыли (services/dust.RelicCardError для
+        -- точечных вызовов; здесь балк-путь, поэтому фильтр прямо в SQL, не в Python).
+        SELECT uc.user_id, uc.card_id, uc.stars, uc.quantity
+        FROM user_cards uc
+        JOIN cards c ON c.id = uc.card_id
+        WHERE uc.user_id = :user_id AND uc.quantity > :target
+          AND NOT c.is_celestial AND NOT c.is_divine
+        FOR UPDATE OF uc
     ), updated AS (
         UPDATE user_cards uc
         SET quantity = :target

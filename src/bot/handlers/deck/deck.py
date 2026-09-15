@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.keys import action_lock
 from bot.cache.lock import try_acquire
-from bot.config.game import TIER_CHANCE_PERCENT
+from bot.config.game import RELIC_CHALLENGE_DECISION_HOURS, TIER_CHANCE_PERCENT
 from bot.config.settings import get_settings
 from bot.constant.deck import (
     CB_DECK_CHANCES,
@@ -27,10 +27,18 @@ from bot.db.models.universe import Universe
 from bot.db.repositories.card import get_discovered_card_ids
 from bot.db.repositories.universe import get_by_code as get_universe
 from bot.db.repositories.user import get_by_id
+from bot.keyboards.celestial import push_accept_decline_menu
 from bot.keyboards.deck import chances_menu, chances_tier_menu, deck_menu, roll_result_menu
 from bot.services import ticket
 from bot.services.card import UniverseNotReadyError, get_tier_map
 from bot.services.gacha import NoActiveSeasonError, NotEnoughTicketsError, roll_one
+from bot.texts.celestial import (
+    CELESTIAL_PUSH_NEW_CHALLENGE_OWNER,
+    CELESTIAL_PUSH_NEW_CHALLENGER_SELF,
+    CELESTIAL_PUSH_NEW_OWNER,
+    DIVINE_PUSH_GLOBAL,
+    DIVINE_PUSH_UNIVERSE,
+)
 from bot.texts.common import BTN_DECK, NEED_START
 from bot.texts.deck import (
     CARD_CAPTION,
@@ -120,8 +128,35 @@ async def _get_ready_user(callback: CallbackQuery, session: AsyncSession):
     return user
 
 
+async def _notify_celestial_outcome(bot, session: AsyncSession, callback: CallbackQuery, result) -> None:
+    """Небесные/божественные карты (см. CLAUDE.md, "Небесные карты") — сообщения ПОВЕРХ
+    обычной подписи к фото, а не вместо неё: карта уже показана как обычно выше, здесь
+    только объясняем особый статус/дополнительную награду."""
+    if result.celestial_outcome == "owner":
+        await callback.message.answer(CELESTIAL_PUSH_NEW_OWNER.format(name=esc(result.card.name)))
+    elif result.celestial_outcome == "challenger":
+        await callback.message.answer(
+            CELESTIAL_PUSH_NEW_CHALLENGER_SELF.format(name=esc(result.card.name), hours=RELIC_CHALLENGE_DECISION_HOURS)
+        )
+        if result.celestial_current_owner_id is not None:
+            text = CELESTIAL_PUSH_NEW_CHALLENGE_OWNER.format(name=esc(result.card.name), hours=RELIC_CHALLENGE_DECISION_HOURS)
+            markup = push_accept_decline_menu(result.card.id)
+            try:
+                await bot.send_message(result.celestial_current_owner_id, text, reply_markup=markup)
+            except TelegramAPIError:
+                pass
+
+    if result.universe_divine_card is not None:
+        universe = await get_universe(session, result.universe_divine_card.universe_code)
+        await callback.message.answer(
+            DIVINE_PUSH_UNIVERSE.format(universe=esc(universe.title), name=esc(result.universe_divine_card.name))
+        )
+    if result.global_divine_card is not None:
+        await callback.message.answer(DIVINE_PUSH_GLOBAL.format(name=esc(result.global_divine_card.name)))
+
+
 @router.callback_query(F.data == CB_DECK_ROLL1)
-async def cb_roll1(callback: CallbackQuery, session: AsyncSession, redis: Redis) -> None:
+async def cb_roll1(callback: CallbackQuery, session: AsyncSession, redis: Redis, bot) -> None:
     user_id = callback.from_user.id
     async with try_acquire(redis, action_lock(user_id, LOCK_ACTION_ROLL), ttl_ms=8000) as acquired:
         if not acquired:
@@ -184,6 +219,7 @@ async def cb_roll1(callback: CallbackQuery, session: AsyncSession, redis: Redis)
             return
 
         await cache_card_photo(redis, result.card.id, sent)
+        await _notify_celestial_outcome(bot, session, callback, result)
 
 
 async def _get_ready_tier_map(callback: CallbackQuery, session: AsyncSession, universe: Universe) -> dict[int, list[Card]] | None:

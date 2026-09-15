@@ -6,6 +6,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.cache.leaderboard import sync_score
+from bot.cache.universe_leaderboard import sync_score as sync_universe_score
 from bot.config.game import MAX_STARS, MERGE_COPIES_REQUIRED, ubp_for_stars
 from bot.constant.merge import TRANSACTION_REASON_MERGE
 from bot.db.models.card import Card
@@ -13,7 +14,7 @@ from bot.db.repositories.card import get_by_id as get_card_by_id
 from bot.db.repositories.inventory import add_card, decrement_by, list_owned_stacks_in_universe
 from bot.db.repositories.season import get_active as get_active_season
 from bot.services import battle_pass as pass_service
-from bot.services.ubp import award_ubp
+from bot.services.ubp import UbpAward, award_ubp
 
 
 class CardNotFoundError(Exception):
@@ -47,14 +48,14 @@ class MergeSummary:
 
 async def _cascade_all(
     session: AsyncSession, *, user_id: int, card: Card, season_id: int, stars: int, target_stars: int
-) -> tuple[MergeSummary | None, int | None]:
+) -> tuple[MergeSummary | None, UbpAward | None]:
     """Сливает ВСЕ копии `stars`, каскадом, не поднимаясь выше `target_stars`. Не
     коммитит — вызывающая функция коммитит один раз в конце (правило 10). Возвращает
-    (сводка или None, если ничего не смёрджилось; последний ubp_season после award_ubp)."""
+    (сводка или None, если ничего не смёрджилось; последний UbpAward после award_ubp)."""
     total_events = 0
     total_bonus = 0
     final_stars = stars
-    new_season_ubp: int | None = None
+    last_award: UbpAward | None = None
 
     level = stars
     while level < target_stars:
@@ -63,7 +64,13 @@ async def _cascade_all(
             new_level = level + 1
             await add_card(session, user_id=user_id, card_id=card.id, stars=new_level, qty=1)
             bonus = ubp_for_stars(card.base_ubp, level)
-            new_season_ubp = await award_ubp(session, user_id=user_id, amount=bonus, reason=TRANSACTION_REASON_MERGE)
+            last_award = await award_ubp(
+                session,
+                user_id=user_id,
+                amount=bonus,
+                reason=TRANSACTION_REASON_MERGE,
+                universe_code=card.universe_code,
+            )
             await pass_service.add_progress(session, user_id=user_id, season_id=season_id, real_ubp=bonus)
             total_events += 1
             total_bonus += bonus
@@ -75,7 +82,7 @@ async def _cascade_all(
 
     if total_events == 0:
         return None, None
-    return MergeSummary(card=card, final_stars=final_stars, events=total_events, total_bonus=total_bonus), new_season_ubp
+    return MergeSummary(card=card, final_stars=final_stars, events=total_events, total_bonus=total_bonus), last_award
 
 
 async def merge_to_target(
@@ -115,13 +122,17 @@ async def merge_to_target(
         qty = required
         total_events = 0
         total_bonus = 0
-        new_season_ubp: int | None = None
+        last_award: UbpAward | None = None
         for level in range(stars, target_stars):
             n_events = qty // MERGE_COPIES_REQUIRED
             bonus_per_event = ubp_for_stars(card.base_ubp, level)
             for _ in range(n_events):
-                new_season_ubp = await award_ubp(
-                    session, user_id=user_id, amount=bonus_per_event, reason=TRANSACTION_REASON_MERGE
+                last_award = await award_ubp(
+                    session,
+                    user_id=user_id,
+                    amount=bonus_per_event,
+                    reason=TRANSACTION_REASON_MERGE,
+                    universe_code=card.universe_code,
                 )
                 await pass_service.add_progress(session, user_id=user_id, season_id=season.id, real_ubp=bonus_per_event)
             total_events += n_events
@@ -130,17 +141,19 @@ async def merge_to_target(
         await add_card(session, user_id=user_id, card_id=card_id, stars=target_stars, qty=1)
 
         await session.commit()
-        await sync_score(redis, season.id, user_id, new_season_ubp)
+        await sync_score(redis, season.id, user_id, last_award.ubp_season)
+        await sync_universe_score(redis, season.id, card.universe_code, user_id, last_award.universe_ubp_season)
         return MergeSummary(card=card, final_stars=target_stars, events=total_events, total_bonus=total_bonus)
 
-    summary, new_season_ubp = await _cascade_all(
+    summary, last_award = await _cascade_all(
         session, user_id=user_id, card=card, season_id=season.id, stars=stars, target_stars=target_stars
     )
     if summary is None:
         raise NotEnoughCopiesError(needed=MERGE_COPIES_REQUIRED)
 
     await session.commit()
-    await sync_score(redis, season.id, user_id, new_season_ubp)
+    await sync_score(redis, season.id, user_id, last_award.ubp_season)
+    await sync_universe_score(redis, season.id, card.universe_code, user_id, last_award.universe_ubp_season)
     return summary
 
 
@@ -160,18 +173,21 @@ async def merge_all_to_max_in_universe(
     eligible = [s for s in stacks if s.stars < MAX_STARS and s.quantity >= MERGE_COPIES_REQUIRED]
 
     summaries: list[MergeSummary] = []
-    last_season_ubp: int | None = None
+    last_award: UbpAward | None = None
     for stack in eligible:
-        summary, new_season_ubp = await _cascade_all(
+        summary, award = await _cascade_all(
             session, user_id=user_id, card=stack.card, season_id=season.id, stars=stack.stars, target_stars=MAX_STARS
         )
         if summary is not None:
             summaries.append(summary)
-            last_season_ubp = new_season_ubp
+            last_award = award
 
     if not summaries:
         return []
 
     await session.commit()
-    await sync_score(redis, season.id, user_id, last_season_ubp)
+    # Все стопки — одной вселенной (параметр universe_code), поэтому одной синхронизации
+    # достаточно даже если смёржено несколько разных карт.
+    await sync_score(redis, season.id, user_id, last_award.ubp_season)
+    await sync_universe_score(redis, season.id, universe_code, user_id, last_award.universe_ubp_season)
     return summaries

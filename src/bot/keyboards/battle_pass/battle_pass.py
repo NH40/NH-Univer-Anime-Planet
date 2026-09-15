@@ -37,21 +37,30 @@ def _reward_text(dust: int, tickets: int, coins: int = 0) -> str:
 
 
 def _free_label(entry: LevelEntry) -> str:
+    # Награда за уровень детерминирована по позиции и не зависит от того, дошёл ли до неё
+    # игрок (см. config/game._battle_pass_roll) — значит превью для ещё не открытого уровня
+    # ничем не отличается от превью открытого, только заблокирован клейм. Раньше локнутая
+    # ячейка показывала только номер уровня без награды — игрок не мог посмотреть, что его
+    # ждёт на следующем уровне, не пролистав вперёд (жалоба пользователя 2026-09-15).
+    reward = _reward_text(entry.free_dust, entry.free_tickets)
     if not entry.unlocked:
-        return f"{PASS_LEVEL_ICON_LOCKED} {entry.level}"
+        return f"{PASS_LEVEL_ICON_LOCKED} {entry.level} · {reward}"
     if entry.free_claimed:
         return f"{PASS_LEVEL_ICON_CLAIMED} {entry.level}"
-    return BTN_PASS_LEVEL_FREE.format(level=entry.level, reward=_reward_text(entry.free_dust, entry.free_tickets))
+    return BTN_PASS_LEVEL_FREE.format(level=entry.level, reward=reward)
 
 
 def _premium_label(entry: LevelEntry, *, is_premium: bool) -> str:
+    reward = _reward_text(entry.premium_dust, entry.premium_tickets, entry.premium_coins)
     if not is_premium:
-        return f"{PASS_LEVEL_ICON_LOCKED}💎"
+        # Ветка вообще не куплена — показываем награду всё равно (мотивация купить), просто
+        # с "закрытым" значком вместо номера уровня (нет is_premium => нет current_level
+        # контекста, к которому его привязывать).
+        return f"{PASS_LEVEL_ICON_LOCKED}💎 {reward}"
     if not entry.unlocked:
-        return f"{PASS_LEVEL_ICON_LOCKED} {entry.level}"
+        return f"{PASS_LEVEL_ICON_LOCKED} {entry.level} · {reward}"
     if entry.premium_claimed:
         return f"{PASS_LEVEL_ICON_CLAIMED} {entry.level}"
-    reward = _reward_text(entry.premium_dust, entry.premium_tickets, entry.premium_coins)
     return BTN_PASS_LEVEL_PREMIUM.format(level=entry.level, reward=reward)
 
 
