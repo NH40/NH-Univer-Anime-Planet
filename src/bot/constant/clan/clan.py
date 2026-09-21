@@ -10,6 +10,7 @@ LOCK_ACTION_START_WAR = "start_clan_war"
 LOCK_ACTION_EXCHANGE = "clan_exchange_currency"
 LOCK_ACTION_TRANSFER_OWNERSHIP = "transfer_clan_ownership"
 LOCK_ACTION_DELETE_CLAN = "delete_clan"
+LOCK_ACTION_KICK_MEMBER = "kick_clan_member"
 
 CB_CLAN_OPEN = "clan:open"
 CB_CLAN_CREATE_START = "clan:create"
@@ -35,6 +36,9 @@ CB_CLAN_TRANSFER_CONFIRM_PREFIX = "clan:transfer_confirm:"
 
 CB_CLAN_DELETE = "clan:delete"
 CB_CLAN_DELETE_CONFIRM = "clan:delete_confirm"
+
+CB_CLAN_KICK_START = "clan:kick_start"
+CB_CLAN_KICK_CONFIRM_PREFIX = "clan:kick_confirm:"
 
 CB_CLAN_EDIT = "clan:edit"
 CB_CLAN_EDIT_NAME = "clan:edit_name"

@@ -25,6 +25,11 @@ class PromoExpiredError(Exception):
     pass
 
 
+class PromoDeactivatedError(Exception):
+    """Код деактивирован админом вручную (PromoCode.is_active=False) — отдельно от
+    истёкшего по времени/исчерпанного по лимиту (см. PromoExpiredError/PromoUsesExhaustedError)."""
+
+
 class PromoNotAllowedError(Exception):
     pass
 
@@ -41,6 +46,7 @@ class PromoAlreadyRedeemedError(Exception):
 class PromoStatus:
     code: str
     is_active: bool
+    deactivated: bool
     dust: int
     coins: int
     tickets: int
@@ -48,30 +54,61 @@ class PromoStatus:
     used_count: int
 
 
+def _status_from_row(promo) -> PromoStatus:
+    now = datetime.now(timezone.utc)
+    expired = promo.expires_at is not None and promo.expires_at <= now
+    exhausted = promo.max_uses is not None and promo.used_count >= promo.max_uses
+    reward = promo.reward or {}
+    return PromoStatus(
+        code=promo.code,
+        is_active=promo.is_active and not expired and not exhausted,
+        deactivated=not promo.is_active,
+        dust=int(reward.get("dust", 0)),
+        coins=int(reward.get("coins", 0)),
+        tickets=int(reward.get("tickets", 0)),
+        max_uses=promo.max_uses,
+        used_count=promo.used_count,
+    )
+
+
 async def list_status(session: AsyncSession, *, limit: int = 20) -> list[PromoStatus]:
     """Последние выпущенные промокоды со статусом (активен/нет) — экран /admin -> Промокоды
-    (см. CLAUDE.md, "Промокоды: список существующих"). Активен = не истёк по времени И
-    (лимита активаций нет, либо он ещё не исчерпан) — та же логика, что проверяет redeem()
-    при активации, просто без похода в БД за инкрементом."""
+    (см. CLAUDE.md, "Промокоды: список существующих"). Активен = включён админом вручную
+    (PromoCode.is_active) И не истёк по времени И (лимита активаций нет, либо он ещё не
+    исчерпан) — та же логика, что проверяет redeem() при активации, просто без похода в БД
+    за инкрементом. `deactivated` — отдельно, ИМЕННО ручной флаг (для кнопки
+    Активировать/Деактивировать на детальном экране — та должна предлагать включить обратно
+    только то, что деактивировано вручную, а не "почини истёкший по времени код")."""
     codes = await promo_repo.list_recent(session, limit=limit)
-    now = datetime.now(timezone.utc)
-    statuses = []
-    for promo in codes:
-        expired = promo.expires_at is not None and promo.expires_at <= now
-        exhausted = promo.max_uses is not None and promo.used_count >= promo.max_uses
-        reward = promo.reward or {}
-        statuses.append(
-            PromoStatus(
-                code=promo.code,
-                is_active=not expired and not exhausted,
-                dust=int(reward.get("dust", 0)),
-                coins=int(reward.get("coins", 0)),
-                tickets=int(reward.get("tickets", 0)),
-                max_uses=promo.max_uses,
-                used_count=promo.used_count,
-            )
-        )
-    return statuses
+    return [_status_from_row(promo) for promo in codes]
+
+
+async def get_status(session: AsyncSession, *, code: str) -> PromoStatus | None:
+    """Статус ОДНОГО кода — детальный экран /admin -> Промокоды -> код (см.
+    handlers/admin/promo.py). None, если код не существует (например, уже удалён)."""
+    promo = await promo_repo.get_by_code(session, code)
+    return _status_from_row(promo) if promo is not None else None
+
+
+async def deactivate_promo(session: AsyncSession, *, code: str) -> None:
+    ok = await promo_repo.set_active(session, code=code, is_active=False)
+    if not ok:
+        raise PromoNotFoundError
+    await session.commit()
+
+
+async def activate_promo(session: AsyncSession, *, code: str) -> None:
+    ok = await promo_repo.set_active(session, code=code, is_active=True)
+    if not ok:
+        raise PromoNotFoundError
+    await session.commit()
+
+
+async def delete_promo(session: AsyncSession, *, code: str) -> None:
+    ok = await promo_repo.delete(session, code=code)
+    if not ok:
+        raise PromoNotFoundError
+    await session.commit()
 
 
 async def create_promo(
@@ -110,6 +147,9 @@ async def redeem(session: AsyncSession, *, code: str, user_id: int, username: st
     promo = await promo_repo.get_by_code(session, code)
     if promo is None:
         raise PromoNotFoundError
+
+    if not promo.is_active:
+        raise PromoDeactivatedError
 
     if promo.expires_at is not None and promo.expires_at <= datetime.now(timezone.utc):
         raise PromoExpiredError

@@ -16,8 +16,9 @@ COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY alembic.ini ./
 COPY scripts/ ./scripts/
+COPY docker/ ./docker/
 
-RUN chown -R app:app /app
+RUN chmod +x docker/entrypoint.sh && chown -R app:app /app
 USER app
 
-CMD ["python", "-m", "bot.main"]
+ENTRYPOINT ["docker/entrypoint.sh"]

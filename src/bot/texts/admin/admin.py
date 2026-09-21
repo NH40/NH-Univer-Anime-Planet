@@ -47,6 +47,7 @@ NO_CLAN = "—"
 BTN_GIVE_DUST = "✨ Выдать пыль"
 BTN_GIVE_COINS = "💎 Выдать коины"
 BTN_GIVE_CARD = "🃏 Выдать карточку"
+BTN_GIVE_CARD_ALL = "🃏 Выдать всю вселенную"
 BTN_GIVE_TICKET_CAP_SEASONAL = "🗓 Выдать сезон. слот капа"
 BTN_GIVE_TICKET_CAP_PERMANENT = "♾ Выдать перм. слот капа"
 BTN_GIVE_BATTLE_PASS = "🎫 Выдать Battle Pass"
@@ -88,6 +89,14 @@ GIVE_TICKET_CAP_SEASONAL_DONE = "✅ Выдано {amount} сезонных сл
 GIVE_TICKET_CAP_PERMANENT_DONE = "✅ Выдано {amount} перманентных слотов капа игроку {name}. Новый бонус: +{bonus}."
 GIVE_CARD_DONE = "✅ Выдана карта «{card_name}» {stars}★ x{qty} игроку {name}."
 GIVE_CARD_REVOKED = "✅ Забрана карта «{card_name}» {stars}★ x{qty} у игрока {name}."
+
+# --- Выдать всю коллекцию вселенной разом (2026-09-21) — 1 копия/1★ каждой обычной карты,
+# небесные/божественные исключены (уникальное владение, не выдаются массово, см. CLAUDE.md,
+# "Небесные карты"). Карты, которые у игрока уже есть на 1★ (в любом количестве, включая 0
+# после распыления), пропускаются — довыдаёт только недостающее, не стакает поверх имеющегося.
+GIVE_CARD_ALL_CONFIRM = "🃏 Выдать по 1 копии 1★ КАЖДОЙ обычной карты вселенной «{universe}» игроку {name}?"
+GIVE_CARD_ALL_DONE = "✅ Выдано {count} новых карт (1★, по 1 копии) из вселенной «{universe}» игроку {name}."
+GIVE_CARD_ALL_EMPTY = "У игрока уже есть все карты этой вселенной на 1★ — выдавать нечего."
 BAN_DONE = "⛔️ {name} забанен."
 UNBAN_DONE = "✅ {name} разбанен."
 
@@ -131,7 +140,6 @@ PROMO_SCREEN = "🎟 <b>Промокоды</b> — всего: {count}\n\n{lines
 PROMO_SCREEN_EMPTY = "Пока ни одного не создано."
 PROMO_LINE_ACTIVE = "✅"
 PROMO_LINE_INACTIVE = "❌"
-PROMO_LINE = "{icon} <code>{code}</code> | {reward}{uses}\n"
 PROMO_LINE_USES = " ({used}/{max_uses})"
 BTN_PROMO_CREATE = "➕ Создать промокод"
 PROMO_CREATE_PROMPT = (
@@ -153,9 +161,29 @@ PROMO_CREATE_INVALID = "Не разобрал формат — см. подск�
 PROMO_CREATE_TAKEN = "Такой код уже существует."
 PROMO_CREATE_DONE = "✅ Промокод «{code}» создан."
 
+# --- Детальный экран промокода (тап по коду из списка) — активировать/деактивировать/
+# удалить, тот же паттерн "список -> карточка одного элемента", что у реферальных кампаний.
+PROMO_DETAIL = (
+    "🎟 <b>Промокод <code>{code}</code></b>\n\n"
+    "Статус: {status}\n"
+    "Награда: {reward}\n"
+    "{uses_line}"
+)
+PROMO_DETAIL_STATUS_ACTIVE = "✅ Активен"
+PROMO_DETAIL_STATUS_INACTIVE = "❌ Неактивен"
+PROMO_DETAIL_USES_LINE = "Использований: {used}/{max_uses}\n"
+BTN_PROMO_DEACTIVATE = "❌ Деактивировать"
+BTN_PROMO_ACTIVATE = "✅ Активировать"
+BTN_PROMO_DELETE = "🗑 Удалить"
+PROMO_DEACTIVATE_DONE = "❌ Промокод «{code}» деактивирован."
+PROMO_ACTIVATE_DONE = "✅ Промокод «{code}» снова активен."
+PROMO_DELETE_CONFIRM = "⚠️ Точно удалить промокод «{code}»? Это необратимо — история активаций тоже удалится."
+PROMO_DELETE_DONE = "🗑 Промокод «{code}» удалён."
+
 # --- Активация промокода (игрок) ---
 PROMO_REDEEM_PROMPT = "Введите промокод."
 PROMO_NOT_FOUND = "Промокод не найден."
+PROMO_DEACTIVATED = "Этот промокод деактивирован администратором."
 PROMO_EXPIRED = "Срок действия промокода истёк."
 PROMO_NOT_ALLOWED = "Этот промокод не для вас."
 PROMO_USES_EXHAUSTED = "Промокод исчерпан."

@@ -51,7 +51,17 @@ class AlreadyAppliedElsewhereError(Exception):
     "висящие" заявки сразу в куче кланов. Заявку в тот же клан — не ошибка, no-op."""
 
 
+class CannotKickHigherRankError(Exception):
+    """Актор пытается кикнуть владельца или участника своего/более высокого ранга (см.
+    kick_member) — капитан не может кикнуть зама/капитана, зам не может кикнуть зама."""
+
+
 MANAGER_RANKS = (ClanRank.owner, ClanRank.deputy)
+# Кикать может владелец/зам/капитан (шире MANAGER_RANKS, который регулирует приглашения и
+# редактирование профиля клана — подтверждено пользователем: кик должен быть доступен и
+# капитану, а не только владельцу/заму).
+KICK_RANKS = (ClanRank.owner, ClanRank.deputy, ClanRank.captain)
+_RANK_LEVEL = {ClanRank.owner: 3, ClanRank.deputy: 2, ClanRank.captain: 1, ClanRank.member: 0}
 
 
 @dataclass
@@ -302,6 +312,37 @@ async def delete_clan(session: AsyncSession, *, clan_id: int, actor_id: int) -> 
     await clan_repo.delete(session, clan_id)
     await session.commit()
     return other_member_ids
+
+
+async def list_kickable_members(session: AsyncSession, *, clan_id: int, actor_id: int):
+    """Участники, которых actor вправе кикнуть (см. kick_member) — свой ранг строго выше
+    цели, сам actor исключён. Общий фильтр для экрана выбора (handlers/clan/kick.py), чтобы
+    не дублировать сравнение _RANK_LEVEL там."""
+    actor = await clan_repo.get_member(session, actor_id)
+    if actor is None or actor.rank not in KICK_RANKS:
+        return []
+    rows = await list_members_with_users(session, clan_id)
+    return [(m, u) for m, u in rows if m.user_id != actor_id and _RANK_LEVEL[m.rank] < _RANK_LEVEL[actor.rank]]
+
+
+async def kick_member(session: AsyncSession, *, clan_id: int, actor_id: int, target_user_id: int) -> None:
+    """Кикает участника из клана — доступно owner/deputy/captain (KICK_RANKS, шире, чем
+    MANAGER_RANKS). Нельзя кикнуть владельца и нельзя кикнуть того, чей ранг такой же или
+    выше своего (иначе капитан мог бы выгнать зама, а зам — другого зама) — та же
+    иерархическая защита, что set_member_rank даёт владельцу единолично."""
+    actor = await clan_repo.get_member(session, actor_id)
+    if actor is None or actor.clan_id != clan_id or actor.rank not in KICK_RANKS:
+        raise NotAuthorizedError
+
+    target = await clan_repo.get_member(session, target_user_id)
+    if target is None or target.clan_id != clan_id:
+        raise NotInClanError
+    if _RANK_LEVEL[target.rank] >= _RANK_LEVEL[actor.rank]:
+        raise CannotKickHigherRankError
+
+    await clan_repo.remove_member(session, target_user_id)
+    await set_clan(session, user_id=target_user_id, clan_id=None)
+    await session.commit()
 
 
 async def leave_clan(session: AsyncSession, *, user_id: int) -> None:

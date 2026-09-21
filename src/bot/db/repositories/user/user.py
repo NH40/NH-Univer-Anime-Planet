@@ -180,6 +180,39 @@ async def grant_ticket_cap_seasonal_bonus(session: AsyncSession, *, user_id: int
     return result.scalar_one()
 
 
+_GRANT_BATTLE_PASS_COINS_CAPPED_SQL = text(
+    """
+    WITH calc AS (
+        SELECT GREATEST(LEAST(:amount, :cap - battle_pass_coins_earned), 0) AS granted
+        FROM users
+        WHERE id = :user_id
+        FOR UPDATE
+    )
+    UPDATE users
+    SET battle_pass_coins_earned = users.battle_pass_coins_earned + calc.granted,
+        coins = users.coins + calc.granted
+    FROM calc
+    WHERE users.id = :user_id
+    RETURNING calc.granted
+    """
+)
+
+
+async def grant_battle_pass_coins_capped(session: AsyncSession, *, user_id: int, amount: int, cap: int) -> int:
+    """Начисляет коины от Battle Pass, но не больше остатка ПОЖИЗНЕННОГО капа `cap` (см.
+    CLAUDE.md, "Сезонный пасс: 500 циклических уровней" — бесконечный цикл иначе давал бы
+    неограниченные коины за жизнь аккаунта). Атомарно клампится прямо в SQL (`FOR UPDATE` +
+    `GREATEST(LEAST(...), 0)`), а не читается отдельным SELECT перед начислением (правило 1,
+    см. CLAUDE.md) — иначе гонка между двумя параллельными клеймами могла бы дать больше
+    `cap` коинов суммарно. Не коммитит. Возвращает РЕАЛЬНО начисленное количество (может
+    быть меньше `amount` или 0, если кап уже исчерпан) — вызывающий код должен показать
+    игроку и записать в Transaction именно это значение, не номинальное `amount`."""
+    result = await session.execute(
+        _GRANT_BATTLE_PASS_COINS_CAPPED_SQL, {"user_id": user_id, "amount": amount, "cap": cap}
+    )
+    return result.scalar_one()
+
+
 async def increment_total_rolls(session: AsyncSession, *, user_id: int, amount: int) -> tuple[int, int | None]:
     """Накопительный счётчик "круток за всё время" для профиля. Не коммитит — вызывается
     внутри services/gacha как часть одной композитной операции крутки.

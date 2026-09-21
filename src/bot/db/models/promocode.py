@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import (
     ARRAY,
     BigInteger,
+    Boolean,
     DateTime,
     Enum,
     ForeignKey,
@@ -30,6 +31,12 @@ class PromoCode(Base):
     used_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     allowed_usernames: Mapped[list[str] | None] = mapped_column(ARRAY(String(32)), nullable=True)
+    # Ручной тумблер админа (/admin -> Промокоды -> код -> Деактивировать/Активировать),
+    # НЕЗАВИСИМЫЙ от "естественной" неактивности по времени/лимиту использований (те
+    # по-прежнему проверяются отдельно в redeem()/list_status — см. services/promo). В
+    # отличие от прежней чисто вычисляемой активности, эту можно включить обратно:
+    # is_active=False просто блокирует redeem(), не трогает expires_at/used_count.
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
     # {"dust": 100, "coins": 0, "tickets": 0, "cards": [...]}
     reward: Mapped[dict] = mapped_column(JSON)

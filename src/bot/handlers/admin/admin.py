@@ -13,6 +13,8 @@ from bot.config.game import TICKET_CAP_SLOT_BONUS
 from bot.config.settings import get_settings
 from bot.constant.admin import (
     CB_ADMIN_FIND_PLAYER_START,
+    CB_ADMIN_GIVE_CARD_ALL_CONFIRM,
+    CB_ADMIN_GIVE_CARD_ALL_START,
     CB_ADMIN_GIVE_CARD_CARD_PREFIX,
     CB_ADMIN_GIVE_CARD_PAGE_PREFIX,
     CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX,
@@ -39,7 +41,7 @@ from bot.db.repositories import card as card_repo
 from bot.db.repositories import clan as clan_repo
 from bot.db.repositories import season as season_repo
 from bot.db.repositories import universe as universe_repo
-from bot.db.repositories.inventory import add_card, decrement_by
+from bot.db.repositories.inventory import add_card, decrement_by, grant_universe_collection
 from bot.db.repositories.user import (
     add_coins,
     add_dust,
@@ -53,6 +55,7 @@ from bot.db.repositories.user import (
 from bot.keyboards.admin import (
     admin_menu,
     back_to_admin_menu,
+    give_card_all_confirm_menu,
     give_card_card_menu,
     give_card_universe_menu,
     player_card_menu,
@@ -70,6 +73,9 @@ from bot.texts.admin import (
     GIVE_BATTLE_PASS_ALREADY,
     GIVE_BATTLE_PASS_DONE,
     GIVE_BATTLE_PASS_NO_SEASON,
+    GIVE_CARD_ALL_CONFIRM,
+    GIVE_CARD_ALL_DONE,
+    GIVE_CARD_ALL_EMPTY,
     GIVE_CARD_DONE,
     GIVE_CARD_INVALID,
     GIVE_CARD_NOT_ENOUGH,
@@ -608,6 +614,65 @@ async def cb_give_card_page(callback: CallbackQuery, state: FSMContext, session:
     await state.set_state(None)
     await callback.answer()
     await _show_card_page(callback, state, session, page=page)
+
+
+@router.callback_query(F.data == CB_ADMIN_GIVE_CARD_ALL_START)
+async def cb_give_card_all_start(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    data = await state.get_data()
+    target_id = data.get("target_user_id")
+    universe_code = data.get("give_card_universe")
+    if target_id is None or universe_code is None:
+        await callback.answer()
+        await safe_edit_text(callback.message, ADMIN_MENU, reply_markup=back_to_admin_menu())
+        return
+
+    target = await get_by_id(session, target_id)
+    universe = await universe_repo.get_by_code(session, universe_code)
+    if target is None or universe is None:
+        await callback.answer()
+        await safe_edit_text(callback.message, FIND_PLAYER_NOT_FOUND, reply_markup=back_to_admin_menu())
+        return
+
+    await callback.answer()
+    name = target.display_name or str(target.id)
+    await safe_edit_text(
+        callback.message,
+        GIVE_CARD_ALL_CONFIRM.format(universe=universe.title, name=name),
+        reply_markup=give_card_all_confirm_menu(),
+    )
+
+
+@router.callback_query(F.data == CB_ADMIN_GIVE_CARD_ALL_CONFIRM)
+async def cb_give_card_all_confirm(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    data = await state.get_data()
+    target_id = data.get("target_user_id")
+    universe_code = data.get("give_card_universe")
+    if target_id is None or universe_code is None:
+        await callback.answer()
+        await safe_edit_text(callback.message, ADMIN_MENU, reply_markup=back_to_admin_menu())
+        return
+
+    target = await get_by_id(session, target_id)
+    universe = await universe_repo.get_by_code(session, universe_code)
+    if target is None or universe is None:
+        await callback.answer()
+        await safe_edit_text(callback.message, FIND_PLAYER_NOT_FOUND, reply_markup=back_to_admin_menu())
+        return
+
+    count = await grant_universe_collection(session, user_id=target_id, universe_code=universe_code)
+    await session.commit()
+    await state.clear()
+
+    name = target.display_name or str(target.id)
+    text = (
+        GIVE_CARD_ALL_DONE.format(count=count, universe=universe.title, name=name)
+        if count
+        else GIVE_CARD_ALL_EMPTY
+    )
+    await callback.answer(text, show_alert=True)
+
+    text, keyboard = await _render_player_card(session, target)
+    await safe_edit_text(callback.message, text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith(CB_ADMIN_GIVE_CARD_CARD_PREFIX))

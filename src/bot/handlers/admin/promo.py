@@ -9,18 +9,32 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.constant.admin import CB_ADMIN_PROMO, CB_ADMIN_PROMO_CREATE
+from bot.constant.admin import (
+    CB_ADMIN_PROMO,
+    CB_ADMIN_PROMO_CREATE,
+    CB_ADMIN_PROMO_DELETE_CONFIRM_PREFIX,
+    CB_ADMIN_PROMO_DELETE_PREFIX,
+    CB_ADMIN_PROMO_DETAIL_PREFIX,
+    CB_ADMIN_PROMO_TOGGLE_PREFIX,
+)
 from bot.db.models.enums import PromoCodeType
-from bot.keyboards.admin import promo_create_prompt_menu, promo_menu
+from bot.keyboards.admin import promo_create_prompt_menu, promo_delete_confirm_menu, promo_detail_menu, promo_menu
 from bot.services import promo as promo_service
 from bot.states.admin import AdminStates
 from bot.texts.admin import (
     ACTION_CANCELLED,
+    PROMO_ACTIVATE_DONE,
     PROMO_CREATE_DONE,
     PROMO_CREATE_INVALID,
     PROMO_CREATE_PROMPT,
     PROMO_CREATE_TAKEN,
-    PROMO_LINE,
+    PROMO_DEACTIVATE_DONE,
+    PROMO_DELETE_CONFIRM,
+    PROMO_DELETE_DONE,
+    PROMO_DETAIL,
+    PROMO_DETAIL_STATUS_ACTIVE,
+    PROMO_DETAIL_STATUS_INACTIVE,
+    PROMO_DETAIL_USES_LINE,
     PROMO_LINE_ACTIVE,
     PROMO_LINE_INACTIVE,
     PROMO_LINE_USES,
@@ -40,7 +54,10 @@ _TYPES = {"uses": PromoCodeType.uses, "time": PromoCodeType.time, "users": Promo
 _REWARD_TOKEN_RE = re.compile(r"^(tickets|coins|dust):(-?\d+)$")
 
 
-def _reward_line(status: promo_service.PromoStatus) -> str:
+def _reward_summary(status: promo_service.PromoStatus) -> str:
+    """Плоская строка без HTML (переиспользуется и в тексте сообщения, и в тексте кнопки
+    списка — у кнопки HTML не рендерится вообще, см. CLAUDE.md, "Popup-алерты не
+    поддерживают HTML" — тот же принцип: plain-text поверхность требует plain-text строку)."""
     parts = []
     if status.dust:
         parts.append(f"{status.dust}✨")
@@ -48,17 +65,30 @@ def _reward_line(status: promo_service.PromoStatus) -> str:
         parts.append(f"{status.coins}💎")
     if status.tickets:
         parts.append(f"{status.tickets}🎫")
-    reward = ", ".join(parts) if parts else "—"
+    return ", ".join(parts) if parts else "—"
+
+
+def _button_label(status: promo_service.PromoStatus) -> str:
+    icon = PROMO_LINE_ACTIVE if status.is_active else PROMO_LINE_INACTIVE
     uses = PROMO_LINE_USES.format(used=status.used_count, max_uses=status.max_uses) if status.max_uses is not None else ""
-    return PROMO_LINE.format(
-        icon=PROMO_LINE_ACTIVE if status.is_active else PROMO_LINE_INACTIVE, code=status.code, reward=reward, uses=uses
-    )
+    return f"{icon} {status.code} | {_reward_summary(status)}{uses}"
 
 
-async def _render_promo_screen(session: AsyncSession) -> str:
+async def _render_promo_screen(session: AsyncSession) -> tuple[str, list[tuple[str, str]]]:
     statuses = await promo_service.list_status(session)
-    lines = "".join(_reward_line(s) for s in statuses) if statuses else PROMO_SCREEN_EMPTY
-    return PROMO_SCREEN.format(count=len(statuses), lines=lines)
+    codes = [(s.code, _button_label(s)) for s in statuses]
+    text = PROMO_SCREEN.format(count=len(statuses), lines="" if statuses else PROMO_SCREEN_EMPTY)
+    return text, codes
+
+
+def _render_detail_text(status: promo_service.PromoStatus) -> str:
+    uses_line = (
+        PROMO_DETAIL_USES_LINE.format(used=status.used_count, max_uses=status.max_uses)
+        if status.max_uses is not None
+        else ""
+    )
+    status_label = PROMO_DETAIL_STATUS_ACTIVE if status.is_active else PROMO_DETAIL_STATUS_INACTIVE
+    return PROMO_DETAIL.format(code=status.code, status=status_label, reward=_reward_summary(status), uses_line=uses_line)
 
 
 @router.callback_query(F.data == CB_ADMIN_PROMO)
@@ -67,8 +97,8 @@ async def cb_promo(callback: CallbackQuery, state: FSMContext, session: AsyncSes
     # осталось бы висеть, и следующий текст игрока ошибочно попал бы в apply_promo_create.
     await state.clear()
     await callback.answer()
-    text = await _render_promo_screen(session)
-    await safe_edit_text(callback.message, text, reply_markup=promo_menu())
+    text, codes = await _render_promo_screen(session)
+    await safe_edit_text(callback.message, text, reply_markup=promo_menu(codes))
 
 
 @router.callback_query(F.data == CB_ADMIN_PROMO_CREATE)
@@ -152,5 +182,64 @@ async def apply_promo_create(message: Message, state: FSMContext, session: Async
         return
 
     await message.answer(PROMO_CREATE_DONE.format(code=code))
-    text = await _render_promo_screen(session)
-    await message.answer(text, reply_markup=promo_menu())
+    text, codes = await _render_promo_screen(session)
+    await message.answer(text, reply_markup=promo_menu(codes))
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PROMO_DETAIL_PREFIX))
+async def cb_promo_detail(callback: CallbackQuery, session: AsyncSession) -> None:
+    code = callback.data[len(CB_ADMIN_PROMO_DETAIL_PREFIX) :]
+    status = await promo_service.get_status(session, code=code)
+    await callback.answer()
+    if status is None:
+        text, codes = await _render_promo_screen(session)
+        await safe_edit_text(callback.message, text, reply_markup=promo_menu(codes))
+        return
+    await safe_edit_text(
+        callback.message, _render_detail_text(status), reply_markup=promo_detail_menu(code=code, is_active=status.is_active)
+    )
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PROMO_TOGGLE_PREFIX))
+async def cb_promo_toggle(callback: CallbackQuery, session: AsyncSession) -> None:
+    code = callback.data[len(CB_ADMIN_PROMO_TOGGLE_PREFIX) :]
+    status = await promo_service.get_status(session, code=code)
+    if status is None:
+        await callback.answer()
+        text, codes = await _render_promo_screen(session)
+        await safe_edit_text(callback.message, text, reply_markup=promo_menu(codes))
+        return
+
+    if status.is_active:
+        await promo_service.deactivate_promo(session, code=code)
+        await callback.answer(PROMO_DEACTIVATE_DONE.format(code=code))
+    else:
+        await promo_service.activate_promo(session, code=code)
+        await callback.answer(PROMO_ACTIVATE_DONE.format(code=code))
+
+    new_status = await promo_service.get_status(session, code=code)
+    await safe_edit_text(
+        callback.message,
+        _render_detail_text(new_status),
+        reply_markup=promo_detail_menu(code=code, is_active=new_status.is_active),
+    )
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PROMO_DELETE_PREFIX))
+async def cb_promo_delete_start(callback: CallbackQuery, session: AsyncSession) -> None:
+    code = callback.data[len(CB_ADMIN_PROMO_DELETE_PREFIX) :]
+    await callback.answer()
+    await safe_edit_text(callback.message, PROMO_DELETE_CONFIRM.format(code=code), reply_markup=promo_delete_confirm_menu(code))
+
+
+@router.callback_query(F.data.startswith(CB_ADMIN_PROMO_DELETE_CONFIRM_PREFIX))
+async def cb_promo_delete_confirm(callback: CallbackQuery, session: AsyncSession) -> None:
+    code = callback.data[len(CB_ADMIN_PROMO_DELETE_CONFIRM_PREFIX) :]
+    try:
+        await promo_service.delete_promo(session, code=code)
+    except promo_service.PromoNotFoundError:
+        pass
+    await callback.answer(PROMO_DELETE_DONE.format(code=code), show_alert=True)
+
+    text, codes = await _render_promo_screen(session)
+    await safe_edit_text(callback.message, text, reply_markup=promo_menu(codes))

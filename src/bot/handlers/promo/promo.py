@@ -14,6 +14,7 @@ from bot.states.promo import PromoStates
 from bot.texts.admin import (
     ACTION_CANCELLED,
     PROMO_ALREADY_REDEEMED,
+    PROMO_DEACTIVATED,
     PROMO_EXPIRED,
     PROMO_NOT_ALLOWED,
     PROMO_NOT_FOUND,
@@ -34,6 +35,9 @@ async def _redeem_and_reply(message: Message, session: AsyncSession, code: str) 
         )
     except promo_service.PromoNotFoundError:
         await message.answer(PROMO_NOT_FOUND)
+        return
+    except promo_service.PromoDeactivatedError:
+        await message.answer(PROMO_DEACTIVATED)
         return
     except promo_service.PromoExpiredError:
         await message.answer(PROMO_EXPIRED)

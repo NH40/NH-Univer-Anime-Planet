@@ -151,6 +151,12 @@ BATTLE_PASS_DUST_MAX = 50
 _BATTLE_PASS_PREMIUM_SEED_OFFSET = 10_000  # разный seed от free — независимый ролл
 BATTLE_PASS_COIN_MILESTONE_MOD = 50  # только премиум-ветка, каждый 50-й уровень цикла
 BATTLE_PASS_MILESTONE_COINS = 15
+# Потолок коинов от Battle Pass ЗА ВСЮ ЖИЗНЬ АККАУНТА, не за сезон и не за один 500-уровневый
+# круг (подтверждено пользователем 2026-09-21 — без этого бесконечный цикл коин-чекпоинтов
+# давал бы неограниченные коины за долгую игру). Бесплатная ветка коинов не даёт вообще (0
+# коинов, см. battle_pass_free_reward) — кап применяется только к премиум-ветке, см.
+# services/battle_pass._grant/db.repositories.user.grant_battle_pass_coins_capped.
+BATTLE_PASS_COIN_LIFETIME_CAP = 200
 
 
 def _battle_pass_roll(seed: int) -> tuple[int, int]:

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config.game import (
     BATTLE_PASS_BOOST_TIER_LEVELS,
+    BATTLE_PASS_COIN_LIFETIME_CAP,
     BATTLE_PASS_CYCLE_LEVELS,
     battle_pass_boost_multiplier,
     battle_pass_cumulative,
@@ -21,7 +22,7 @@ from bot.db.models.enums import TransactionCurrency
 from bot.db.models.transaction import Transaction
 from bot.db.repositories import battle_pass as pass_repo
 from bot.db.repositories import season as season_repo
-from bot.db.repositories.user import add_coins, add_dust
+from bot.db.repositories.user import add_dust, grant_battle_pass_coins_capped
 from bot.services import ticket
 
 Track = Literal["free", "premium"]
@@ -69,7 +70,14 @@ def _claimed_level(row, track: Track) -> int:
     return row.claimed_free_level if track == TRACK_FREE else row.claimed_premium_level
 
 
-async def _grant(session: AsyncSession, *, user_id: int, track: Track, dust: int, tickets: int, coins: int) -> None:
+async def _grant(session: AsyncSession, *, user_id: int, track: Track, dust: int, tickets: int, coins: int) -> int:
+    """Начисляет награду одной ветки. Коины премиум-ветки клампятся пожизненным капом
+    (BATTLE_PASS_COIN_LIFETIME_CAP, см. CLAUDE.md, "Сезонный пасс: 500 циклических уровней")
+    — бесплатная ветка коинов не даёт вообще (`_reward` уже гарантирует coins=0 для неё, см.
+    выше), так что кап-функция вызывается только когда coins > 0, что и так означает
+    premium. Возвращает РЕАЛЬНО начисленные коины (может быть меньше запрошенного `coins`
+    или 0, если кап уже исчерпан) — вызывающий код (claim_level/claim_all) обязан показать
+    игроку и записать в Transaction именно это значение, не номинальное."""
     reason = _reason(track)
     if dust:
         await add_dust(session, user_id=user_id, amount=dust)
@@ -77,9 +85,16 @@ async def _grant(session: AsyncSession, *, user_id: int, track: Track, dust: int
     if tickets:
         await ticket.grant(session, user_id, tickets)
         session.add(Transaction(user_id=user_id, currency=TransactionCurrency.tickets, amount=tickets, reason=reason))
+    granted_coins = 0
     if coins:
-        await add_coins(session, user_id=user_id, amount=coins)
-        session.add(Transaction(user_id=user_id, currency=TransactionCurrency.coins, amount=coins, reason=reason))
+        granted_coins = await grant_battle_pass_coins_capped(
+            session, user_id=user_id, amount=coins, cap=BATTLE_PASS_COIN_LIFETIME_CAP
+        )
+        if granted_coins:
+            session.add(
+                Transaction(user_id=user_id, currency=TransactionCurrency.coins, amount=granted_coins, reason=reason)
+            )
+    return granted_coins
 
 
 async def claim_level(session: AsyncSession, *, user_id: int, track: Track, level: int) -> tuple[int, int, int]:
@@ -106,7 +121,8 @@ async def claim_level(session: AsyncSession, *, user_id: int, track: Track, leve
         raise LevelAlreadyClaimedError
 
     dust, tickets, coins = _reward(track, level)
-    await _grant(session, user_id=user_id, track=track, dust=dust, tickets=tickets, coins=coins)
+    granted_coins = await _grant(session, user_id=user_id, track=track, dust=dust, tickets=tickets, coins=coins)
+    coins = granted_coins
 
     if level == claimed_level + 1:
         # Продвигаем high-water mark и поглощаем подряд идущие внеочередные клеймы, уже
@@ -168,7 +184,8 @@ async def claim_all(session: AsyncSession, *, user_id: int, track: Track) -> Cla
     if count == 0:
         raise NothingToClaimError
 
-    await _grant(session, user_id=user_id, track=track, dust=total_dust, tickets=total_tickets, coins=total_coins)
+    granted_coins = await _grant(session, user_id=user_id, track=track, dust=total_dust, tickets=total_tickets, coins=total_coins)
+    total_coins = granted_coins
     await pass_repo.set_claimed_level(session, user_id=user_id, season_id=season.id, track=track, level=current_level)
     await pass_repo.clear_claims(session, user_id=user_id, season_id=season.id, track=track)
 

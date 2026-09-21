@@ -33,3 +33,23 @@
 		file_server
 	}
 }
+
+# Второй сайт в ЭТОМ ЖЕ Caddyfile — LookismBattlePlanet (сосед по серверу, отдельный
+# docker-compose проект). Caddy умеет несколько site-блоков в одном Caddyfile из коробки
+# (свой авто-HTTPS сертификат на каждый домен) — заводить второй Caddy-контейнер не
+# нужно и нельзя (см. docker-compose.yml, "два Caddy не могут слушать 80/443
+# одновременно"). `lookism_api`/`lookism_web` резолвятся по имени контейнера ТОЛЬКО
+# потому что этот `caddy`-сервис и они оба состоят в общей внешней сети `edge` (см.
+# docker-compose.yml, `networks.edge`, и LBP CLAUDE.md "Mini App: постоянный домен") —
+# без этой сети имя контейнера из чужого docker-compose проекта было бы недостижимо.
+lbp.universanimeplanet.ru {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy lookism_api:8000
+	}
+
+	handle {
+		reverse_proxy lookism_web:80
+	}
+}

@@ -78,6 +78,14 @@ services:
   # Собирает фронтенд (Vite) и отдаёт его + картинки карточек + проксирует /api — см.
   # Dockerfile.web, Caddyfile. Нужен DOMAIN в .env (иначе просто не поднимайте этот сервис:
   # `docker compose up -d postgres redis bot api`, без caddy).
+  #
+  # Этот же контейнер теперь обслуживает и второй домен — `lbp.universanimeplanet.ru`
+  # (LookismBattlePlanet, сосед по серверу, см. Caddyfile — второй site-блок) — два
+  # независимых Caddy не могут одновременно слушать 80/443 на одной машине, поэтому LBP
+  # СВОЙ Caddy не поднимает вообще (см. его docker-compose.yml: `web`/`api` без портов
+  # наружу), а этот контейнер достаёт их по имени контейнера через общую внешнюю сеть
+  # `edge` (создаётся один раз вручную: `docker network create edge`, см. CLAUDE.md
+  # LBP — "Mini App: постоянный домен").
   caddy:
     build:
       context: .
@@ -92,6 +100,9 @@ services:
       - ./assets/cards:/srv/cards:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - default
+      - edge
     depends_on:
       - api
     mem_limit: 128m
@@ -101,3 +112,12 @@ volumes:
   redisdata:
   caddy_data:
   caddy_config:
+
+networks:
+  # Общая сеть с соседним проектом LookismBattlePlanet (см. `caddy` выше) — создаётся
+  # ОДИН РАЗ вручную ДО первого `docker compose up` в любом из двух проектов:
+  # `docker network create edge`. Ни один из двух `docker-compose.yml` её не создаёт сам
+  # (`external: true`) — иначе оба проекта попытались бы создать её независимо друг от
+  # друга при первом же поднятии, и один из них упал бы с конфликтом имени сети.
+  edge:
+    external: true

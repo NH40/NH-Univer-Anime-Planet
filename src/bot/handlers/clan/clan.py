@@ -339,6 +339,7 @@ async def cb_members(callback: CallbackQuery, session: AsyncSession) -> None:
             name=u.display_name,
             username=u.username or "—",
             rank_name=RANK_NAME[m.rank.value],
+            ubp_season=format_number(u.ubp_season),
         )
         for m, u in rows
     )

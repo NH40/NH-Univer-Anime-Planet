@@ -1,7 +1,9 @@
 from bot.services.clan.clan import (
+    KICK_RANKS,
     MANAGER_RANKS,
     AlreadyAppliedElsewhereError,
     AlreadyInClanError,
+    CannotKickHigherRankError,
     ClanFullError,
     ClanNameTakenError,
     ClanNotFoundError,
@@ -21,7 +23,9 @@ from bot.services.clan.clan import (
     edit_profile,
     get_clan_view,
     invite_player,
+    kick_member,
     leave_clan,
+    list_kickable_members,
     list_applications,
     list_members_with_users,
     list_outgoing_invites,
@@ -37,10 +41,12 @@ from bot.services.clan.war import NotAuthorizedError as WarNotAuthorizedError
 from bot.services.clan.war import WarProgress, get_progress, start_war
 
 __all__ = [
+    "KICK_RANKS",
     "MANAGER_RANKS",
     "AlreadyAppliedElsewhereError",
     "AlreadyAtWarError",
     "AlreadyInClanError",
+    "CannotKickHigherRankError",
     "ClanFullError",
     "ClanNameTakenError",
     "ClanNotFoundError",
@@ -66,7 +72,9 @@ __all__ = [
     "get_clan_view",
     "get_progress",
     "invite_player",
+    "kick_member",
     "leave_clan",
+    "list_kickable_members",
     "list_applications",
     "list_members_with_users",
     "list_outgoing_invites",

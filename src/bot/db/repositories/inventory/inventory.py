@@ -261,6 +261,30 @@ async def decrement_to(
     return result.scalar_one_or_none()
 
 
+_GRANT_UNIVERSE_COLLECTION_SQL = text(
+    """
+    INSERT INTO user_cards (user_id, card_id, stars, quantity)
+    SELECT :user_id, c.id, 1, 1
+    FROM cards c
+    WHERE c.universe_code = :universe_code AND NOT c.is_celestial AND NOT c.is_divine
+    ON CONFLICT (user_id, card_id, stars) DO NOTHING
+    RETURNING card_id
+    """
+)
+
+
+async def grant_universe_collection(session: AsyncSession, *, user_id: int, universe_code: str) -> int:
+    """Выдаёт по 1 копии 1★ КАЖДОЙ обычной карты вселенной разом — один INSERT...SELECT,
+    без Python-цикла по картам (правило 3, см. CLAUDE.md, "Выдача коллекции карт"). Карты,
+    которые у игрока уже есть на 1★ (в любом количестве, включая 0 после распыления —
+    строка не удаляется, см. add_card), пропускаются через ON CONFLICT DO NOTHING: довыдаёт
+    только недостающее, не стакает поверх уже имеющегося. Небесные/божественные карты
+    исключены явно — уникальное владение (см. "Небесные карты"), массово не выдаются. Не
+    коммитит. Возвращает число реально добавленных карт (0, если выдавать было нечего)."""
+    result = await session.execute(_GRANT_UNIVERSE_COLLECTION_SQL, {"user_id": user_id, "universe_code": universe_code})
+    return len(result.all())
+
+
 _DISTILL_ALL_OWNED_SQL = text(
     """
     WITH locked AS (

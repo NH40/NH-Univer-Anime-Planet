@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,6 +63,23 @@ async def create_redemption(session: AsyncSession, *, code: str, user_id: int) -
         .returning(PromoRedemption.id)
     )
     result = await session.execute(stmt)
+    return result.scalar_one_or_none() is not None
+
+
+async def set_active(session: AsyncSession, *, code: str, is_active: bool) -> bool:
+    """Ручное вкл/выкл — независимо от expires_at/used_count (см. db/models/promocode).
+    False, если кода не существует. Не коммитит."""
+    result = await session.execute(
+        update(PromoCode).where(PromoCode.code == code).values(is_active=is_active).returning(PromoCode.code)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def delete(session: AsyncSession, *, code: str) -> bool:
+    """Удаляет промокод целиком — PromoRedemption каскадируется на уровне БД
+    (ondelete="CASCADE", см. db/models/promocode.py). False, если кода уже нет.
+    Не коммитит."""
+    result = await session.execute(sa_delete(PromoCode).where(PromoCode.code == code).returning(PromoCode.code))
     return result.scalar_one_or_none() is not None
 
 

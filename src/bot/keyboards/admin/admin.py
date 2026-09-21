@@ -10,6 +10,8 @@ from bot.constant.admin import (
     CB_ADMIN_EVENT_TOGGLE_PREFIX,
     CB_ADMIN_EVENTS,
     CB_ADMIN_FIND_PLAYER_START,
+    CB_ADMIN_GIVE_CARD_ALL_CONFIRM,
+    CB_ADMIN_GIVE_CARD_ALL_START,
     CB_ADMIN_GIVE_CARD_CARD_PREFIX,
     CB_ADMIN_GIVE_CARD_PAGE_PREFIX,
     CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX,
@@ -32,6 +34,10 @@ from bot.constant.admin import (
     CB_ADMIN_PLAYER_VIEW_PREFIX,
     CB_ADMIN_PROMO,
     CB_ADMIN_PROMO_CREATE,
+    CB_ADMIN_PROMO_DELETE_CONFIRM_PREFIX,
+    CB_ADMIN_PROMO_DELETE_PREFIX,
+    CB_ADMIN_PROMO_DETAIL_PREFIX,
+    CB_ADMIN_PROMO_TOGGLE_PREFIX,
     CB_ADMIN_REFERRAL,
     CB_ADMIN_REFERRAL_CREATE,
     CB_ADMIN_REFERRAL_DETAIL_PREFIX,
@@ -67,6 +73,7 @@ from bot.texts.admin import (
     BTN_FIND_ANOTHER,
     BTN_GIVE_BATTLE_PASS,
     BTN_GIVE_CARD,
+    BTN_GIVE_CARD_ALL,
     BTN_GIVE_COINS,
     BTN_GIVE_DUST,
     BTN_GIVE_SUBSCRIPTION,
@@ -77,7 +84,10 @@ from bot.texts.admin import (
     BTN_MASS_GRANT_COINS,
     BTN_MASS_GRANT_DUST,
     BTN_MASS_GRANT_TICKETS,
+    BTN_PROMO_ACTIVATE,
     BTN_PROMO_CREATE,
+    BTN_PROMO_DEACTIVATE,
+    BTN_PROMO_DELETE,
     BTN_REFERRAL_CREATE,
     BTN_REVOKE_ADMIN,
     BTN_SEASON_BUMP_VERSION,
@@ -222,10 +232,24 @@ def give_card_card_menu(cards: list, *, page: int, total_pages: int, user_id: in
     if nav_row:
         rows.append(nav_row)
 
+    # Выдать всю коллекцию ВЫБРАННОЙ вселенной разом — 1 копия/1★ каждой обычной карты
+    # (см. CLAUDE.md, "Выдача коллекции карт"). target_user_id/give_card_universe уже в
+    # FSM-данных состояния, поэтому колбэк без параметра.
+    rows.append([InlineKeyboardButton(text=BTN_GIVE_CARD_ALL, callback_data=CB_ADMIN_GIVE_CARD_ALL_START)])
+
     # Назад — к списку вселенных (тот же экран, что открывает "🃏 Выдать карточку" в первый
     # раз, переиспользуем без отдельной константы).
     rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=f"{CB_ADMIN_PLAYER_GIVE_CARD_PREFIX}{user_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def give_card_all_confirm_menu() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_CONFIRM, callback_data=CB_ADMIN_GIVE_CARD_ALL_CONFIRM)],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=f"{CB_ADMIN_GIVE_CARD_PAGE_PREFIX}1")],
+        ]
+    )
 
 
 def season_menu() -> InlineKeyboardMarkup:
@@ -247,17 +271,46 @@ def season_new_confirm_menu() -> InlineKeyboardMarkup:
     )
 
 
-def promo_menu() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=BTN_PROMO_CREATE, callback_data=CB_ADMIN_PROMO_CREATE)],
-            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)],
-        ]
-    )
+def promo_menu(codes: list[tuple[str, str]] | None = None) -> InlineKeyboardMarkup:
+    """Тап по коду открывает детальную карточку (см. CLAUDE.md — тот же паттерн "список ->
+    карточка одного элемента", что и реферальные кампании). `codes` — (code, label), label —
+    уже готовая строка статуса (иконка+код+награда, см. handlers/admin/promo.py:
+    _button_label), не голый код — список должен быть узнаваем без похода в детальный экран."""
+    rows = [
+        [InlineKeyboardButton(text=label, callback_data=f"{CB_ADMIN_PROMO_DETAIL_PREFIX}{code}")]
+        for code, label in (codes or [])
+    ]
+    rows.append([InlineKeyboardButton(text=BTN_PROMO_CREATE, callback_data=CB_ADMIN_PROMO_CREATE)])
+    rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_OPEN)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def promo_create_prompt_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_PROMO)]])
+
+
+def promo_detail_menu(*, code: str, is_active: bool) -> InlineKeyboardMarkup:
+    toggle_btn = (
+        InlineKeyboardButton(text=BTN_PROMO_DEACTIVATE, callback_data=f"{CB_ADMIN_PROMO_TOGGLE_PREFIX}{code}")
+        if is_active
+        else InlineKeyboardButton(text=BTN_PROMO_ACTIVATE, callback_data=f"{CB_ADMIN_PROMO_TOGGLE_PREFIX}{code}")
+    )
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [toggle_btn],
+            [InlineKeyboardButton(text=BTN_PROMO_DELETE, callback_data=f"{CB_ADMIN_PROMO_DELETE_PREFIX}{code}")],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_ADMIN_PROMO)],
+        ]
+    )
+
+
+def promo_delete_confirm_menu(code: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=BTN_CONFIRM, callback_data=f"{CB_ADMIN_PROMO_DELETE_CONFIRM_PREFIX}{code}")],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=f"{CB_ADMIN_PROMO_DETAIL_PREFIX}{code}")],
+        ]
+    )
 
 
 def referral_menu(codes: list[str]) -> InlineKeyboardMarkup:

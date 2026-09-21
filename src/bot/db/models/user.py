@@ -82,6 +82,16 @@ class User(Base):
     # Отдельно от полноценного Battle Pass (таблица battle_passes, per-season) — это только
     # флаг/срок premium-доступа, сам Battle Pass ещё не спроектирован (см. TODO, Этап 8).
     premium_pass_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Сколько коинов ВСЕГО когда-либо начислено через Battle Pass (премиум-ветка, коины на
+    # каждом BATTLE_PASS_COIN_MILESTONE_MOD-м уровне цикла) — НЕ per-season (в отличие от
+    # BattlePass.progress, который переживает только один сезон), а за всю жизнь аккаунта.
+    # Подтверждено пользователем 2026-09-21: бесплатная ветка коинов не даёт вообще (0),
+    # премиум-ветка не должна дать больше BATTLE_PASS_COIN_LIFETIME_CAP=200 коинов за все
+    # круги/сезоны разом — иначе бесконечный 500-уровневый цикл (см. CLAUDE.md, "Сезонный
+    # пасс") давал бы неограниченное количество коинов за жизнь аккаунта. Растёт только
+    # через db.repositories.user.grant_battle_pass_coins_capped (атомарный клампинг остатка
+    # капа прямо в SQL, см. services/battle_pass._grant).
+    battle_pass_coins_earned: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
 
     # Слоты капа тикетов, купленные в магазине за рубли (см. CLAUDE.md, "Магазин: слот капа
     # тикетов") — прибавляются к TICKET_NATURAL_CAP в services/ticket, а не заменяют его.

@@ -33,6 +33,12 @@ CB_ADMIN_PLAYER_VIEW_PREFIX = "admin:player_view:"
 CB_ADMIN_GIVE_CARD_UNIVERSE_PREFIX = "admin:give_card_uni:"
 CB_ADMIN_GIVE_CARD_PAGE_PREFIX = "admin:give_card_page:"
 CB_ADMIN_GIVE_CARD_CARD_PREFIX = "admin:give_card_card:"
+# Выдать всю коллекцию вселенной разом — 1 копия/1★ каждой ОБЫЧНОЙ карты (см. CLAUDE.md,
+# "Выдача коллекции карт"). target_user_id/give_card_universe уже в FSM-данных состояния
+# (тот же паттерн, что остальной флоу выдачи карточки выше) — в callback_data ничего
+# кодировать не нужно.
+CB_ADMIN_GIVE_CARD_ALL_START = "admin:give_card_all"
+CB_ADMIN_GIVE_CARD_ALL_CONFIRM = "admin:give_card_all_confirm"
 
 CB_ADMIN_SEASON = "admin:season"
 CB_ADMIN_SEASON_NEW = "admin:season_new"
@@ -41,6 +47,12 @@ CB_ADMIN_SEASON_BUMP_VERSION = "admin:season_bump"
 
 CB_ADMIN_PROMO = "admin:promo"
 CB_ADMIN_PROMO_CREATE = "admin:promo_create"
+# Список -> карточка одного промокода (тот же паттерн, что реферальные кампании ниже) —
+# код кодируется прямо в callback_data (макс. 32 символа, см. PromoCode.code), не через FSM.
+CB_ADMIN_PROMO_DETAIL_PREFIX = "admin:promo_detail:"
+CB_ADMIN_PROMO_TOGGLE_PREFIX = "admin:promo_toggle:"
+CB_ADMIN_PROMO_DELETE_PREFIX = "admin:promo_delete:"
+CB_ADMIN_PROMO_DELETE_CONFIRM_PREFIX = "admin:promo_delete_confirm:"
 
 CB_ADMIN_REFERRAL = "admin:referral"
 CB_ADMIN_REFERRAL_CREATE = "admin:referral_create"

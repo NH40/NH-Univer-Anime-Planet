@@ -21,6 +21,8 @@ from bot.constant.clan import (
     CB_CLAN_FIND,
     CB_CLAN_FIND_PAGE_PREFIX,
     CB_CLAN_INVITE_START,
+    CB_CLAN_KICK_CONFIRM_PREFIX,
+    CB_CLAN_KICK_START,
     CB_CLAN_LEAVE,
     CB_CLAN_LEAVE_CONFIRM,
     CB_CLAN_MEMBERS,
@@ -59,6 +61,7 @@ from bot.texts.clan import (
     BTN_EXCHANGE_TICKETS,
     BTN_FIND_CLAN,
     BTN_INVITE,
+    BTN_KICK,
     BTN_LEAVE,
     BTN_MEMBERS,
     BTN_MY_INVITES,
@@ -71,7 +74,7 @@ from bot.texts.clan import (
     BTN_TRANSFER,
     BTN_WAR,
 )
-from bot.services.clan import MANAGER_RANKS
+from bot.services.clan import KICK_RANKS, MANAGER_RANKS
 from bot.texts.common import BTN_BACK
 
 RANK_LABELS = {
@@ -158,6 +161,8 @@ def clan_card_menu(*, rank: ClanRank, request_count: int = 0) -> InlineKeyboardM
         rows.append([InlineKeyboardButton(text=BTN_EDIT, callback_data=CB_CLAN_EDIT)])
     if rank == ClanRank.owner:
         rows.append([InlineKeyboardButton(text=BTN_RANKS, callback_data=CB_CLAN_RANKS)])
+    if rank in KICK_RANKS:
+        rows.append([InlineKeyboardButton(text=BTN_KICK, callback_data=CB_CLAN_KICK_START)])
     rows.append([InlineKeyboardButton(text=BTN_LEAVE, callback_data=CB_CLAN_LEAVE)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -244,6 +249,23 @@ def rank_set_menu(user_id: int) -> InlineKeyboardMarkup:
     ]
     rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_RANKS)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def kick_menu(members: list[tuple[int, str]]) -> InlineKeyboardMarkup:
+    """members — (user_id, display_name) кандидатов, которых актор вправе кикнуть (уже
+    отфильтровано по рангу в handlers/clan/kick.py, не здесь)."""
+    rows = [[InlineKeyboardButton(text=name, callback_data=f"{CB_CLAN_KICK_CONFIRM_PREFIX}{uid}")] for uid, name in members]
+    rows.append([InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_OPEN)])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def kick_confirm_menu(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"{CB_CLAN_KICK_CONFIRM_PREFIX}{user_id}:confirm")],
+            [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_CLAN_KICK_START)],
+        ]
+    )
 
 
 def transfer_menu(members: list[tuple[int, str]]) -> InlineKeyboardMarkup:

@@ -43,9 +43,18 @@ FIND_CLANS_EMPTY = "Кланов пока нет — стань первым, к
 
 # --- Участники ---
 MEMBERS_HEADER = "👥 <b>Участники «{name}»</b>\n\n"
-MEMBERS_LINE = "{rank_emoji} {name} (@{username}) — {rank_name}\n"
+MEMBERS_LINE = "{rank_emoji} {name} (@{username}) — {rank_name}, ⭐ {ubp_season} UBP за сезон\n"
 RANK_EMOJI = {"owner": "👑", "deputy": "🥈", "captain": "🎖", "member": "👤"}
 RANK_NAME = {"owner": "Владелец", "deputy": "Заместитель", "captain": "Капитан", "member": "Участник"}
+
+# --- Кик участника (владелец/зам/капитан) ---
+BTN_KICK = "👢 Кикнуть"
+KICK_PROMPT = "Кого кикнуть из клана?"
+KICK_EMPTY = "Кикать некого."
+KICK_CONFIRM = "Точно кикнуть {name} из клана?"
+KICK_DONE = "👢 {name} исключён(а) из клана."
+KICK_NOT_ALLOWED = "Нельзя кикнуть игрока с таким же или более высоким рангом."
+NOTIFY_KICKED = "👢 Тебя исключили из клана «{name}»."
 
 # --- Заявки (владелец/зам) ---
 REQUESTS_HEADER = "📬 <b>Заявки в клан</b>\n\n"
