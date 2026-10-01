@@ -4,6 +4,9 @@ __pycache__
 .venv
 venv
 .env
-node_modules
+**/node_modules
 src/web/dist
 *.log
+# Картинки карт монтируются в bot/caddy томом (см. docker-compose.yml), в образ не копируются —
+# без этого исключения каждый build гоняет ~1.8GB контекста в Docker daemon.
+assets
