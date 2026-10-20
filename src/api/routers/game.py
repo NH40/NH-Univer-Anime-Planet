@@ -336,7 +336,7 @@ async def get_celestial(user_id: int = Depends(get_current_user_id), session: As
 
     statuses = await list_all_statuses(session)
     ids = {x for s in statuses if s.ownership for x in (s.ownership.owner_id, s.ownership.challenger_id) if x}
-    names = dict((await session.execute(select(User.id, User.display_name).where(User.id.in_(ids))))) if ids else {}
+    names = dict((await session.execute(select(User.id, User.display_name).where(User.id.in_(ids)))).all()) if ids else {}
     titles = {u.code: u.title for u in await list_active_universes(session)}
     out: dict[str, list] = {}
     for s in statuses:
