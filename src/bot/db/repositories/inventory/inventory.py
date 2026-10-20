@@ -86,7 +86,7 @@ async def list_owned_stacks_in_universe(session: AsyncSession, *, user_id: int, 
     result = await session.execute(
         select(Card, UserCard.stars, UserCard.quantity)
         .join(UserCard, UserCard.card_id == Card.id)
-        .where(Card.universe_code == universe_code, UserCard.user_id == user_id, UserCard.quantity > 0)
+        .where(Card.universe_code == universe_code, UserCard.user_id == user_id, UserCard.quantity > 0, Card.is_celestial.is_(False), Card.is_divine.is_(False))
         .order_by(Card.base_ubp.desc(), Card.external_id, UserCard.stars)
     )
     return [OwnedStack(card=card, stars=stars, quantity=qty) for card, stars, qty in result.all()]
@@ -130,7 +130,7 @@ async def list_owned_stacks_in_universe_page(
     stmt = (
         select(Card, UserCard.stars, UserCard.quantity)
         .join(UserCard, UserCard.card_id == Card.id)
-        .where(Card.universe_code == universe_code, UserCard.user_id == user_id, UserCard.quantity > 0)
+        .where(Card.universe_code == universe_code, UserCard.user_id == user_id, UserCard.quantity > 0, Card.is_celestial.is_(False), Card.is_divine.is_(False))
     )
     if search:
         stmt = stmt.where(Card.name.ilike(f"%{search}%"))
@@ -203,7 +203,7 @@ async def get_universe_progress(session: AsyncSession, user_id: int) -> list[Uni
             func.count(func.distinct(Card.id)),
         )
         .select_from(Universe)
-        .join(Card, Card.universe_code == Universe.code)
+        .join(Card, (Card.universe_code == Universe.code) & Card.is_celestial.is_(False) & Card.is_divine.is_(False))
         .outerjoin(UserCard, (UserCard.card_id == Card.id) & (UserCard.user_id == user_id))
         .group_by(Universe.code, Universe.title)
         .order_by(Universe.title)

@@ -2,19 +2,30 @@ import { getInitData } from '../telegram'
 
 const API_BASE = '/api'
 
-async function apiFetch<T>(path: string): Promise<T> {
+/** Текст ошибки для тоста: `detail` FastAPI, иначе код ответа. */
+async function errorText(response: Response): Promise<string> {
+	try {
+		const data = await response.json()
+		if (typeof data.detail === 'string') return data.detail
+	} catch {
+		/* не JSON */
+	}
+	return `Ошибка ${response.status}`
+}
+
+export async function apiFetch<T>(path: string): Promise<T> {
 	const response = await fetch(`${API_BASE}${path}`, {
 		headers: { 'X-Telegram-Init-Data': getInitData() },
 	})
 	if (!response.ok) {
-		throw new Error(`API error ${response.status}: ${await response.text()}`)
+		throw new Error(await errorText(response))
 	}
 	return response.json() as Promise<T>
 }
 
 // Первый write-запрос Mini App (см. CLAUDE.md, "Mini App") — используется только для
 // /battle-pass/claim, остальной API по-прежнему read-only через apiFetch выше.
-async function apiPost<T>(path: string, body: unknown): Promise<T> {
+export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 	const response = await fetch(`${API_BASE}${path}`, {
 		method: 'POST',
 		headers: {
@@ -24,7 +35,7 @@ async function apiPost<T>(path: string, body: unknown): Promise<T> {
 		body: JSON.stringify(body),
 	})
 	if (!response.ok) {
-		throw new Error(`API error ${response.status}: ${await response.text()}`)
+		throw new Error(await errorText(response))
 	}
 	return response.json() as Promise<T>
 }
@@ -37,6 +48,10 @@ export interface Profile {
 	ubp_total: number
 	dust: number
 	coins: number
+	tickets: number
+	ticket_cap: number
+	is_admin: boolean
+	is_super_admin: boolean
 }
 
 export interface Universe {
@@ -53,6 +68,7 @@ export interface CardStack {
 	stars: number
 	quantity: number
 	image_url: string
+	image_full?: string
 }
 
 export interface CardStackPage {

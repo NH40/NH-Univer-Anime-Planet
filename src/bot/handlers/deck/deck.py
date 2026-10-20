@@ -15,6 +15,7 @@ from bot.cache.lock import try_acquire
 from bot.config.game import RELIC_CHALLENGE_DECISION_HOURS, TIER_CHANCE_PERCENT
 from bot.config.settings import get_settings
 from bot.constant.deck import (
+    CB_DECK_ROLL_MANY_PREFIX,
     CB_DECK_CHANCES,
     CB_DECK_CHANCES_BACK,
     CB_DECK_CHANCES_TIER_PREFIX,
@@ -298,3 +299,80 @@ async def cb_chances_tier(callback: CallbackQuery, session: AsyncSession) -> Non
         for i, card in enumerate(sorted(tier_map[tier], key=lambda c: c.external_id), start=1)
     )
     await safe_edit_text(callback.message, header + lines, reply_markup=chances_tier_menu())
+
+
+
+# --- массовое открытие (2026-10-20) ---
+
+@router.callback_query(F.data.startswith(CB_DECK_ROLL_MANY_PREFIX))
+async def cb_roll_many(callback: CallbackQuery, session: AsyncSession, redis: Redis, bot) -> None:
+    from collections import Counter
+
+    from bot.config.game import MASS_ROLL_COUNTS, MASS_ROLL_MAX
+    from bot.constant.deck import MASS_ROLL_ALL
+    from bot.services.gacha import roll_many
+    from bot.texts.deck import (
+        MASS_CELESTIAL_LINE, MASS_DIVINE_LINE, MASS_RESULT, MASS_STOPPED, MASS_TIER_LINE, TIER_EMOJI, TIER_NAMES,
+    )
+    from bot.utils.formatting import format_number
+
+    user_id = callback.from_user.id
+    raw = callback.data.removeprefix(CB_DECK_ROLL_MANY_PREFIX)
+    async with try_acquire(redis, action_lock(user_id, LOCK_ACTION_ROLL), ttl_ms=90_000) as acquired:
+        if not acquired:
+            await callback.answer()
+            return
+        user = await _get_ready_user(callback, session)
+        if user is None:
+            return
+        if raw == MASS_ROLL_ALL:
+            count = min(await ticket.get_balance(session, user_id), MASS_ROLL_MAX)
+            await session.commit()
+        elif raw.isdigit() and int(raw) in MASS_ROLL_COUNTS:
+            count = int(raw)
+        else:
+            await callback.answer()
+            return
+        await callback.answer()
+        try:
+            results = await roll_many(session, redis, user_id=user_id, universe_code=user.universe_selected, count=max(1, count))
+        except NoActiveSeasonError:
+            await callback.message.answer(NO_ACTIVE_SEASON)
+            return
+        except UniverseNotReadyError as exc:
+            await callback.message.answer(UNIVERSE_NOT_READY.format(universe=esc(user.universe_selected), tiers=", ".join(map(str, exc.missing_tiers))))
+            return
+        except NotEnoughTicketsError as exc:
+            status = await ticket.get_status(session, user_id)
+            await session.commit()
+            await callback.message.answer(NOT_ENOUGH_TICKETS.format(needed=exc.needed, cap=status.cap))
+            return
+
+        tiers = Counter(r.card.base_ubp for r in results if not r.card.is_celestial and not r.card.is_divine)
+        tier_lines = "\n".join(
+            MASS_TIER_LINE.format(emoji=TIER_EMOJI.get(t, "•"), name=TIER_NAMES.get(t, t), count=n) for t, n in sorted(tiers.items(), reverse=True)
+        )
+        best = max(results, key=lambda r: r.card.base_ubp)
+        extra = "".join(MASS_CELESTIAL_LINE.format(name=esc(r.card.name)) for r in results if r.card.is_celestial)
+        extra += "".join(
+            MASS_DIVINE_LINE.format(name=esc(d.name)) for r in results for d in (r.universe_divine_card, r.global_divine_card) if d is not None
+        )
+        if len(results) < count:
+            extra += MASS_STOPPED
+        balance = await ticket.get_balance(session, user_id)
+        await session.commit()
+        caption = MASS_RESULT.format(
+            count=len(results), tiers=tier_lines, new=sum(1 for r in results if r.owned_quantity == 1),
+            ubp=format_number(sum(r.card.base_ubp for r in results)), tickets=format_number(balance),
+            best=esc(best.card.name), extra=extra,
+        )
+        try:
+            photo = await get_card_photo(redis, best.card)
+            sent = await callback.message.answer_photo(photo, caption=caption, reply_markup=roll_result_menu())
+            await cache_card_photo(redis, best.card.id, sent)
+        except TelegramAPIError:
+            log.exception("mass roll photo delivery failed")
+            await callback.message.answer(caption, reply_markup=roll_result_menu())
+        for r in results:
+            if r.celestial_outcome or r.universe_divine_card or r.global_divine_card:
+                await _notify_celestial_outcome(bot, session, callback, r)

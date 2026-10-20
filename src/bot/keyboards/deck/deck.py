@@ -35,6 +35,7 @@ from bot.utils.mini_app import mini_app_url as build_mini_app_url
 def deck_menu(*, mini_app_url: str | None = None) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text=BTN_ROLL_1, callback_data=CB_DECK_ROLL1)],
+        mass_roll_row(),
         [
             InlineKeyboardButton(text=BTN_COLLECTION, callback_data=CB_DECK_COLLECTION),
             InlineKeyboardButton(text=BTN_CHANCES, callback_data=CB_DECK_CHANCES),
@@ -70,6 +71,7 @@ def roll_result_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=BTN_ROLL_AGAIN, callback_data=CB_DECK_ROLL1)],
+            mass_roll_row(),
             [InlineKeyboardButton(text=BTN_BACK, callback_data=CB_DECK_OPEN)],
         ]
     )
@@ -98,3 +100,14 @@ def chances_tier_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text=BTN_BACK_CHANCES, callback_data=CB_DECK_CHANCES_BACK)]]
     )
+
+
+def mass_roll_row() -> list[InlineKeyboardButton]:
+    """×5 / ×10 / Все — массовое открытие (2026-10-20)."""
+    from bot.config.game import MASS_ROLL_COUNTS, MASS_ROLL_MAX
+    from bot.constant.deck import CB_DECK_ROLL_MANY_PREFIX, MASS_ROLL_ALL
+    from bot.texts.deck import BTN_ROLL_ALL, BTN_ROLL_MANY
+
+    row = [InlineKeyboardButton(text=BTN_ROLL_MANY.format(n=n), callback_data=f"{CB_DECK_ROLL_MANY_PREFIX}{n}") for n in MASS_ROLL_COUNTS]
+    row.append(InlineKeyboardButton(text=BTN_ROLL_ALL.format(n=f"≤{MASS_ROLL_MAX}"), callback_data=f"{CB_DECK_ROLL_MANY_PREFIX}{MASS_ROLL_ALL}"))
+    return row

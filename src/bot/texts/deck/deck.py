@@ -62,3 +62,20 @@ CHANCES_TIER_HEADER = "{emoji} <b>{name}</b> — {chance}%\n\nВсего пер�
 CHANCES_CARD_LINE = "{i}. {name}\n"
 CHANCES_UNDISCOVERED = "???"
 BTN_BACK_CHANCES = "◀️ К шансам"
+
+
+# Массовое открытие (2026-10-20).
+BTN_ROLL_MANY = "🎴 ×{n}"
+BTN_ROLL_ALL = "🎴 Все ({n})"
+MASS_RESULT = (
+    "🎴 <b>Открыто карт: {count}</b>\n"
+    "{tiers}\n"
+    "✨ Новых в коллекции: <b>{new}</b>\n"
+    "⭐ UBP: <b>+{ubp}</b>\n"
+    "🎫 Тикетов осталось: <b>{tickets}</b>\n\n"
+    "Лучшая карта — <b>{best}</b>{extra}"
+)
+MASS_TIER_LINE = "{emoji} {name}: {count}"
+MASS_CELESTIAL_LINE = "\n🌌 Небесная карта: <b>{name}</b>"
+MASS_DIVINE_LINE = "\n🔱 Божественная карта: <b>{name}</b>"
+MASS_STOPPED = "\n<i>Тикеты закончились — открыто, сколько хватило.</i>"

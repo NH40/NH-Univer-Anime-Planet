@@ -31,7 +31,8 @@ def _stacks_out(stacks: list[OwnedStack]) -> list[CardStackOut]:
             base_ubp=stack.card.base_ubp,
             stars=stack.stars,
             quantity=stack.quantity,
-            image_url=f"/cards/{stack.card.image_path}",
+            image_url=f"/api/img/{stack.card.image_path}?w=320",
+            image_full=f"/api/img/{stack.card.image_path}?w=720",
         )
         for stack in stacks
     ]

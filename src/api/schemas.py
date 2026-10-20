@@ -11,6 +11,10 @@ class ProfileOut(BaseModel):
     ubp_total: int
     dust: int
     coins: int
+    tickets: int = 0
+    ticket_cap: int = 3
+    is_admin: bool = False
+    is_super_admin: bool = False
 
 
 class UniverseOut(BaseModel):
@@ -26,7 +30,8 @@ class CardStackOut(BaseModel):
     base_ubp: int
     stars: int
     quantity: int
-    image_url: str
+    image_url: str  # превью для сетки (WebP ~320px, `api/routers/img.py`)
+    image_full: str = ""  # для экрана карточки (~720px)
 
 
 class CardStackPageOut(BaseModel):

@@ -33,8 +33,13 @@ export function useAppData() {
 			.finally(() => setLoading(false))
 	}, [])
 
+	const reloadProfile = () => {
+		fetchProfile().then(setProfile).catch(() => {})
+	}
+
 	return {
 		profile,
+		reloadProfile,
 		universes,
 		progress,
 		selectedUniverse,

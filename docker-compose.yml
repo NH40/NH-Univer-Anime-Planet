@@ -70,10 +70,14 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
     command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # Превью карточек (`api/routers/img.py`): оригиналы — только чтение, WebP-кэш — свой том.
+    volumes:
+      - ./assets/cards:/app/assets/cards:ro
+      - card_thumbs:/app/thumbs
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 192m
+    mem_limit: 256m
 
   # Собирает фронтенд (Vite) и отдаёт его + картинки карточек + проксирует /api — см.
   # Dockerfile.web, Caddyfile. Нужен DOMAIN в .env (иначе просто не поднимайте этот сервис:
@@ -108,6 +112,7 @@ services:
     mem_limit: 128m
 
 volumes:
+  card_thumbs:
   pgdata:
   redisdata:
   caddy_data:

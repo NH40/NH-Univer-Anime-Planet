@@ -1,8 +1,9 @@
-import { Loader2, PartyPopper, Star } from 'lucide-react'
+import { Loader2, PartyPopper } from 'lucide-react'
 import { useState } from 'preact/hooks'
 import type { CardStack, Universe } from '../api'
 import { TIER_INFO } from '../config'
 import { EVENTS_TAB_CODE } from '../constants'
+import { TierCard } from '../components/ui/TierCard'
 import { useCollection } from '../hooks/useCollection'
 
 export function CollectionPage({
@@ -10,15 +11,17 @@ export function CollectionPage({
 	selectedUniverse,
 	onSelectUniverse,
 	onOpenCard,
+	version,
 }: {
 	universes: Universe[]
 	selectedUniverse: string | null
 	onSelectUniverse: (code: string) => void
 	onOpenCard: (card: CardStack) => void
+	version: number
 }) {
 	const [search, setSearch] = useState('')
 	const [tierFilter, setTierFilter] = useState<number | 'all'>('all')
-	const { cards, hasMore, loading, loadMore } = useCollection(selectedUniverse, search, tierFilter)
+	const { cards, hasMore, loading, loadMore } = useCollection(selectedUniverse, search, tierFilter, version)
 
 	return (
 		<>
@@ -79,29 +82,18 @@ export function CollectionPage({
 						<div class='empty'>Ничего не найдено.</div>
 					) : (
 						<>
-							<div class='grid'>
-								{cards.map((card) => {
-									const tier = TIER_INFO[card.base_ubp]
-									return (
-										<button
-											type='button'
-											class='card'
-											key={`${card.card_id}-${card.stars}`}
-											onClick={() => onOpenCard(card)}
-										>
-											{tier && <span class='card-tier-dot' style={{ background: tier.color }} />}
-											<img src={card.image_url} alt={card.name} loading='lazy' />
-											<div class='card-name'>{card.name}</div>
-											<div class='card-meta'>
-												<span class='card-meta-stars'>
-													<Star size={11} fill='currentColor' /> {card.stars}
-												</span>
-												<span>{card.base_ubp} UBP</span>
-												<span>×{card.quantity}</span>
-											</div>
-										</button>
-									)
-								})}
+							<div class='tgrid'>
+								{cards.map((card) => (
+									<TierCard
+										key={`${card.card_id}-${card.stars}`}
+										name={card.name}
+										image={card.image_url}
+										baseUbp={card.base_ubp}
+										stars={card.stars}
+										quantity={card.quantity}
+										onClick={() => onOpenCard(card)}
+									/>
+								))}
 							</div>
 							{loading && (
 								<div class='grid-loading' key='grid-loading'>

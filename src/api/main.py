@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.db import engine
-from api.routers import battle_pass, collection, profile, progress, universes
+from api.routers import admin, battle_pass, collection, game, img, profile, progress, universes
 
 
 @asynccontextmanager
@@ -34,6 +34,9 @@ app.include_router(universes.router)
 app.include_router(collection.router)
 app.include_router(progress.router)
 app.include_router(battle_pass.router)
+app.include_router(img.router)
+app.include_router(game.router)
+app.include_router(admin.router)
 
 
 @app.get("/api/health")

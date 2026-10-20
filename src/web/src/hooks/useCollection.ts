@@ -30,6 +30,7 @@ export function useCollection(
 	selectedUniverse: string | null,
 	search: string,
 	tier: number | 'all',
+	version = 0,
 ) {
 	const [cards, setCards] = useState<CardStack[]>([])
 	const [hasMore, setHasMore] = useState(false)
@@ -65,7 +66,7 @@ export function useCollection(
 		)
 
 		return () => clearTimeout(timer)
-	}, [selectedUniverse, search, tier])
+	}, [selectedUniverse, search, tier, version])
 
 	function loadMore() {
 		if (!selectedUniverse || loading || !hasMore) return

@@ -15,6 +15,12 @@ export interface TelegramWebApp {
 		onClick: (cb: () => void) => void
 		offClick: (cb: () => void) => void
 	}
+	HapticFeedback?: {
+		notificationOccurred: (type: 'error' | 'success' | 'warning') => void
+		impactOccurred: (style: 'light' | 'medium' | 'heavy') => void
+	}
+	setHeaderColor?: (color: string) => void
+	setBackgroundColor?: (color: string) => void
 }
 
 declare global {

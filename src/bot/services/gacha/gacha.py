@@ -192,3 +192,19 @@ async def roll_one(session: AsyncSession, redis: Redis, *, user_id: int, univers
         universe_divine_card=universe_divine_card,
         global_divine_card=global_divine_card,
     )
+
+
+
+async def roll_many(session: AsyncSession, redis: Redis, *, user_id: int, universe_code: str, count: int) -> list[RollResult]:
+    """Массовое открытие: `count` одиночных круток подряд, каждая — своя транзакция (`roll_one`).
+    Тикеты кончились посреди — останавливаемся и отдаём то, что выпало; не хватило даже на
+    первую — `NotEnoughTicketsError` наружу, как у одиночной."""
+    results: list[RollResult] = []
+    for _ in range(max(1, count)):
+        try:
+            results.append(await roll_one(session, redis, user_id=user_id, universe_code=universe_code))
+        except NotEnoughTicketsError:
+            if not results:
+                raise
+            break
+    return results

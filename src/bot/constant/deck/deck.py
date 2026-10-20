@@ -6,6 +6,8 @@ from __future__ import annotations
 
 CB_DECK_OPEN = "deck:open"
 CB_DECK_ROLL1 = "deck:roll1"
+CB_DECK_ROLL_MANY_PREFIX = "deck:rollm:"  # + число круток или MASS_ROLL_ALL
+MASS_ROLL_ALL = "all"
 CB_DECK_CHANCES = "deck:chances"
 CB_DECK_CHANCES_TIER_PREFIX = "deck:chances_tier:"
 # Отдельно от CB_DECK_CHANCES: вход в "Шансы" из "Колоды" открывает НОВОЕ сообщение (как

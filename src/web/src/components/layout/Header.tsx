@@ -1,18 +1,21 @@
-import { Star, Trophy } from 'lucide-react'
+import { Gem, Sparkles, Ticket } from 'lucide-react'
 import type { Profile } from '../../api'
+import { fmt } from '../../service/ui'
 
+/** Шапка: имя игрока и три валюты (🎫 тикеты, ✨ пыль, 💎 коины — те же, что в боте). */
 export function Header({ profile }: { profile: Profile | null }) {
 	return (
-		<header class='app-header'>
-			<div class='app-header-name'>{profile?.display_name ?? 'Игрок'}</div>
-			<div class='app-header-stats'>
-				<span class='stat-pill' title='UBP сезона'>
-					<Star size={14} />
-					{profile?.ubp_season ?? 0}
+		<header class='top-bar'>
+			<div class='top-name'>{profile?.display_name ?? 'Игрок'}</div>
+			<div class='currencies'>
+				<span class='cur' title='Тикеты'>
+					<Ticket size={13} /> {fmt(profile?.tickets)}
 				</span>
-				<span class='stat-pill' title='UBP всего'>
-					<Trophy size={14} />
-					{profile?.ubp_total ?? 0}
+				<span class='cur' title='Пыль'>
+					<Sparkles size={13} /> {fmt(profile?.dust)}
+				</span>
+				<span class='cur' title='Коины'>
+					<Gem size={13} /> {fmt(profile?.coins)}
 				</span>
 			</div>
 		</header>

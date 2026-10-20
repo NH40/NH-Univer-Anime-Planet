@@ -2,6 +2,7 @@ from __future__ import annotations
 
 TRANSACTION_REASON_ADMIN_GRANT_DUST = "admin_grant_dust"
 TRANSACTION_REASON_ADMIN_GRANT_COINS = "admin_grant_coins"
+TRANSACTION_REASON_ADMIN_GRANT_TICKETS = "admin_grant_tickets"
 TRANSACTION_REASON_ADMIN_MASS_GRANT = "admin_mass_grant"
 TRANSACTION_REASON_PROMO = "promo_redeem"
 
