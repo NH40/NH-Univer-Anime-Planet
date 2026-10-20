@@ -18,7 +18,9 @@ COPY alembic.ini ./
 COPY scripts/ ./scripts/
 COPY docker/ ./docker/
 
-RUN chmod +x docker/entrypoint.sh && chown -R app:app /app
+# /app/thumbs — volume WebP-превью (api/routers/img.py): заранее создаём от app, иначе свежий
+# volume монтируется root-овым и API не может писать превью.
+RUN chmod +x docker/entrypoint.sh && mkdir -p /app/thumbs && chown -R app:app /app
 USER app
 
 ENTRYPOINT ["docker/entrypoint.sh"]
