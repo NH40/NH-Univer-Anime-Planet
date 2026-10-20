@@ -4,8 +4,11 @@
 {$DOMAIN} {
 	encode gzip
 
+	# Полное имя контейнера, НЕ короткое `api`: этот caddy состоит и в общей сети `edge`, где у API
+	# LookismBattlePlanet тоже есть псевдоним `api` — короткое имя резолвилось в чужой API, и Mini App
+	# UAP получал 404 на все запросы (сломалось с выкладкой LBP 2.0, исправлено 2026-10-20).
 	handle /api/* {
-		reverse_proxy api:8000
+		reverse_proxy universe-anime-planet-api-1:8000
 	}
 
 	handle /cards/* {
