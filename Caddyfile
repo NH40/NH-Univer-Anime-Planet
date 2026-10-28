@@ -56,3 +56,17 @@ lbp.universanimeplanet.ru {
 		reverse_proxy lookism_web:80
 	}
 }
+
+# Третий сайт — BTF (менеджмент команды, проект NH-BTFChat). Те же правила, что у LBP:
+# `btf_api`/`btf_web` — имена контейнеров BTF в общей сети `edge`.
+btf.universanimeplanet.ru {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy btf_api:8000
+	}
+
+	handle {
+		reverse_proxy btf_web:80
+	}
+}
