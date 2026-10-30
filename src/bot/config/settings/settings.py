@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # донат идёт только картой через Telegram, как раньше.
     yookassa_shop_id: str = ""
     yookassa_secret_key: str = ""
+    # Магазин ЮKassa общий с LookismBattlePlanet, а адрес уведомлений в кабинете один — на
+    # этот API. Уведомления о платежах LBP переотправляются по этому адресу (вебхук LBP),
+    # чтобы там зачислялось сразу. Пусто — LBP зачислит своей фоновой проверкой (до минуты).
+    yookassa_forward_url: str = ""
 
     log_level: str = "INFO"
     tz: str = "Europe/Moscow"

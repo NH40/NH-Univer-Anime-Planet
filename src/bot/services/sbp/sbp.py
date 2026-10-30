@@ -15,6 +15,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+import aiohttp
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineKeyboardMarkup
@@ -126,9 +127,30 @@ async def announce(bot: Bot, result: Settled) -> None:
 async def handle_notification(session: AsyncSession, bot: Bot, payment_id: str) -> None:
     """Вебхук ЮKassa: перечитать платёж по id и применить. YooKassaError пробрасывается —
     API ответит 5xx, и ЮKassa повторит уведомление позже."""
-    result = await settle(session, await get_payment(payment_id))
+    payment = await get_payment(payment_id)
+    if payment.metadata.get("bot") not in (None, SBP_METADATA_BOT):
+        await _forward(payment_id)
+        return
+    result = await settle(session, payment)
     if result is not None:
         await announce(bot, result)
+
+
+async def _forward(payment_id: str) -> None:
+    """Платёж другого бота с общего магазина (в кабинете ЮKassa один адрес уведомлений на
+    магазин) — переотправить его id во вебхук того бота, чтобы он зачислил сразу, а не ждал
+    свою фоновую проверку. Передаём только id: получатель перечитывает платёж из API сам.
+    Сбой — не беда: платёж всё равно подхватит фоновая проверка того бота."""
+    url = get_settings().yookassa_forward_url
+    if not url:
+        return
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as http:
+            async with http.post(url, json={"type": "notification", "object": {"id": payment_id}}) as resp:
+                if resp.status >= 400:
+                    log.warning("SBP forward %s -> %s: HTTP %s", payment_id, url, resp.status)
+    except (aiohttp.ClientError, TimeoutError) as exc:
+        log.warning("SBP forward %s -> %s: %s", payment_id, url, exc)
 
 
 async def sweep(bot: Bot, session_factory: async_sessionmaker[AsyncSession]) -> None:
