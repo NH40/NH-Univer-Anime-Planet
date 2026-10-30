@@ -10,6 +10,7 @@ from bot.db.models.payment import Payment
 from bot.db.models.promocode import PromoCode, PromoRedemption
 from bot.db.models.quest import DailyQuest
 from bot.db.models.referral import ReferralLink, ReferralVisit
+from bot.db.models.sbp_payment import SbpPayment
 from bot.db.models.season import Season
 from bot.db.models.transaction import Transaction
 from bot.db.models.universe import Universe
@@ -38,6 +39,7 @@ __all__ = [
     "PromoRedemption",
     "ReferralLink",
     "ReferralVisit",
+    "SbpPayment",
     "Season",
     "Transaction",
     "Universe",

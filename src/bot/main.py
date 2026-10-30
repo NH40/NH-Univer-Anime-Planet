@@ -23,6 +23,8 @@ from bot.middlewares.db_session import DbSessionMiddleware
 from bot.middlewares.tech_mode import TechModeMiddleware
 from bot.middlewares.throttling import ThrottlingMiddleware
 from bot.services.notify import SWEEP_INTERVAL_SECONDS, run_sweep
+from bot.services import sbp as sbp_service
+from bot.config.game import SBP_POLL_INTERVAL_SECONDS
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +46,17 @@ async def _notify_sweep_loop(bot: Bot, session_factory: async_sessionmaker[Async
         except Exception:
             log.exception("Notify sweep failed")
         await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
+
+
+async def _sbp_sweep_loop(bot: Bot, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    """Страховка к вебхуку ЮKassa (СБП): раз в минуту спросить статус незакрытых свежих
+    счетов (services/sbp.sweep). Без ключей ЮKassa цикл не запускается."""
+    while True:
+        try:
+            await sbp_service.sweep(bot, session_factory)
+        except Exception:
+            log.exception("SBP sweep failed")
+        await asyncio.sleep(SBP_POLL_INTERVAL_SECONDS)
 
 
 async def main() -> None:
@@ -88,6 +101,7 @@ async def main() -> None:
     dp.include_routers(*get_routers())
 
     sweep_task = asyncio.create_task(_notify_sweep_loop(bot, session_factory, redis))
+    sbp_task = asyncio.create_task(_sbp_sweep_loop(bot, session_factory)) if sbp_service.enabled() else None
 
     try:
         log.info("Starting bot polling")
@@ -97,6 +111,8 @@ async def main() -> None:
         # нельзя переиспользовать `session` запроса — та закрывается вместе с хендлером.
         await dp.start_polling(bot, redis=redis, session_factory=session_factory)
     finally:
+        if sbp_task is not None:
+            sbp_task.cancel()
         sweep_task.cancel()
         try:
             await sweep_task

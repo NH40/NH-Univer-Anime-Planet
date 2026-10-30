@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     # ЮKassa напрямую — оплата идёт через sendInvoice/pre_checkout_query, без отдельного
     # вебхука от ЮKassa (см. CLAUDE.md, "Донат").
     yookassa_provider_token: str = ""
+    # СБП (2026-10-30) — прямое API ЮKassa, отдельно от формы Telegram выше: shopId и
+    # секретный ключ из кабинета ЮKassa (Интеграция → Ключи API). Пусто — кнопки СБП нет,
+    # донат идёт только картой через Telegram, как раньше.
+    yookassa_shop_id: str = ""
+    yookassa_secret_key: str = ""
 
     log_level: str = "INFO"
     tz: str = "Europe/Moscow"
